@@ -1,6 +1,7 @@
 
 #include <stdio.h>
-#include "cpu.h"
+#include <stdlib.h>
+#include "src/cpu.h"
 
 int main(void) {
 
