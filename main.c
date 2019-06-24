@@ -3,34 +3,18 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "main.h"
 #include "src/cpu.h"
 #include "utilities.h"
 
 #define MAX_INPUT_LENGTH 1024
 
-// The contents of the ROM, loaded to memory
-uint8_t * ROM;
-// The global ptr to the CPU emulator
-cpu * CPU;
-
-// initialize all the registers, interrupts etc
-void create_cpu(cpu * cpu, peripherals * peripherals);
-// The main cpu runtime
-void start_cpu(cpu * cpu);
-// destroys the cpu
-void free_cpu(cpu * cpu);
-// create some common peripherals like RAM
-peripherals* create_peripherals(uint16_t num_bytes_memory);
-// copies a program into the main memory from start_loc. Returns true if succeeded.
-bool load_program(uint8_t * program, uint16_t program_size, 
-        uint8_t * memory, uint16_t memory_size, uint16_t start_loc);
-// dispatches execution of instructions, and updates flags
-void dispatch_instr_exec(cpu * cpu, uint16_t instr_addr);
-
 int main(void) {
     
     FILE * rom_fptr;
     char * rom_loc = malloc(sizeof(char) * MAX_INPUT_LENGTH);
+    uint8_t * ROM;
+    uint16_t ROM_SIZE;
     
     printf("Enter ROM location: ");
     get_string_safely(rom_loc, MAX_INPUT_LENGTH);
@@ -47,7 +31,7 @@ int main(void) {
     
     // Get the file length
     fseek(rom_fptr, 0, SEEK_END);
-    uint16_t ROM_SIZE = ftell(rom_fptr);
+    ROM_SIZE = ftell(rom_fptr);
     rewind(rom_fptr);
     
     // Read the entire file into memory
@@ -59,7 +43,7 @@ int main(void) {
     
     // --------------------- Create a new cpu --------------------
     
-    CPU = (struct cpu *) malloc(sizeof (cpu));
+    cpu * CPU = (struct cpu *) malloc(sizeof (cpu));
     
     // Initialize common peripherals
     peripherals * peripherals = create_peripherals((uint16_t)HIGHEST_ADDR);
