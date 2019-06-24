@@ -18,10 +18,10 @@ void start_cpu(cpu * cpu);
 // destroys the cpu
 void free_cpu(cpu * cpu);
 // create some common peripherals like RAM
-peripherals* create_peripherals(uint16_t num_bytes_memory);
+peripherals* create_peripherals(uint16_t highest_memory_addr);
 // copies a program into the main memory from start_loc. Returns true if succeeded.
 bool load_program(uint8_t * program, uint16_t program_size, 
-        uint8_t * memory, uint16_t memory_size, uint16_t start_loc);
+        uint8_t * memory, uint16_t highest_memory_addr, uint16_t start_loc);
 // dispatches execution of instructions, and updates flags
 void dispatch_instr_exec(cpu * cpu, uint16_t instr_addr);
 

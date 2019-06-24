@@ -6,6 +6,7 @@
 #include "main.h"
 #include "src/cpu.h"
 #include "utilities.h"
+#include "opcodes.h"
 
 #define MAX_INPUT_LENGTH 1024
 
@@ -48,7 +49,7 @@ int main(void) {
     // Initialize common peripherals
     peripherals * peripherals = create_peripherals((uint16_t)HIGHEST_ADDR);
     
-    if (load_program(ROM, ROM_SIZE, peripherals->memory, peripherals->memory_size, 0x0)) {
+    if (load_program(ROM, ROM_SIZE, peripherals->memory, peripherals->highest_mem_addr, 0x0)) {
         // program loading succeeded
         create_cpu(CPU, peripherals);
         start_cpu(CPU);
@@ -65,13 +66,13 @@ void dispatch_instr_exec(cpu * cpu, uint16_t instr_addr) {
 }
 
 void create_cpu(cpu * cpu, peripherals * peripherals) {
-    // blank the registers
+    // blank the registers    
     cpu->A = cpu->B = cpu->C = cpu->D = cpu->E = cpu->H = cpu->L = 0x0;
     
     // initialize stack, peripherals
     cpu->peripherals = peripherals;
     if (peripherals != NULL) {
-        cpu->SP = peripherals->memory_size - 1;
+        cpu->SP = peripherals->highest_mem_addr;
     }
     
     cpu->PC = 0x0;
@@ -96,19 +97,20 @@ void start_cpu(cpu * cpu) {
     
 }
 
-peripherals* create_peripherals(uint16_t num_bytes_memory) {
+peripherals* create_peripherals(uint16_t highest_memory_addr) {
     peripherals * peripherals = (struct peripherals *)malloc(sizeof(peripherals));
     // Allocate num_bytes_mem bytes of working CPU memory
+    int num_bytes_memory = (int)highest_memory_addr + 1;
     peripherals->memory = (uint8_t *)malloc(sizeof(uint8_t) * num_bytes_memory);
-    peripherals->memory_size = num_bytes_memory;
+    peripherals->highest_mem_addr = highest_memory_addr;
     return peripherals;
 }
 
 bool load_program(uint8_t * program, uint16_t program_size, 
-        uint8_t * memory, uint16_t memory_size, uint16_t loc) {
+        uint8_t * memory, uint16_t highest_memory_addr, uint16_t loc) {
     // copy the program into memory, making sure not to go over bounds
     for (uint16_t i = 0; i < program_size; ++i) {
-        if (loc < memory_size) {
+        if (loc <= highest_memory_addr) {
             memory[loc++] = program[i];
         } else {
             return false;

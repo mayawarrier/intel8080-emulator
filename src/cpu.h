@@ -15,7 +15,7 @@ typedef enum flag {
 
 typedef struct peripherals {
     uint8_t * memory;
-    uint16_t memory_size; // in bytes
+    uint16_t highest_mem_addr;
 } peripherals;
 
 typedef struct cpu {
