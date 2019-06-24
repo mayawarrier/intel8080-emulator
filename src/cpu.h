@@ -11,6 +11,13 @@ typedef enum flag {
     FLAG_SIGN = 7
 } flag;
 
+#define HIGHEST_ADDR 65535
+
+typedef struct peripherals {
+    uint8_t * memory;
+    uint16_t memory_size; // in bytes
+} peripherals;
+
 typedef struct cpu {
     // registers
     uint8_t A;
@@ -28,6 +35,9 @@ typedef struct cpu {
     uint8_t instr_buf;
     uint16_t addr_buf;
     uint8_t data_buf;
+    
+    // common peripherals
+    peripherals * peripherals;
 } cpu;
 
 void set_flag(cpu * cpu, flag flag) {
