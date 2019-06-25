@@ -146,78 +146,78 @@
 #define MOV_A_A 0x7f      /*      1                    A <- A                               5    */
 
 // ------- Arithmetic ----------
-#define ADD_B 0x80
-#define ADD_C 0x81
-#define ADD_D 0x82
-#define ADD_E 0x83
-#define ADD_H 0x84
-#define ADD_L 0x85
-#define ADD_M 0x86
-#define ADD_A 0x87
+#define ADD_B 0x80        /*      1       Z,S,P,CY,AC  A <- A + B                           4    */
+#define ADD_C 0x81        /*      1       Z,S,P,CY,AC  A <- A + C                           4    */
+#define ADD_D 0x82        /*      1       Z,S,P,CY,AC  A <- A + D                           4    */
+#define ADD_E 0x83        /*      1       Z,S,P,CY,AC  A <- A + E                           4    */
+#define ADD_H 0x84        /*      1       Z,S,P,CY,AC  A <- A + H                           4    */
+#define ADD_L 0x85        /*      1       Z,S,P,CY,AC  A <- A + L                           4    */
+#define ADD_M 0x86        /*      1       Z,S,P,CY,AC  A <- A + [HL]                        7    */
+#define ADD_A 0x87        /*      1       Z,S,P,CY,AC  A <- A + A                           4    */
 
-#define ADC_B 0x88
-#define ADC_C 0x89
-#define ADC_D 0x8a
-#define ADC_E 0x8b
-#define ADC_H 0x8c
-#define ADC_L 0x8d
-#define ADC_M 0x8e
-#define ADC_A 0x8f
+#define ADC_B 0x88        /*      1       Z,S,P,CY,AC  A <- A + B + CY                      4    */
+#define ADC_C 0x89        /*      1       Z,S,P,CY,AC  A <- A + C + CY                      4    */
+#define ADC_D 0x8a        /*      1       Z,S,P,CY,AC  A <- A + D + CY                      4    */
+#define ADC_E 0x8b        /*      1       Z,S,P,CY,AC  A <- A + E + CY                      4    */
+#define ADC_H 0x8c        /*      1       Z,S,P,CY,AC  A <- A + H + CY                      4    */
+#define ADC_L 0x8d        /*      1       Z,S,P,CY,AC  A <- A + L + CY                      4    */
+#define ADC_M 0x8e        /*      1       Z,S,P,CY,AC  A <- A + [HL] + CY                   7    */
+#define ADC_A 0x8f        /*      1       Z,S,P,CY,AC  A <- A + A + CY                      4    */
 
-#define SUB_B 0x90
-#define SUB_C 0x91
-#define SUB_D 0x92
-#define SUB_E 0x93
-#define SUB_H 0x94
-#define SUB_L 0x95
-#define SUB_M 0x96
-#define SUB_A 0x97
+#define SUB_B 0x90        /*      1       Z,S,P,CY,AC  A <- A - B                           4    */
+#define SUB_C 0x91        /*      1       Z,S,P,CY,AC  A <- A - C                           4    */
+#define SUB_D 0x92        /*      1       Z,S,P,CY,AC  A <- A - D                           4    */
+#define SUB_E 0x93        /*      1       Z,S,P,CY,AC  A <- A - E                           4    */
+#define SUB_H 0x94        /*      1       Z,S,P,CY,AC  A <- A - H                           4    */
+#define SUB_L 0x95        /*      1       Z,S,P,CY,AC  A <- A - L                           4    */
+#define SUB_M 0x96        /*      1       Z,S,P,CY,AC  A <- A - [HL]                        7    */
+#define SUB_A 0x97        /*      1       Z,S,P,CY,AC  A <- A - A                           4    */
 
-#define SBB_B 0x98
-#define SBB_C 0x99
-#define SBB_D 0x9a
-#define SBB_E 0x9b
-#define SBB_H 0x9c
-#define SBB_L 0x9d
-#define SBB_M 0x9e
-#define SBB_A 0x9f
+#define SBB_B 0x98        /*      1       Z,S,P,CY,AC  A <- A - B - CY                      4    */
+#define SBB_C 0x99        /*      1       Z,S,P,CY,AC  A <- A - C - CY                      4    */
+#define SBB_D 0x9a        /*      1       Z,S,P,CY,AC  A <- A - D - CY                      4    */
+#define SBB_E 0x9b        /*      1       Z,S,P,CY,AC  A <- A - E - CY                      4    */
+#define SBB_H 0x9c        /*      1       Z,S,P,CY,AC  A <- A - H - CY                      4    */
+#define SBB_L 0x9d        /*      1       Z,S,P,CY,AC  A <- A - L - CY                      4    */
+#define SBB_M 0x9e        /*      1       Z,S,P,CY,AC  A <- A - [HL] - CY                   7    */
+#define SBB_A 0x9f        /*      1       Z,S,P,CY,AC  A <- A - A - CY                      4    */
 
 // ------- Logical ----------
-#define ANA_B 0xa0
-#define ANA_C 0xa1
-#define ANA_D 0xa2
-#define ANA_E 0xa3
-#define ANA_H 0xa4
-#define ANA_L 0xa5
-#define ANA_M 0xa6
-#define ANA_A 0xa7
+#define ANA_B 0xa0        /*      1       Z,S,P,CY,AC  A <- A & B                           4    */
+#define ANA_C 0xa1        /*      1       Z,S,P,CY,AC  A <- A & C                           4    */
+#define ANA_D 0xa2        /*      1       Z,S,P,CY,AC  A <- A & D                           4    */
+#define ANA_E 0xa3        /*      1       Z,S,P,CY,AC  A <- A & E                           4    */
+#define ANA_H 0xa4        /*      1       Z,S,P,CY,AC  A <- A & H                           4    */
+#define ANA_L 0xa5        /*      1       Z,S,P,CY,AC  A <- A & L                           4    */
+#define ANA_M 0xa6        /*      1       Z,S,P,CY,AC  A <- A & [HL]                        7    */
+#define ANA_A 0xa7        /*      1       Z,S,P,CY,AC  A <- A & A                           4    */
 
-#define XRA_B 0xa8
-#define XRA_C 0xa9
-#define XRA_D 0xaa
-#define XRA_E 0xab
-#define XRA_H 0xac
-#define XRA_L 0xad
-#define XRA_M 0xae
-#define XRA_A 0xaf
+#define XRA_B 0xa8        /*      1       Z,S,P,CY,AC  A <- A ^ B                           4    */
+#define XRA_C 0xa9        /*      1       Z,S,P,CY,AC  A <- A ^ C                           4    */
+#define XRA_D 0xaa        /*      1       Z,S,P,CY,AC  A <- A ^ D                           4    */
+#define XRA_E 0xab        /*      1       Z,S,P,CY,AC  A <- A ^ E                           4    */
+#define XRA_H 0xac        /*      1       Z,S,P,CY,AC  A <- A ^ H                           4    */
+#define XRA_L 0xad        /*      1       Z,S,P,CY,AC  A <- A ^ L                           4    */
+#define XRA_M 0xae        /*      1       Z,S,P,CY,AC  A <- A ^ [HL]                        7    */
+#define XRA_A 0xaf        /*      1       Z,S,P,CY,AC  A <- A ^ A                           4    */
 
-#define ORA_B 0xb0
-#define ORA_C 0xb1
-#define ORA_D 0xb2
-#define ORA_E 0xb3
-#define ORA_H 0xb4
-#define ORA_L 0xb5
-#define ORA_M 0xb6
-#define ORA_A 0xb7
+#define ORA_B 0xb0        /*      1       Z,S,P,CY,AC  A <- A | B                           4    */
+#define ORA_C 0xb1        /*      1       Z,S,P,CY,AC  A <- A | C                           4    */
+#define ORA_D 0xb2        /*      1       Z,S,P,CY,AC  A <- A | D                           4    */
+#define ORA_E 0xb3        /*      1       Z,S,P,CY,AC  A <- A | E                           4    */
+#define ORA_H 0xb4        /*      1       Z,S,P,CY,AC  A <- A | H                           4    */
+#define ORA_L 0xb5        /*      1       Z,S,P,CY,AC  A <- A | L                           4    */
+#define ORA_M 0xb6        /*      1       Z,S,P,CY,AC  A <- A | [HL]                        7    */
+#define ORA_A 0xb7        /*      1       Z,S,P,CY,AC  A <- A | A                           4    */
 
-#define CMP_B 0xb8
-#define CMP_C 0xb9
-#define CMP_D 0xba
-#define CMP_E 0xbb
-#define CMP_H 0xbc
-#define CMP_L 0xbd
-#define CMP_M 0xbe
-#define CMP_A 0xbf
+#define CMP_B 0xb8        /*      1       Z,S,P,CY,AC  A - B                                4    */
+#define CMP_C 0xb9        /*      1       Z,S,P,CY,AC  A - C                                4    */
+#define CMP_D 0xba        /*      1       Z,S,P,CY,AC  A - D                                4    */
+#define CMP_E 0xbb        /*      1       Z,S,P,CY,AC  A - E                                4    */
+#define CMP_H 0xbc        /*      1       Z,S,P,CY,AC  A - H                                4    */
+#define CMP_L 0xbd        /*      1       Z,S,P,CY,AC  A - L                                4    */
+#define CMP_M 0xbe        /*      1       Z,S,P,CY,AC  A - [HL]                             7    */
+#define CMP_A 0xbf        /*      1       Z,S,P,CY,AC  A - A                                4    */
 
 // --- Subroutines, stack, conditionals, I/O -----
 #define RNZ 0xc0
