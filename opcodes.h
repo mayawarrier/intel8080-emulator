@@ -10,47 +10,49 @@
 
 #ifndef OPCODES_H
 #define OPCODES_H
+                          /*    size       flags       details                           cycles  */
+#define NOP 0x00          /*      1                    no operation                         4    */
+#define LXI_B 0x01        /*      3                    B <- byte 3, C <- byte 2             10   */
+#define STAX_B 0x02       /*      1                    [BC] <- A                            7    */
+#define INX_B 0x03        /*      1                    BC <- BC + 1                         5    */
+#define INR_B 0x04        /*      1       Z,S,P,AC     B <- B + 1                           5    */
+#define DCR_B 0x05        /*      1       Z,S,P,AC     B <- B - 1                           5    */
+#define MVI_B 0x06        /*      2                    B <- byte 2                          7    */
+#define RLC 0x07          /*      1       CY           CY <- bit 7, A = A << 1              4    */
 
-#define NOP 0x00
-#define LXI_B 0x01
-#define STAX_B 0x02
-#define INX_B 0x03
-#define INR_B 0x04
-#define DCR_B 0x05
-#define MVI_B 0x06
-#define RLC 0x07
+#define DAD_B 0x09        /*      1       CY           HL <- HL + BC                        10   */
+#define LDAX_B 0x0a       /*      1                    A <- [BC]                            7    */
+#define DCX_B 0x0b        /*      1                    BC <- BC - 1                         5    */
+#define INR_C 0x0c        /*      1       Z,S,P,AC     C <- C + 1                           5    */
+#define DCR_C 0x0d        /*      1       Z,S,P,AC     C <- C - 1                           5    */
+#define MVI_C 0x0e        /*      2                    C <- byte 2                          7    */
+#define RRC 0x0f          /*      1       CY           CY <- bit 0, A = A >> 1              4    */
 
-#define DAD_B 0x09
-#define LDAX_B 0x0a
-#define DCX_B 0x0b
-#define INR_C 0x0c
-#define DCR_C 0x0d
-#define MVI_C 0x0e
-#define RRC 0x0f
+#define LXI_D 0x11        /*      3                    D <- byte 3, E <- byte 2             10   */
+#define STAX_D 0x12       /*      1                    [DE] <- A                            7    */
+#define INX_D 0x13        /*      1                    DE <- DE + 1                         5    */
+#define INR_D 0x14        /*      1       Z,S,P,AC     D <- D + 1                           5    */
+#define DCR_D 0x15        /*      1       Z,S,P,AC     D <- D - 1                           5    */
+#define MVI_D 0x16        /*      2                    D <- byte 2                          7    */
+#define RAL 0x17          /*      1       CY           A = A << 1 through carry             4    */
 
-#define LXI_D 0x11
-#define STAX_D 0x12
-#define INX_D 0x13
-#define INR_D 0x14
-#define DCR_D 0x15
-#define MVI_D 0x16
-#define RAL 0x17
+#define DAD_D 0x19        /*      1       CY           HL <- HL + DE                        10   */
+#define LDAX_D 0x1a       /*      1                    A <- [DE]                            7    */
+#define DCX_D 0x1b        /*      1                    DE <- DE - 1                         5    */
+#define INR_E 0x1c        /*      1       Z,S,P,AC     E <- E + 1                           5    */
+#define DCR_E 0x1d        /*      1       Z,S,P,AC     E <- E - 1                           5    */
+#define MVI_E 0x1e        /*      2                    E <- byte 2                          7    */
+#define RAR 0x1f          /*      1       CY           A = A >> 1 through carry             4    */
 
-#define DAD_D 0x19
-#define LDAX_D 0x1a
-#define DCX_D 0x1b
-#define INR_E 0x1c
-#define DCR_E 0x1d
-#define MVI_E 0x1e
-#define RAR 0x1f
-
-#define LXI_H 0x21
-#define SHLD 0x22
-#define INX_H 0x23
-#define INR_H 0x24
-#define DCR_H 0x25
-#define MVI_H 0x26
-#define DAA 0x27
+#define LXI_H 0x21        /*      3                    H <- byte 3, L <- byte 2             10   */
+#define SHLD 0x22         /*      3                    [adr] <- L, [adr + 1] <- H           16   */
+#define INX_H 0x23        /*      1                    HL <- HL + 1                         5    */
+#define INR_H 0x24        /*      1       Z,S,P,AC     H <- H + 1                           5    */
+#define DCR_H 0x25        /*      1       Z,S,P,AC     H <- H - 1                           5    */
+#define MVI_H 0x26        /*      2                    H <- byte 2                          7    */
+#define DAA 0x27          /*      1       Z,S,P,AC     A to BCD, add 6 to lower nibble      
+                                                       if AC or > 9, add 6 to higher
+                                                       nibble if CY or > 9                  4    */
 
 #define DAD_H 0x29
 #define LHLD 0x2a
