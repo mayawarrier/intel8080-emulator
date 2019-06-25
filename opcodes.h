@@ -4,7 +4,13 @@
  * 
  * All the opcodes in the INTEL 8080.
  * Roughly categorized by instruction type.
+ * 
+ * Cycle counts with _/_ indicate:
+ * - left is the cycle count if the action is taken
+ * - right is the cycle count if the action is not taken
  *
+ * Missing opcodes are alternatives for existing ones.
+ * 
  * Created on June 23, 2019, 11:02 PM
  */
 
@@ -220,69 +226,69 @@
 #define CMP_A 0xbf        /*      1       Z,S,P,CY,AC  A - A                                4    */
 
 // --- Subroutines, stack, conditionals, I/O -----
-#define RNZ 0xc0
-#define POP_B 0xc1
-#define JNZ 0xc2
-#define JMP 0xc3
-#define CNZ 0xc4
-#define PUSH_B 0xc5
-#define ADI 0xc6
-#define RST_0 0xc7
-#define RZ 0xc8
-#define RET 0xc9
-#define JZ 0xca
+#define RNZ 0xc0          /*      1                    if NZ, perform RET                   11/5 */
+#define POP_B 0xc1        /*      1                    BC = {[SP + 1], [SP]}, SP <- SP + 2  10   */
+#define JNZ 0xc2          /*      3                    if NZ, PC <- adr                     10   */
+#define JMP 0xc3          /*      3                    PC <- adr                            10   */
+#define CNZ 0xc4          /*      3                    if NZ, CALL adr                      17/11*/
+#define PUSH_B 0xc5       /*      1                    {[SP-1],[SP-2]}={B,C}, SP <- SP - 2  11   */
+#define ADI 0xc6          /*      2       Z,S,P,CY,AC  A <- A + byte 2                      7    */
+#define RST_0 0xc7        /*      1                    CALL $0 interrupt vector             11   */
+#define RZ 0xc8           /*      1                    if Z, perform RET                    11/5 */
+#define RET 0xc9          /*      1                    PC = {[SP + 1], [SP]}, SP <- SP + 2  10   */
+#define JZ 0xca           /*      3                    if Z, perform JMP                    10   */
 
-#define CZ 0xcc
-#define CALL 0xcd
-#define ACI 0xce
-#define RST_1 0xcf
-#define RNC 0xd0
-#define POP_D 0xd1
-#define JNC 0xd2
-#define OUT 0xd3
-#define CNC 0xd4
-#define PUSH_D 0xd5
-#define SUI 0xd6
-#define RST_2 0xd7
-#define RC 0xd8
+#define CZ 0xcc           /*      3                    if Z, CALL adr                       17/11*/
+#define CALL 0xcd         /*      3                    PUSH PC, PC <- adr                   17   */
+#define ACI 0xce          /*      2       Z,S,P,CY,AC  A <- A + byte 2 + CY                 7    */
+#define RST_1 0xcf        /*      1                    CALL $8 interrupt vector             11   */
+#define RNC 0xd0          /*      1                    if NCY, perform RET                  11/5 */
+#define POP_D 0xd1        /*      1                    DE = {[SP + 1], [SP]}, SP <- SP + 2  10   */
+#define JNC 0xd2          /*      3                    if NCY, perform JMP                  10   */
+#define OUT 0xd3          /*      2                    Serial I/O out, byte 2 is 8-bit adr  10   */
+#define CNC 0xd4          /*      3                    if NCY, CALL adr                     17/11*/
+#define PUSH_D 0xd5       /*      1                    {[SP-1],[SP-2]}={D,E}, SP <- SP - 2  11   */
+#define SUI 0xd6          /*      2       Z,S,P,CY,AC  A <- A - byte 2                      7    */
+#define RST_2 0xd7        /*      1                    CALL $10 interrupt vector            11   */
+#define RC 0xd8           /*      1                    if CY, perform RET                   11/5 */
 
-#define JC 0xda
-#define IN 0xdb
-#define CC 0xdc
+#define JC 0xda           /*      3                    if CY, perform JMP                   10   */
+#define IN 0xdb           /*      2                    Serial I/O in, byte 2 is 8-bit adr   10   */
+#define CC 0xdc           /*      3                    if CY, CALL adr                      17/11*/
 
-#define SBI 0xde
-#define RST_3 0xdf
-#define RPO 0xe0
-#define POP_H 0xe1
-#define JPO 0xe2
-#define XTHL 0xe3
-#define CPO 0xe4
-#define PUSH_H 0xe5
-#define ANI 0xe6
-#define RST_4 0xe7
-#define RPE 0xe8
-#define PCHL 0xe9
-#define JPE 0xea
-#define XCHG 0xeb
-#define CPE 0xec
+#define SBI 0xde          /*      2       Z,S,P,CY,AC  A <- A - byte 2 - CY                 7    */
+#define RST_3 0xdf        /*      1                    CALL $18 interrupt vector            11   */
+#define RPO 0xe0          /*      1                    if P odd, perform RET                11/5 */
+#define POP_H 0xe1        /*      1                    HL = {[SP + 1], [SP]}, SP <- SP + 2  10   */
+#define JPO 0xe2          /*      3                    if P odd, perform JMP                10   */
+#define XTHL 0xe3         /*      1                    HL <-> {[SP + 1], [SP]}              18   */
+#define CPO 0xe4          /*      3                    if P odd, CALL adr                   17/11*/
+#define PUSH_H 0xe5       /*      1                    {[SP-1],[SP-2]}={H,L}, SP <- SP - 2  11   */
+#define ANI 0xe6          /*      2       Z,S,P,CY,AC  A <- A & byte 2                      7    */
+#define RST_4 0xe7        /*      1                    CALL $20 interrupt vector            11   */
+#define RPE 0xe8          /*      1                    if P even, perform RET               11/5 */
+#define PCHL 0xe9         /*      1                    PC <- HL                             5    */
+#define JPE 0xea          /*      3                    if P even, perform JMP               10   */
+#define XCHG 0xeb         /*      1                    HL <-> DE                            5    */
+#define CPE 0xec          /*      3                    if P even, CALL adr                  17/11*/
 
-#define XRI 0xee
-#define RST_5 0xef
-#define RP 0xf0
-#define POP_PSW 0xf1
-#define JP 0xf2
-#define DI 0xf3
-#define CP 0xf4
-#define PUSH_PSW 0xf5
-#define ORI 0xf6
-#define RST_6 0xf7
-#define RM 0xf8
-#define SPHL 0xf9
-#define JM 0xfa
-#define EI 0xfb
-#define CM 0xfc
+#define XRI 0xee          /*      2       Z,S,P,CY,AC  A <- A ^ byte 2                      7    */
+#define RST_5 0xef        /*      1                    CALL $28 interrupt vector            11   */
+#define RP 0xf0           /*      1                    if !S i.e. positive, perform RET     11/5 */
+#define POP_PSW 0xf1      /*      1                    {A,flags}={[SP+1],[SP]},SP<-SP+2     10   */
+#define JP 0xf2           /*      3                    if !S i.e. positive, perform JMP     10   */
+#define DI 0xf3           /*      1                    disable interrupts,clr interrupt bit 4    */
+#define CP 0xf4           /*      3                    if !S i.e. positive, CALL adr        17/11*/
+#define PUSH_PSW 0xf5     /*      1                    {[SP-1],[SP-2]}={A,flags}, SP<-SP-2  11   */
+#define ORI 0xf6          /*      2       Z,S,P,CY,AC  A <- A | byte 2                      7    */
+#define RST_6 0xf7        /*      1                    CALL $30 interrupt vector            11   */
+#define RM 0xf8           /*      1                    if S i.e. negative, perform RET      11/5 */
+#define SPHL 0xf9         /*      1                    SP <- HL                             5    */
+#define JM 0xfa           /*      3                    if S i.e. negative, perform JMP      10   */
+#define EI 0xfb           /*      1                    enable interrupts, set interrupt bit 4    */
+#define CM 0xfc           /*      3                    if S i.e. negative, CALL adr         17/11*/
 
-#define CPI 0xfe
-#define RST_7 0xff
+#define CPI 0xfe          /*      2       Z,S,P,CY,AC  A - byte 2                           7    */
+#define RST_7 0xff        /*      1                    CALL $38 interrupt vector            11   */
 
 #endif /* OPCODES_H */
