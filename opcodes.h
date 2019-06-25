@@ -54,95 +54,96 @@
                                                        if AC or > 9, add 6 to higher
                                                        nibble if CY or > 9                  4    */
 
-#define DAD_H 0x29
-#define LHLD 0x2a
-#define DCX_H 0x2b
-#define INR_L 0x2c
-#define DCR_L 0x2d
-#define MVI_L 0x2e
-#define CMA 0x2f
+#define DAD_H 0x29        /*      1       CY           HL <- HL + HL                        10   */
+#define LHLD 0x2a         /*      3                    L <- [adr], H <- [adr + 1]           16   */
+#define DCX_H 0x2b        /*      1                    HL <- HL - 1                         5    */
+#define INR_L 0x2c        /*      1       Z,S,P,AC     L <- L + 1                           5    */
+#define DCR_L 0x2d        /*      1       Z,S,P,AC     L <- L - 1                           5    */
+#define MVI_L 0x2e        /*      2                    L <- byte 2                          7    */
+#define CMA 0x2f          /*      1                    A <- !A                              4    */
 
-#define LXI_SP 0x31
-#define STA 0x32
-#define INX_SP 0x33
-#define INR_M 0x34
-#define DCR_M 0x35
-#define MVI_M 0x36
-#define STC 0x37
+#define LXI_SP 0x31       /*      3                    SP <- {byte 3, byte 2}               10   */
+#define STA 0x32          /*      3                    [adr] <- A                           13   */
+#define INX_SP 0x33       /*      1                    SP <- SP + 1                         5    */
+#define INR_M 0x34        /*      1       Z,S,P,AC     [HL] <- [HL] + 1                     10    */
+#define DCR_M 0x35        /*      1       Z,S,P,AC     [HL] <- [HL] - 1                     10    */
+#define MVI_M 0x36        /*      2                    [HL] <- byte 2                       10    */
+#define STC 0x37          /*      1       CY           CY = 1                               4    */
 
-#define DAD_SP 0x39
-#define LDA 0x3a
-#define DCX_SP 0x3b
-#define INR_A 0x3c
-#define DCR_A 0x3d
-#define MVI_A 0x3e
-#define CMC 0x3f
+#define DAD_SP 0x39       /*      1       CY           HL <- HL + SP                        10   */
+#define LDA 0x3a          /*      3                    A <- [adr]                           13   */
+#define DCX_SP 0x3b       /*      1                    SP <- SP - 1                         5    */
+#define INR_A 0x3c        /*      1       Z,S,P,AC     A <- A + 1                           5    */
+#define DCR_A 0x3d        /*      1       Z,S,P,AC     A <- A - 1                           5    */
+#define MVI_A 0x3e        /*      2                    A <- byte 2                          7    */
+#define CMC 0x3f          /*      1       CY           CY = !CY                             4    */
 
 // --- 8-bit load/store/move -----
-#define MOV_B_B 0x40
-#define MOV_B_C 0x41
-#define MOV_B_D 0x42
-#define MOV_B_E 0x43
-#define MOV_B_H 0x44
-#define MOV_B_L 0x45
-#define MOV_B_M 0x46
-#define MOV_B_A 0x47
-#define MOV_C_B 0x48
-#define MOV_C_C 0x49
-#define MOV_C_D 0x4a
-#define MOV_C_E 0x4b
-#define MOV_C_H 0x4c
-#define MOV_C_L 0x4d
-#define MOV_C_M 0x4e
-#define MOV_C_A 0x4f
-#define MOV_D_B 0x50
-#define MOV_D_C 0x51
-#define MOV_D_D 0x52
-#define MOV_D_E 0x53
-#define MOV_D_H 0x54
-#define MOV_D_L 0x55
-#define MOV_D_M 0x56
-#define MOV_D_A 0x57
-#define MOV_E_B 0x58
-#define MOV_E_C 0x59
-#define MOV_E_D 0x5a
-#define MOV_E_E 0x5b
-#define MOV_E_H 0x5c
-#define MOV_E_L 0x5d
-#define MOV_E_M 0x5e
-#define MOV_E_A 0x5f
-#define MOV_H_B 0x60
-#define MOV_H_C 0x61
-#define MOV_H_D 0x62
-#define MOV_H_E 0x63
-#define MOV_H_H 0x64
-#define MOV_H_L 0x65
-#define MOV_H_M 0x66
-#define MOV_H_A 0x67
-#define MOV_L_B 0x68
-#define MOV_L_C 0x69
-#define MOV_L_D 0x6a
-#define MOV_L_E 0x6b
-#define MOV_L_H 0x6c
-#define MOV_L_L 0x6d
-#define MOV_L_M 0x6e
-#define MOV_L_A 0x6f
-#define MOV_M_B 0x70
-#define MOV_M_C 0x71
-#define MOV_M_D 0x72
-#define MOV_M_E 0x73
-#define MOV_M_H 0x74
-#define MOV_M_L 0x75
-#define HLT 0x76
-#define MOV_M_A 0x77
-#define MOV_A_B 0x78
-#define MOV_A_C 0x79
-#define MOV_A_D 0x7a
-#define MOV_A_E 0x7b
-#define MOV_A_H 0x7c
-#define MOV_A_L 0x7d
-#define MOV_A_M 0x7e
-#define MOV_A_A 0x7f
+#define MOV_B_B 0x40      /*      1                    B <- B                               5    */
+#define MOV_B_C 0x41      /*      1                    B <- C                               5    */
+#define MOV_B_D 0x42      /*      1                    B <- D                               5    */
+#define MOV_B_E 0x43      /*      1                    B <- E                               5    */
+#define MOV_B_H 0x44      /*      1                    B <- H                               5    */
+#define MOV_B_L 0x45      /*      1                    B <- L                               5    */
+#define MOV_B_M 0x46      /*      1                    B <- [HL]                            7    */
+#define MOV_B_A 0x47      /*      1                    B <- A                               5    */
+#define MOV_C_B 0x48      /*      1                    C <- B                               5    */
+#define MOV_C_C 0x49      /*      1                    C <- C                               5    */
+#define MOV_C_D 0x4a      /*      1                    C <- D                               5    */
+#define MOV_C_E 0x4b      /*      1                    C <- E                               5    */
+#define MOV_C_H 0x4c      /*      1                    C <- H                               5    */
+#define MOV_C_L 0x4d      /*      1                    C <- L                               5    */
+#define MOV_C_M 0x4e      /*      1                    C <- [HL]                            7    */
+#define MOV_C_A 0x4f      /*      1                    C <- A                               5    */
+#define MOV_D_B 0x50      /*      1                    D <- B                               5    */
+#define MOV_D_C 0x51      /*      1                    D <- C                               5    */
+#define MOV_D_D 0x52      /*      1                    D <- D                               5    */
+#define MOV_D_E 0x53      /*      1                    D <- E                               5    */
+#define MOV_D_H 0x54      /*      1                    D <- H                               5    */
+#define MOV_D_L 0x55      /*      1                    D <- L                               5    */
+#define MOV_D_M 0x56      /*      1                    D <- [HL]                            7    */
+#define MOV_D_A 0x57      /*      1                    D <- A                               5    */
+#define MOV_E_B 0x58      /*      1                    E <- B                               5    */
+#define MOV_E_C 0x59      /*      1                    E <- C                               5    */
+#define MOV_E_D 0x5a      /*      1                    E <- D                               5    */
+#define MOV_E_E 0x5b      /*      1                    E <- E                               5    */
+#define MOV_E_H 0x5c      /*      1                    E <- H                               5    */
+#define MOV_E_L 0x5d      /*      1                    E <- L                               5    */
+#define MOV_E_M 0x5e      /*      1                    E <- [HL]                            7    */
+#define MOV_E_A 0x5f      /*      1                    E <- A                               5    */
+#define MOV_H_B 0x60      /*      1                    H <- B                               5    */
+#define MOV_H_C 0x61      /*      1                    H <- C                               5    */
+#define MOV_H_D 0x62      /*      1                    H <- D                               5    */
+#define MOV_H_E 0x63      /*      1                    H <- E                               5    */
+#define MOV_H_H 0x64      /*      1                    H <- H                               5    */
+#define MOV_H_L 0x65      /*      1                    H <- L                               5    */
+#define MOV_H_M 0x66      /*      1                    H <- [HL]                            7    */
+#define MOV_H_A 0x67      /*      1                    H <- A                               5    */
+#define MOV_L_B 0x68      /*      1                    L <- B                               5    */
+#define MOV_L_C 0x69      /*      1                    L <- C                               5    */
+#define MOV_L_D 0x6a      /*      1                    L <- D                               5    */
+#define MOV_L_E 0x6b      /*      1                    L <- E                               5    */
+#define MOV_L_H 0x6c      /*      1                    L <- H                               5    */
+#define MOV_L_L 0x6d      /*      1                    L <- L                               5    */
+#define MOV_L_M 0x6e      /*      1                    L <- [HL]                            7    */
+#define MOV_L_A 0x6f      /*      1                    L <- A                               5    */
+#define MOV_M_B 0x70      /*      1                    [HL] <- B                            7    */
+#define MOV_M_C 0x71      /*      1                    [HL] <- B                            7    */
+#define MOV_M_D 0x72      /*      1                    [HL] <- B                            7    */
+#define MOV_M_E 0x73      /*      1                    [HL] <- B                            7    */
+#define MOV_M_H 0x74      /*      1                    [HL] <- B                            7    */
+#define MOV_M_L 0x75      /*      1                    [HL] <- B                            7    */
+#define HLT 0x76          /*      1                    halt, S0, S1 = 0, interrupt
+                                                       brings it out of this state          7    */
+#define MOV_M_A 0x77      /*      1                    [HL] <- B                            7    */
+#define MOV_A_B 0x78      /*      1                    A <- B                               5    */
+#define MOV_A_C 0x79      /*      1                    A <- C                               5    */
+#define MOV_A_D 0x7a      /*      1                    A <- D                               5    */
+#define MOV_A_E 0x7b      /*      1                    A <- E                               5    */
+#define MOV_A_H 0x7c      /*      1                    A <- H                               5    */
+#define MOV_A_L 0x7d      /*      1                    A <- L                               5    */
+#define MOV_A_M 0x7e      /*      1                    A <- [HL]                            7    */
+#define MOV_A_A 0x7f      /*      1                    A <- A                               5    */
 
 // ------- Arithmetic ----------
 #define ADD_B 0x80
