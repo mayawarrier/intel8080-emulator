@@ -1,8 +1,17 @@
-#ifndef I_8080_EMU_H
-#define I_8080_EMU_H
+#ifndef I_8080_H
+#define I_8080_H
 
 #include "types.h"
 #include <stdbool.h>
+
+typedef struct mem_t {
+    // the memory space
+    word_t * mem;
+    // the highest address in this memory space
+    addr_t highest_addr;
+    // how many bytes of this space is occupied by the program
+    addr_t num_prog_bytes;
+} mem_t;
 
 typedef struct i8080 {   
     // registers
@@ -14,18 +23,9 @@ typedef struct i8080 {
     // carry, parity, interrupt enable
     bool s, z, acy, cy, p, ie;
     
+    // Assign the memory before calling init!
+    mem_t * memory;
+    
 } i8080;
 
-typedef struct i8080_mem {
-    // the memory space
-    word_t * mem;
-    // the highest address in this memory space
-    addr_t highest_addr;
-    // how many bytes of this space is occupied by the program
-    addr_t num_prog_bytes;
-} i8080_mem;
-
-// Initializes the CPU
-void i8080_init(i8080 * const cpu);
-
-#endif // I_8080_EMU_H
+#endif // I_8080_H
