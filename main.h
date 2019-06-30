@@ -9,7 +9,7 @@
 #define MAIN_H
 
 #include <stdint.h>
-#include "src/cpu.h"
+#include "src/i8080.h"
 
 // initialize all the registers, interrupts etc
 void create_cpu(cpu * cpu, peripherals * peripherals);
@@ -24,6 +24,9 @@ bool load_program(uint8_t * program, uint16_t program_size,
         uint8_t * memory, uint16_t highest_memory_addr, uint16_t start_loc);
 // dispatches execution of instructions, and updates flags
 void dispatch_instr_exec(cpu * cpu, uint16_t instr_addr);
+
+bool init_memory(i8080_mem * const memory_handle);
+u16 load_file(const char * file_loc, u8 * memory, u16 start_loc);
 
 #endif /* MAIN_H */
 

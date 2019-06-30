@@ -23,6 +23,15 @@ typedef struct i8080 {
     
 } i8080;
 
+typedef struct i8080_mem {
+    // the memory space
+    u8 * mem;
+    // the highest address in this memory space
+    u16 highest_addr;
+    // how many bytes of this space is occupied by the program
+    u16 num_prog_bytes;
+} i8080_mem;
+
 // Initializes the CPU
 void i8080_init(i8080 * const cpu);
 

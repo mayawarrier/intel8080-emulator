@@ -4,43 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "main.h"
-#include "src/cpu.h"
+#include "src/i8080.h"
 #include "utilities.h"
-#include "opcodes.h"
+#include "src/i8080_opcodes.h"
 
-#define MAX_INPUT_LENGTH 1024
-
-int main(void) {
-    
-    FILE * rom_fptr;
-    char * rom_loc = malloc(sizeof(char) * MAX_INPUT_LENGTH);
-    uint8_t * ROM;
-    uint16_t ROM_SIZE;
-    
-    printf("Enter ROM location: ");
-    get_string_safely(rom_loc, MAX_INPUT_LENGTH);
-    
-    rom_fptr = fopen(rom_loc, "rb");
-    
-    if (rom_fptr == NULL) {
-        printf("ROM file read error, quitting.");
-        return -1;
-    } else {
-        printf("ROM file found. Loading to memory...\n");
-        free(rom_loc);
-    }
-    
-    // Get the file length
-    fseek(rom_fptr, 0, SEEK_END);
-    ROM_SIZE = ftell(rom_fptr);
-    rewind(rom_fptr);
-    
-    // Read the entire file into memory
-    ROM = (uint8_t *)malloc(sizeof(uint8_t) * (ROM_SIZE + 1));
-    fread(ROM, 1, ROM_SIZE, rom_fptr);
-    // End the string and close the file
-    ROM[ROM_SIZE] = '\0';
-    fclose(rom_fptr);
+int main(int argc, char ** argv) {
     
     // --------------------- Create a new cpu --------------------
     
@@ -58,7 +26,7 @@ int main(void) {
         free_cpu(CPU);
     }
     
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 void dispatch_instr_exec(cpu * cpu, uint16_t instr_addr) {
@@ -97,24 +65,55 @@ void start_cpu(cpu * cpu) {
     
 }
 
-peripherals* create_peripherals(uint16_t highest_memory_addr) {
-    peripherals * peripherals = (struct peripherals *)malloc(sizeof(peripherals));
-    // Allocate num_bytes_mem bytes of working CPU memory
-    int num_bytes_memory = (int)highest_memory_addr + 1;
-    peripherals->memory = (uint8_t *)malloc(sizeof(uint8_t) * num_bytes_memory);
-    peripherals->highest_mem_addr = highest_memory_addr;
-    return peripherals;
+bool init_memory(i8080_mem * const memory_handle) {
+    // Allocate 64KB
+    memory_handle->mem = (u8 *)malloc(sizeof(u8) * (HIGHEST_ADDR + 1));
+    
+    if (memory_handle->mem == NULL) {
+        printf("Error: Could not allocate enough memory to emulate.");
+        return false;
+    }
+    
+    // Zero out the entire 64 KB
+    memset((void *)memory_handle->mem, 0, HIGHEST_ADDR + 1);
+    // set size
+    memory_handle->highest_addr = HIGHEST_ADDR;
+    
+    return true;
 }
 
-bool load_program(uint8_t * program, uint16_t program_size, 
-        uint8_t * memory, uint16_t highest_memory_addr, uint16_t loc) {
-    // copy the program into memory, making sure not to go over bounds
-    for (uint16_t i = 0; i < program_size; ++i) {
-        if (loc <= highest_memory_addr) {
-            memory[loc++] = program[i];
-        } else {
-            return false;
-        }
+u16 load_file(const char * file_loc, u8 * memory, u16 start_loc) {
+    
+    size_t file_size = 0;
+    
+    FILE * f_ptr = fopen(file_loc, "rb");
+    
+    if (f_ptr == NULL) {
+        printf("Error: file cannot be opened.");
+        return -1;
     }
-    return true;
+    
+    // get the file size
+    fseek(f_ptr, 0, SEEK_END);
+    file_size = ftell(f_ptr);
+    rewind(f_ptr);
+    
+    // check if it can fit into memory
+    if (file_size + start_loc > HIGHEST_ADDR + 1) {
+        printf("Error: file too large.");
+        return -1;
+    }
+    
+    // Attempt to read the entire file
+    size_t bytes_read = fread(&memory[start_loc], sizeof(u8), file_size, f_ptr);
+    
+    if (bytes_read != file_size) {
+        printf("Error: file read failure.");
+        return -1;
+    }
+    
+    printf("Success: %zd bytes read.", bytes_read);
+    
+    fclose(f_ptr);
+    return (int)bytes_read;
 }
