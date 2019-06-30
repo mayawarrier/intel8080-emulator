@@ -1,11 +1,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <stdbool.h>
 #include "main.h"
 #include "src/i8080.h"
-#include "utilities.h"
 #include "src/i8080_opcodes.h"
 
 int main(int argc, char ** argv) {
@@ -67,7 +65,7 @@ void start_cpu(cpu * cpu) {
 
 bool init_memory(i8080_mem * const memory_handle) {
     // Allocate 64KB
-    memory_handle->mem = (u8 *)malloc(sizeof(u8) * (HIGHEST_ADDR + 1));
+    memory_handle->mem = (word_t *)malloc(sizeof(word_t) * (ADDR_T_MAX + 1));
     
     if (memory_handle->mem == NULL) {
         printf("Error: Could not allocate enough memory to emulate.");
@@ -75,14 +73,14 @@ bool init_memory(i8080_mem * const memory_handle) {
     }
     
     // Zero out the entire 64 KB
-    memset((void *)memory_handle->mem, 0, HIGHEST_ADDR + 1);
+    memset((void *)memory_handle->mem, 0, ADDR_T_MAX + 1);
     // set size
-    memory_handle->highest_addr = HIGHEST_ADDR;
+    memory_handle->highest_addr = ADDR_T_MAX;
     
     return true;
 }
 
-u16 load_file(const char * file_loc, u8 * memory, u16 start_loc) {
+addr_t load_file(const char * file_loc, word_t * memory, addr_t start_loc) {
     
     size_t file_size = 0;
     
@@ -99,21 +97,21 @@ u16 load_file(const char * file_loc, u8 * memory, u16 start_loc) {
     rewind(f_ptr);
     
     // check if it can fit into memory
-    if (file_size + start_loc > HIGHEST_ADDR + 1) {
+    if (file_size + start_loc > ADDR_T_MAX + 1) {
         printf("Error: file too large.");
         return -1;
     }
     
     // Attempt to read the entire file
-    size_t bytes_read = fread(&memory[start_loc], sizeof(u8), file_size, f_ptr);
+    size_t words_read = fread(&memory[start_loc], sizeof(word_t), file_size, f_ptr);
     
-    if (bytes_read != file_size) {
+    if (words_read != file_size) {
         printf("Error: file read failure.");
         return -1;
     }
     
-    printf("Success: %zd bytes read.", bytes_read);
+    printf("Success: %zd words read.", words_read);
     
     fclose(f_ptr);
-    return (int)bytes_read;
+    return (addr_t)words_read;
 }

@@ -348,7 +348,7 @@ static const char * DEBUG_DISASSEMBLY_TABLE[] = {
     "rst 6", "rm", "sphl", "jm $", "ei", "cm $", "undocumented", "cpi #", "rst 7"
 };
 
-static const u8 OPCODES_CYCLES[] = {
+static const word_t OPCODES_CYCLES[] = {
 //  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 0
     4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 1
@@ -368,9 +368,7 @@ static const u8 OPCODES_CYCLES[] = {
     5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  // F
 };
 
-#define GET_CYCLES_FAILURE UINT8_MAX
-
-u8 get_cycles_action_taken(u8 opcode) {
+word_t get_cycles_action_taken(word_t opcode) {
     
     if (opcode > 0xff) {
         printf("Error: invalid opcode");
@@ -395,7 +393,7 @@ u8 get_cycles_action_taken(u8 opcode) {
     }
 }
 
-u8 get_cycles_action_not_taken(u8 opcode) {
+word_t get_cycles_action_not_taken(word_t opcode) {
     
     if (opcode > 0xff) {
         printf("Error: invalid opcode");
