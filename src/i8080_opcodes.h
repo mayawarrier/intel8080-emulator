@@ -368,11 +368,11 @@ static const word_t OPCODES_CYCLES[] = {
     5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  // F
 };
 
-word_t get_cycles_action_taken(word_t opcode) {
+static word_t get_cycles_action_taken(word_t opcode) {
     
     if (opcode > 0xff) {
-        printf("Error: invalid opcode");
-        return GET_CYCLES_FAILURE;
+        // invalid opcode
+        return WORD_T_MAX;
     }
     
     // Adjust by 6 if action taken for
@@ -393,11 +393,11 @@ word_t get_cycles_action_taken(word_t opcode) {
     }
 }
 
-word_t get_cycles_action_not_taken(word_t opcode) {
+static word_t get_cycles_action_not_taken(word_t opcode) {
     
     if (opcode > 0xff) {
-        printf("Error: invalid opcode");
-        return GET_CYCLES_FAILURE;
+        // invalid opcode
+        return WORD_T_MAX;
     }
     
     return OPCODES_CYCLES[opcode];
