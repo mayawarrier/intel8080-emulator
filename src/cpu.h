@@ -1,55 +1,29 @@
-#ifndef CPU_H
-#define CPU_H
+#ifndef I_8080_EMU_H
+#define I_8080_EMU_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
-typedef enum flag {
-    FLAG_CARRY = 0,
-    FLAG_PARITY = 2,
-    FLAG_AUX_CARRY = 4,
-    FLAG_ZERO = 6,
-    FLAG_SIGN = 7
-} flag;
-
+// highest memory address allowed
 #define HIGHEST_ADDR 65535
 
-typedef struct peripherals {
-    uint8_t * memory;
-    uint16_t highest_mem_addr;
-} peripherals;
+// abbreviate these types
+typedef uint8_t u8;
+typedef uint16_t u16;
 
-typedef struct cpu {
+typedef struct i8080 {   
     // registers
-    uint8_t A;
-    uint8_t B;
-    uint8_t C;
-    uint8_t D;
-    uint8_t E;
-    uint8_t H;
-    uint8_t L;
-    uint8_t flags;
-    uint16_t SP;
-    uint16_t PC;
+    u8 a, b, c, d, e, h, l;
+    // stack pointer, program counter
+    u16 sp, pc;
     
-    // buffers
-    uint8_t instr_buf;
-    uint16_t addr_buf;
-    uint8_t data_buf;
+    // flags: sign, zero, auxiliary carry,
+    // carry, parity, interrupt enable
+    bool s, z, acy, cy, p, ie;
     
-    // common peripherals
-    peripherals * peripherals;
-} cpu;
+} i8080;
 
-void set_flag(cpu * cpu, flag flag) {
-    cpu->flags |= (1 << (int) flag);
-}
+// Initializes the CPU
+void i8080_init(i8080 * const cpu);
 
-void clear_flag(cpu * cpu, flag flag) {
-    cpu->flags &= ~(1 << (int) flag);
-}
-
-int get_flag(cpu * cpu, flag flag) {
-    return (cpu->flags >> (int) flag) & 1;
-}
-
-#endif
+#endif // I_8080_EMU_H
