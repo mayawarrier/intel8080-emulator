@@ -1,117 +1,40 @@
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
-#include "main.h"
+#include <stdlib.h>
+#include <stdio.h>
 #include "src/i8080.h"
-#include "src/i8080_opcodes.h"
+#include "src/emu.h"
+
+int boot_failure() {
+    printf("Emulator boot failure.");
+    return EXIT_FAILURE;
+}
 
 int main(int argc, char ** argv) {
     
-    // --------------------- Create a new cpu --------------------
+    // ---------------- Set up memory and boot emulator ------------------
     
-    cpu * CPU = (struct cpu *) malloc(sizeof (cpu));
+    mem_t memory;
     
-    // Initialize common peripherals
-    peripherals * peripherals = create_peripherals((uint16_t)HIGHEST_ADDR);
-    
-    if (load_program(ROM, ROM_SIZE, peripherals->memory, peripherals->highest_mem_addr, 0x0)) {
-        // program loading succeeded
-        create_cpu(CPU, peripherals);
-        start_cpu(CPU);
+    if(memory_init(&memory)) {
+        // Setup interrupts vector table and bootloader
+       addr_t program_start_loc = memory_setup_rom(&memory);
+       // Read file into memory
+       size_t words_read = load_file("rom.bin", memory.mem, program_start_loc);
+       
+       // File read error
+       if (words_read == SIZE_MAX) {
+           return boot_failure();
+       }
+       
+       memory.num_prog_bytes = words_read;
+       
+       // Start the emulator. Does not return until complete.
+       emu_runtime(&memory);
+       
     } else {
-        // ran past end of memory
-        free_cpu(CPU);
+        return boot_failure();
     }
     
     return EXIT_SUCCESS;
-}
-
-void dispatch_instr_exec(cpu * cpu, uint16_t instr_addr) {
-    
-}
-
-void create_cpu(cpu * cpu, peripherals * peripherals) {
-    // blank the registers    
-    cpu->A = cpu->B = cpu->C = cpu->D = cpu->E = cpu->H = cpu->L = 0x0;
-    
-    // initialize stack, peripherals
-    cpu->peripherals = peripherals;
-    if (peripherals != NULL) {
-        cpu->SP = peripherals->highest_mem_addr;
-    }
-    
-    cpu->PC = 0x0;
-    cpu->addr_buf = cpu->data_buf = cpu->instr_buf = 0x0;
-    
-    // initialize flags
-    cpu->flags = 0x0;
-    set_flag(cpu, FLAG_PARITY);
-    set_flag(cpu, FLAG_ZERO);
-}
-
-void free_cpu(cpu * cpu) {
-    free(cpu->peripherals->memory);
-    cpu->peripherals->memory = NULL;
-    free(cpu->peripherals);
-    cpu->peripherals = NULL;
-    free(cpu);
-}
-
-// The main cpu runtime
-void start_cpu(cpu * cpu) {
-    
-}
-
-bool init_memory(i8080_mem * const memory_handle) {
-    // Allocate 64KB
-    memory_handle->mem = (word_t *)malloc(sizeof(word_t) * (ADDR_T_MAX + 1));
-    
-    if (memory_handle->mem == NULL) {
-        printf("Error: Could not allocate enough memory to emulate.");
-        return false;
-    }
-    
-    // Zero out the entire 64 KB
-    memset((void *)memory_handle->mem, 0, ADDR_T_MAX + 1);
-    // set size
-    memory_handle->highest_addr = ADDR_T_MAX;
-    
-    return true;
-}
-
-addr_t load_file(const char * file_loc, word_t * memory, addr_t start_loc) {
-    
-    size_t file_size = 0;
-    
-    FILE * f_ptr = fopen(file_loc, "rb");
-    
-    if (f_ptr == NULL) {
-        printf("Error: file cannot be opened.");
-        return -1;
-    }
-    
-    // get the file size
-    fseek(f_ptr, 0, SEEK_END);
-    file_size = ftell(f_ptr);
-    rewind(f_ptr);
-    
-    // check if it can fit into memory
-    if (file_size + start_loc > ADDR_T_MAX + 1) {
-        printf("Error: file too large.");
-        return -1;
-    }
-    
-    // Attempt to read the entire file
-    size_t words_read = fread(&memory[start_loc], sizeof(word_t), file_size, f_ptr);
-    
-    if (words_read != file_size) {
-        printf("Error: file read failure.");
-        return -1;
-    }
-    
-    printf("Success: %zd words read.", words_read);
-    
-    fclose(f_ptr);
-    return (addr_t)words_read;
 }
