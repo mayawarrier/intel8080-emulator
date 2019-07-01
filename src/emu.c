@@ -6,8 +6,8 @@
 #include <string.h>
 #include "emu.h"
 #include "emu_debug.h"
-#include "i8080_internal.h"
-#include "i8080_opcodes.h"
+#include "i8080/i8080_internal.h"
+#include "i8080/i8080_opcodes.h"
 
 #define DEFAULT_START_OF_PROGRAM_MEMORY 0x40
 

@@ -2,9 +2,9 @@
  * Implement emu_debug.h
  */
 
-#include "emu_debug.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "emu_debug.h"
 
 static const char * DUMP_LOCATION = "memory_dump.bin";
 
