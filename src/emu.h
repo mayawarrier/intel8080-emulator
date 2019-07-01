@@ -12,7 +12,7 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
-#include "types.h"
+#include "emu_types.h"
 #include "i8080/i8080.h"
 
 // Allocates the largest amount of memory addressable (in this case 64KB)

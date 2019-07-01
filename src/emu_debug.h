@@ -10,7 +10,7 @@
 #ifndef EMU_DEBUG_H
 #define EMU_DEBUG_H
 
-#include "types.h"
+#include "emu_types.h"
 
 // Dumps the contents of memory to file
 void dump_memory(const word_t * memory, addr_t highest_addr);

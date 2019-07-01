@@ -1,7 +1,7 @@
 #ifndef I_8080_H
 #define I_8080_H
 
-#include "../types.h"
+#include "../emu_types.h"
 #include <stdbool.h>
 
 typedef struct mem_t {
