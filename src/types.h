@@ -2,8 +2,8 @@
  * File:   types.h
  * Author: dhruvwarrier
  * 
- * Provides word and address types, and defines
- * max values.
+ * Provides word and address types, defines
+ * max values, and provides formatting specifiers.
  * 
  * Modify to port to different architectures.
  *
@@ -20,5 +20,8 @@ typedef uint16_t addr_t;
 
 #define WORD_T_MAX UINT8_MAX
 #define ADDR_T_MAX UINT16_MAX
+
+#define WORD_T_FORMAT "%#04x"
+#define ADDR_T_FORMAT "%#06x"
 
 #endif /* TYPES_H */
