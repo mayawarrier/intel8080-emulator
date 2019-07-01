@@ -17,7 +17,7 @@ int main(int argc, char ** argv) {
     mem_t memory;
     
     if(memory_init(&memory)) {
-        // Setup interrupts vector table and bootloader
+        // Setup interrupts vector table and default bootloader
        addr_t program_start_loc = memory_setup_rom(&memory);
        // Read file into memory
        size_t words_read = load_file("rom.bin", memory.mem, program_start_loc);

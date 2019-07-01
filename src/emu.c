@@ -5,7 +5,34 @@
 #include <stdio.h>
 #include <string.h>
 #include "emu.h"
+#include "emu_debug.h"
+#include "i8080_internal.h"
 #include "i8080_opcodes.h"
+
+#define DEFAULT_START_OF_PROGRAM_MEMORY 0x40
+
+// Jumps to start of program memory
+static const word_t DEFAULT_BOOTLOADER[] = {
+    JMP,
+    0x00,
+    DEFAULT_START_OF_PROGRAM_MEMORY
+};
+
+static const int DEFAULT_BOOTLOADER_SIZE = 3;
+
+// Reserved locations for interrupt vector table
+static const addr_t VECTOR_TABLE_RESERVED_LOCATIONS[] = {
+    0x00, // RESET, RST 0
+    0x08, // RST 1
+    0x10, // RST 2
+    0x18, // RST 3
+    0x20, // RST 4
+    0x28, // RST 5
+    0x30, // RST 6
+    0x38 // RST 7
+};
+
+static const int NUM_VECTOR_TABLE_RESERVED_LOCATIONS = 8;
 
 bool memory_init(mem_t * const memory_handle) {
     // Allocate memory
@@ -25,7 +52,26 @@ bool memory_init(mem_t * const memory_handle) {
 }
 
 addr_t memory_setup_rom(mem_t * const memory_handle) {
+    return memory_setup_rom_custom(memory_handle, DEFAULT_BOOTLOADER, DEFAULT_BOOTLOADER_SIZE);
+}
+
+addr_t memory_setup_rom_custom(mem_t * const memory_handle, const word_t * bootloader, int bootloader_size) {
     
+    if (bootloader_size > 8) {
+        printf("Error: bootloader too large.");
+        return ADDR_T_MAX;
+    }
+    
+    // Copy the bootloader into memory, this is executed on RESET
+    memcpy((void *)memory_handle->mem, (const void *)bootloader, bootloader_size);
+    
+    // Create the rest of the interrupt vector table after the RESET vector
+    for (int i = 1; i < NUM_VECTOR_TABLE_RESERVED_LOCATIONS; ++i) {
+        // HLT for all interrupts
+        memory_handle->mem[VECTOR_TABLE_RESERVED_LOCATIONS[i]] = HLT;
+    }
+    
+    return DEFAULT_START_OF_PROGRAM_MEMORY;
 }
 
 size_t load_file(const char * file_loc, word_t * memory, addr_t start_loc) {
@@ -67,4 +113,7 @@ size_t load_file(const char * file_loc, word_t * memory, addr_t start_loc) {
 bool emu_runtime(mem_t * const memory) {
     
     i8080 cpu;
+    i8080_reset(&cpu);
+    
+    dump_memory(memory->mem, memory->highest_addr);
 }
