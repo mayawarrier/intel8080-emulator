@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "src/i8080.h"
+#include "src/i8080/i8080.h"
 #include "src/emu.h"
 
 int boot_failure() {
