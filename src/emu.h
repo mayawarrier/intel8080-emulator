@@ -15,20 +15,35 @@
 #include "emu_types.h"
 #include "i8080/i8080.h"
 
+#define DEFAULT_START_OF_PROGRAM_MEMORY 0x40
+
 // Allocates the largest amount of memory addressable (in this case 64KB)
 bool memory_init(mem_t * const memory_handle);
-// Sets up the ROM: creates an interrupt vector table and writes a default bootloader.
-// Returns the address from which it is safe to load the program without overwriting ROM.
-addr_t memory_setup_rom(mem_t * const memory_handle);
-// memory_setup_rom() with a custom bootloader.
-// This must be no more than 8 words as it must fit in the RESET/RST 0 interrupt sequence.
-// Returns ADDR_T_MAX if bootloader is too large.
-addr_t memory_setup_rom_custom(mem_t * const memory_handle, const word_t * bootloader, int bootloader_size);
-// Loads a file into memory. Call only after init and setting up ROM.
-size_t load_file(const char * file_loc, word_t * memory, addr_t start_loc);
+// Loads a file into memory. Call only after memory_init().
+size_t memory_load(const char * file_loc, word_t * memory, addr_t start_loc);
 
-// Begin the emulator. Must have properly set up memory first!
-bool emu_runtime(mem_t * const memory);
+// Create a default interrupt vector table at the top 64 bytes of memory.
+// Returns the address from which it is safe to load the program without overwriting the IVT.
+addr_t memory_setup_IVT(mem_t * const memory_handle);
+// Write a bootloader to the RESET/RST 0 interrupt sequence.
+// This must be no more than 8 bytes.
+// Returns false if the bootloader is too large.
+bool memory_write_bootloader(mem_t * const memory_handle, const word_t * bootloader, size_t bootloader_size);
+// Writes a bootloader that simply jumps to the DEFAULT_START_OF_PROGRAM_MEMORY.
+void memory_write_bootloader_default(mem_t * const memory_handle);
+
+// Initialize an i8080
+void emu_init_i8080(i8080 * const cpu);
+// Setup i8080 memory and I/O streams. Returns true if memory stream functions are valid. 
+// I/O read/write are allowed to be NULL, but the emulator will crash if an I/O request is made.
+bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_fp write_memory, 
+        read_word_fp port_in, write_word_fp port_out);
+// Setup default memory and I/O streams. Bytes are read and written from
+// memory initialized through memory_init(), and I/O is taken from stdin and stdout respectively.
+void emu_setup_streams_default(i8080 * const cpu);
+
+// Begin the emulator. Must have properly set up memory and streams first!
+bool emu_runtime(i8080 * const cpu, mem_t * const memory);
 
 #endif /* EMU_H */
 

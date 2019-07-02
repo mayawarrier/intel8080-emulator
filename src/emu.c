@@ -9,7 +9,10 @@
 #include "i8080/i8080_internal.h"
 #include "i8080/i8080_opcodes.h"
 
-#define DEFAULT_START_OF_PROGRAM_MEMORY 0x40
+#define UNUSED(expr) (void)(expr)
+
+// Largest amount of memory addressable
+static word_t * MEMORY;
 
 // Jumps to start of program memory
 static const word_t DEFAULT_BOOTLOADER[] = {
@@ -48,25 +51,16 @@ bool memory_init(mem_t * const memory_handle) {
     // set size
     memory_handle->highest_addr = ADDR_T_MAX;
     
+    // Keep reference to memory stream
+    MEMORY = memory_handle->mem;
+    
     return true;
 }
 
-addr_t memory_setup_rom(mem_t * const memory_handle) {
-    return memory_setup_rom_custom(memory_handle, DEFAULT_BOOTLOADER, DEFAULT_BOOTLOADER_SIZE);
-}
-
-addr_t memory_setup_rom_custom(mem_t * const memory_handle, const word_t * bootloader, int bootloader_size) {
+addr_t memory_setup_IVT(mem_t * const memory_handle) {
     
-    if (bootloader_size > 8) {
-        printf("Error: bootloader too large.");
-        return ADDR_T_MAX;
-    }
-    
-    // Copy the bootloader into memory, this is executed on RESET
-    memcpy((void *)memory_handle->mem, (const void *)bootloader, bootloader_size);
-    
-    // Create the rest of the interrupt vector table after the RESET vector
-    for (int i = 1; i < NUM_VECTOR_TABLE_RESERVED_LOCATIONS; ++i) {
+    // Create the interrupt vector table
+    for (int i = 0; i < NUM_VECTOR_TABLE_RESERVED_LOCATIONS; ++i) {
         // HLT for all interrupts
         memory_handle->mem[VECTOR_TABLE_RESERVED_LOCATIONS[i]] = HLT;
     }
@@ -74,7 +68,24 @@ addr_t memory_setup_rom_custom(mem_t * const memory_handle, const word_t * bootl
     return DEFAULT_START_OF_PROGRAM_MEMORY;
 }
 
-size_t load_file(const char * file_loc, word_t * memory, addr_t start_loc) {
+bool memory_write_bootloader(mem_t * const memory_handle, const word_t * bootloader, size_t bootloader_size) {
+    
+    if (bootloader_size > 8) {
+        printf("Error: bootloader too large.");
+        return false;
+    }
+    
+    // Copy the bootloader into memory, this is executed on RESET
+    memcpy((void *)memory_handle->mem, (const void *)bootloader, bootloader_size);
+    
+    return true;
+}
+
+void memory_write_bootloader_default(mem_t * const memory_handle) {
+    memory_write_bootloader(memory_handle, DEFAULT_BOOTLOADER, DEFAULT_BOOTLOADER_SIZE);
+}
+
+size_t memory_load(const char * file_loc, word_t * memory, addr_t start_loc) {
     
     size_t file_size = 0;
     
@@ -110,10 +121,62 @@ size_t load_file(const char * file_loc, word_t * memory, addr_t start_loc) {
     return words_read;
 }
 
-bool emu_runtime(mem_t * const memory) {
+static word_t rw_from_memory(addr_t addr) {
+    return MEMORY[addr];
+}
+
+static void ww_to_memory(addr_t addr, word_t word) {
+    MEMORY[addr] = word;
+}
+
+static void ww_to_stdout(addr_t addr, word_t word) {
+    // don't need the port address to write to stdout
+    UNUSED(addr);
+    printf(WORD_T_FORMAT, word);
+}
+
+static word_t rw_from_stdin(addr_t addr) {
+    // don't need the port address to read from stdin
+    UNUSED(addr);
+    word_t rw;
+    scanf(WORD_T_FORMAT, &rw);
+    return rw;
+}
+
+void emu_init_i8080(i8080 * const cpu) {
+    i8080_reset(cpu);
+    cpu->read_memory = NULL;
+    cpu->write_memory = NULL;
+    cpu->port_in = NULL;
+    cpu->port_out = NULL;
+}
+
+bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_fp write_memory, 
+        read_word_fp port_in, write_word_fp port_out) {
     
-    i8080 cpu;
-    i8080_reset(&cpu);
+    if (read_memory == NULL || write_memory == NULL) {
+        printf("Error. Memory stream functions NULL.");
+        return false;
+    }
     
+    if (port_in == NULL || port_out == NULL) {
+        printf("Warning: I/O stream functions NULL.");
+    }
+    
+    cpu->read_memory = read_memory;
+    cpu->write_memory = write_memory;
+    cpu->port_in = port_in;
+    cpu->port_out = port_out;
+    
+    return true;
+}
+
+void emu_setup_streams_default(i8080 * const cpu) {
+    emu_setup_streams(cpu, rw_from_memory, ww_to_memory, rw_from_stdin, ww_to_stdout);
+}
+
+bool emu_runtime(i8080 * const cpu, mem_t * const memory) {
+    
+    // debug
     dump_memory(memory->mem, memory->highest_addr);
 }

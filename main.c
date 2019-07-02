@@ -14,23 +14,32 @@ int main(int argc, char ** argv) {
     
     // ---------------- Set up memory and boot emulator ------------------
     
+    // CPU and main memory references
+    i8080 cpu;
     mem_t memory;
     
+    // Program bytes read
+    size_t words_read = 0;
+    
     if(memory_init(&memory)) {
-        // Setup interrupts vector table and default bootloader
-       addr_t program_start_loc = memory_setup_rom(&memory);
+        // Setup interrupt vector table and default bootloader
+       addr_t program_start_loc = memory_setup_IVT(&memory);
+       memory_write_bootloader_default(&memory);
+       
        // Read file into memory
-       size_t words_read = load_file("rom.bin", memory.mem, program_start_loc);
+       words_read = memory_load("rom.bin", memory.mem, program_start_loc);
        
        // File read error
        if (words_read == SIZE_MAX) {
            return boot_failure();
        }
        
-       memory.num_prog_bytes = words_read;
+       // Initialize i8080 and setup default memory + IO streams
+       emu_init_i8080(&cpu);
+       emu_setup_streams_default(&cpu);
        
-       // Start the emulator. Does not return until complete.
-       emu_runtime(&memory);
+       // Begin the emulator. Does not return until complete.
+       emu_runtime(&cpu, &memory);
        
     } else {
         return boot_failure();
