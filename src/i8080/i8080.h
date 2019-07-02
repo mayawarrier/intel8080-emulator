@@ -4,13 +4,15 @@
 #include "../emu_types.h"
 #include <stdbool.h>
 
+// Define types of read/write streams
+typedef word_t (* read_word_fp)(addr_t);
+typedef void (* write_word_fp)(addr_t, word_t);
+
 typedef struct mem_t {
     // the memory space
     word_t * mem;
     // the highest address in this memory space
     addr_t highest_addr;
-    // how many bytes of this space is occupied by the program
-    addr_t num_prog_bytes;
 } mem_t;
 
 typedef struct i8080 {   
@@ -23,8 +25,15 @@ typedef struct i8080 {
     // carry, parity, interrupt enable
     bool s, z, acy, cy, p, ie;
     
-    // Assign the memory before calling init!
-    mem_t * memory;
+    // provide your own read/write streams
+    
+    // Read and write to a memory stream
+    read_word_fp read_memory;
+    write_word_fp write_memory;
+    
+    // I/O stream in and out
+    read_word_fp port_in;
+    write_word_fp port_out;
     
 } i8080;
 
