@@ -18,6 +18,9 @@
 typedef uint8_t word_t;
 typedef uint16_t addr_t;
 
+#define HALF_WORD_SIZE 4
+#define HALF_ADDR_SIZE 8
+
 #define WORD_T_MAX UINT8_MAX
 #define ADDR_T_MAX UINT16_MAX
 
