@@ -12,8 +12,14 @@
 
 #include "i8080.h"
 
-// Resets the CPU. PC is set to 0. No other working registers or flags are affected.
+// Resets the cpu. PC is set to 0. No other working registers or flags are affected.
 void i8080_reset(i8080 * const cpu);
+
+// Executes the next instruction. If an interrupt is pending, services it.
+void i8080_next(i8080 * const cpu);
+
+// Executes the opcode on cpu, updating its cycle count, registers and flags.
+void i8080_exec(i8080 * const cpu, word_t opcode);
 
 #endif /* I8080_INTERNAL_H */
 
