@@ -144,14 +144,14 @@
 #define MOV_L_M 0x6e      /*      1                    L <- [HL]                            7    */
 #define MOV_L_A 0x6f      /*      1                    L <- A                               5    */
 #define MOV_M_B 0x70      /*      1                    [HL] <- B                            7    */
-#define MOV_M_C 0x71      /*      1                    [HL] <- B                            7    */
-#define MOV_M_D 0x72      /*      1                    [HL] <- B                            7    */
-#define MOV_M_E 0x73      /*      1                    [HL] <- B                            7    */
-#define MOV_M_H 0x74      /*      1                    [HL] <- B                            7    */
-#define MOV_M_L 0x75      /*      1                    [HL] <- B                            7    */
+#define MOV_M_C 0x71      /*      1                    [HL] <- C                            7    */
+#define MOV_M_D 0x72      /*      1                    [HL] <- D                            7    */
+#define MOV_M_E 0x73      /*      1                    [HL] <- E                            7    */
+#define MOV_M_H 0x74      /*      1                    [HL] <- H                            7    */
+#define MOV_M_L 0x75      /*      1                    [HL] <- L                            7    */
 #define HLT 0x76          /*      1                    halt, S0, S1 = 0, interrupt
                                                        brings it out of this state          7    */
-#define MOV_M_A 0x77      /*      1                    [HL] <- B                            7    */
+#define MOV_M_A 0x77      /*      1                    [HL] <- A                            7    */
 #define MOV_A_B 0x78      /*      1                    A <- B                               5    */
 #define MOV_A_C 0x79      /*      1                    A <- C                               5    */
 #define MOV_A_D 0x7a      /*      1                    A <- D                               5    */
@@ -368,7 +368,8 @@ static const word_t OPCODES_CYCLES[] = {
     5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  // F
 };
 
-static word_t get_cycles_action_taken(word_t opcode) {
+// For conditional RETs and CALLs, 6 extra cycles are taken
+static word_t get_cycle_offset_conditional_opcode(word_t opcode) {
     
     if (opcode > 0xff) {
         // invalid opcode
@@ -386,21 +387,11 @@ static word_t get_cycles_action_taken(word_t opcode) {
         case RPE: case CPE:
         case RP: case CP:
         case RM: case CM:
-            return OPCODES_CYCLES[opcode] + 6;
+            return 6;
             
         default:
-            return OPCODES_CYCLES[opcode];
+            return 0;
     }
-}
-
-static word_t get_cycles_action_not_taken(word_t opcode) {
-    
-    if (opcode > 0xff) {
-        // invalid opcode
-        return WORD_T_MAX;
-    }
-    
-    return OPCODES_CYCLES[opcode];
 }
 
 #endif /* OPCODES_H */
