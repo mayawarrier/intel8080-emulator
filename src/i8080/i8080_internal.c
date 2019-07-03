@@ -114,7 +114,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case MOV_B_M: case MOV_C_M: case MOV_D_M: case MOV_E_M: case MOV_H_M: case MOV_L_M: case MOV_A_M:
         {
             // Read a word at address [HL]
-            word_t mem_word = cpu->read_memory((addr_t)(cpu->h << HALF_ADDR_SIZE | cpu->l));
+            word_t mem_word = cpu->read_memory((addr_t)cpu->h << HALF_ADDR_SIZE | (addr_t)cpu->l);
             
             switch(opcode) {
                 case MOV_B_M: cpu->b = mem_word; break;
@@ -143,8 +143,8 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
                 case MOV_M_A: word_to_write = cpu->a; break;
             }
             
-            cpu->write_memory((addr_t)(cpu->h << HALF_ADDR_SIZE | cpu->l), word_to_write);
-            
+            // Write a word at address [HL]
+            cpu->write_memory((addr_t)cpu->h << HALF_ADDR_SIZE | (addr_t)cpu->l, word_to_write);
             break;
         }
     }
