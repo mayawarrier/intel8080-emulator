@@ -3,6 +3,7 @@
 
 #include "../emu_types.h"
 #include <stdbool.h>
+#include <stdlib.h>
 
 // Define types of read/write streams
 typedef word_t (* read_word_fp)(addr_t);
