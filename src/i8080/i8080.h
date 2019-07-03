@@ -35,6 +35,9 @@ typedef struct i8080 {
     read_word_fp port_in;
     write_word_fp port_out;
     
+    // Cycles taken for last emu_runtime
+    size_t cycles_taken;
+    
 } i8080;
 
 #endif // I_8080_H

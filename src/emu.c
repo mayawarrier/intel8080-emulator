@@ -9,8 +9,6 @@
 #include "i8080/i8080_internal.h"
 #include "i8080/i8080_opcodes.h"
 
-#define UNUSED(expr) (void)(expr)
-
 // Largest amount of memory addressable
 static word_t * MEMORY;
 
@@ -121,28 +119,6 @@ size_t memory_load(const char * file_loc, word_t * memory, addr_t start_loc) {
     return words_read;
 }
 
-static word_t rw_from_memory(addr_t addr) {
-    return MEMORY[addr];
-}
-
-static void ww_to_memory(addr_t addr, word_t word) {
-    MEMORY[addr] = word;
-}
-
-static void ww_to_stdout(addr_t addr, word_t word) {
-    // don't need the port address to write to stdout
-    UNUSED(addr);
-    printf(WORD_T_FORMAT, word);
-}
-
-static word_t rw_from_stdin(addr_t addr) {
-    // don't need the port address to read from stdin
-    UNUSED(addr);
-    word_t rw;
-    scanf(WORD_T_FORMAT, &rw);
-    return rw;
-}
-
 void emu_init_i8080(i8080 * const cpu) {
     i8080_reset(cpu);
     cpu->read_memory = NULL;
@@ -171,12 +147,21 @@ bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_f
     return true;
 }
 
-void emu_setup_streams_default(i8080 * const cpu) {
-    emu_setup_streams(cpu, rw_from_memory, ww_to_memory, rw_from_stdin, ww_to_stdout);
-}
-
 bool emu_runtime(i8080 * const cpu, mem_t * const memory) {
+    
+    cpu->cycles_taken = 0;
     
     // debug
     dump_memory(memory->mem, memory->highest_addr);
+}
+
+void emu_cleanup(i8080 * cpu, mem_t * memory_handle) {
+    cpu->read_memory = NULL;
+    cpu->write_memory = NULL;
+    cpu->port_in = NULL;
+    cpu->port_out = NULL;
+    free(memory_handle->mem);
+    memory_handle = NULL;
+    cpu = NULL;
+    memory_handle = NULL;
 }
