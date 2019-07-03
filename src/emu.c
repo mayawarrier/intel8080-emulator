@@ -9,9 +9,6 @@
 #include "i8080/i8080_internal.h"
 #include "i8080/i8080_opcodes.h"
 
-// Largest amount of memory addressable
-static word_t * MEMORY;
-
 // Jumps to start of program memory
 static const word_t DEFAULT_BOOTLOADER[] = {
     JMP,
@@ -48,9 +45,6 @@ bool memory_init(mem_t * const memory_handle) {
     memset((void *)memory_handle->mem, 0, ADDR_T_MAX + 1);
     // set size
     memory_handle->highest_addr = ADDR_T_MAX;
-    
-    // Keep reference to memory stream
-    MEMORY = memory_handle->mem;
     
     return true;
 }
