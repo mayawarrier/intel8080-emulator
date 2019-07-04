@@ -41,27 +41,27 @@ static struct register_pair i8080_mov_get_register_pair(i8080 * const cpu, word_
     }
     
     switch(hi_opcode) {
-        case 0x04:
+        case 0x40:
             if (lo_opcode >= 0x0 && lo_opcode <= 0x07) {
                 regs.left = &cpu->b;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
                 regs.left = &cpu->c;
             }
             break;
-        case 0x05:
+        case 0x50:
             if (lo_opcode >= 0x0 && lo_opcode <= 0x07) {
                 regs.left = &cpu->d;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
                 regs.left = &cpu->e;
             }
             break;
-        case 0x06:
+        case 0x60:
             if (lo_opcode >= 0x0 && lo_opcode <= 0x07) {
                 regs.left = &cpu->h;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
                 regs.left = &cpu->l;
             }
-        case 0x07:
+        case 0x70:
             // Moving into M = [HL] should be dealt with separately
             if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
                 regs.left = &cpu->a;
