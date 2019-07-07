@@ -28,6 +28,8 @@ static inline void update_ZSP(i8080 * const cpu);
 static void i8080_mov_registers(i8080 * const cpu, word_t opcode);
 // Performs an add to accumulator and updates flags.
 static void i8080_add(i8080 * const cpu, word_t word);
+// Performs an add with carry to accumulator and updates flags
+static void i8080_adc(i8080 * const cpu, word_t word);
 
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
@@ -112,6 +114,16 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case ADD_L: i8080_add(cpu, cpu->l); break;
         case ADD_M: i8080_add(cpu, i8080_read_memory(cpu)); break;
         case ADD_A: i8080_add(cpu, cpu->a); break;
+        
+        // Addition with carry
+        case ADC_B: i8080_adc(cpu, cpu->b); break;
+        case ADC_C: i8080_adc(cpu, cpu->c); break;
+        case ADC_D: i8080_adc(cpu, cpu->d); break;
+        case ADC_E: i8080_adc(cpu, cpu->e); break;
+        case ADC_H: i8080_adc(cpu, cpu->h); break;
+        case ADC_L: i8080_adc(cpu, cpu->l); break;
+        case ADC_M: i8080_adc(cpu, i8080_read_memory(cpu)); break;
+        case ADC_A: i8080_adc(cpu, cpu->b); break;
     }
 }
 
@@ -205,7 +217,7 @@ static inline void update_ZSP(i8080 * const cpu) {
      * (buff<<=1): shift the buffer to the left
      * & BIT_PAST_WORD: select the bit we just shifted
      * == 0: invert the bit before the XOR */
-    while(buf & (word_t)WORD_T_MAX != 0) { 
+    while(buf & (buf_t)WORD_T_MAX != 0) { 
         cpu->p ^= ((buf<<=1) & BIT_PAST_WORD == 0); 
     }
 }
@@ -216,7 +228,17 @@ static void i8080_add(i8080 * const cpu, word_t word) {
     // We need a larger type so buffer overflow does not occur
     buf_t acc_buf = (buf_t)cpu->a + (buf_t)word;
     // The accumulator only needs to keep the word bits
-    cpu->a = (word_t)(acc_buf & (word_t)WORD_T_MAX); // this is more implementation-safe than (word_t)acc_buf
+    cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX); // this is more implementation-safe than (word_t)acc_buf
+    // Update remaining flags
+    cpu->cy = acc_buf & BIT_PAST_WORD != 0;
+    update_ZSP(cpu);
+}
+
+static void i8080_adc(i8080 * const cpu, word_t word) {
+    cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(word) + (buf_t)cpu->cy) & BIT_PAST_HALF_WORD != 0;
+    // Perform ADC
+    buf_t acc_buf =  (buf_t)cpu->a + (buf_t)word + (buf_t)cpu->cy;
+    cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
     cpu->cy = acc_buf & BIT_PAST_WORD != 0;
     update_ZSP(cpu);
