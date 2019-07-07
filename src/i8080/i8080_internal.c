@@ -15,8 +15,9 @@ struct register_pair {
 
 static const buf_t BIT_PAST_WORD = (buf_t)1 << (HALF_WORD_SIZE * 2);
 static const buf_t BIT_PAST_HALF_WORD = (buf_t)1 << (HALF_WORD_SIZE);
-static const buf_t WORD_LO_F = ((buf_t)1 << (HALF_WORD_SIZE)) - (buf_t)1;
-static const buf_t BUF_BIT_MSB = (buf_t)1 << ((sizeof(buf_t) / sizeof(char)) * CHAR_BIT - 1);
+static const buf_t BIT_MSB_HALF_WORD = (buf_t)1 << (HALF_WORD_SIZE - 1);
+static const buf_t WORD_LO_F = ((buf_t)1 << HALF_WORD_SIZE) - (buf_t)1;
+static const buf_t BIT_MSB_BUF = (buf_t)1 << ((sizeof(buf_t) / sizeof(char)) * CHAR_BIT - 1);
 
 // Picks the lower half of the word
 #define WORD_LO_BITS(expr) ((buf_t)expr & WORD_LO_F)
@@ -133,6 +134,17 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case SBB_L: i8080_sbb(cpu, cpu->l); break;
         case SBB_M: i8080_sbb(cpu, i8080_read_memory(cpu)); break;
         case SBB_A: i8080_sbb(cpu, cpu->a); break;
+        
+        // Logical AND with accumulator
+        case ANA_B: i8080_ana(cpu, cpu->b); break;
+        case ANA_C: i8080_ana(cpu, cpu->c); break;
+        case ANA_D: i8080_ana(cpu, cpu->d); break;
+        case ANA_E: i8080_ana(cpu, cpu->e); break;
+        case ANA_H: i8080_ana(cpu, cpu->h); break;
+        case ANA_L: i8080_ana(cpu, cpu->l); break;
+        case ANA_M: i8080_ana(cpu, i8080_read_memory(cpu)); break;
+        case ANA_A: i8080_ana(cpu, cpu->a); break;
+        
     }
 }
 
@@ -261,25 +273,34 @@ static void i8080_adc(i8080 * const cpu, word_t word) {
 static void i8080_sub(i8080 * const cpu, word_t word) {
     // Subtraction borrows a bit from buf_t's MSB on underflow and
     // not the bit just past the left most column
-    cpu->acy = (WORD_LO_BITS(cpu->a) - WORD_LO_BITS(word)) & BUF_BIT_MSB != 0;
+    cpu->acy = (WORD_LO_BITS(cpu->a) - WORD_LO_BITS(word)) & BIT_MSB_BUF != 0;
     // Perform SUB
     buf_t acc_buf = (buf_t)cpu->a - (buf_t)word;
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
-    cpu->cy = acc_buf & BUF_BIT_MSB != 0;
+    cpu->cy = acc_buf & BIT_MSB_BUF != 0;
     update_ZSP(cpu, acc_buf);
 }
 
 static void i8080_sbb(i8080 * const cpu, word_t word) {
-    cpu->acy = (WORD_LO_BITS(cpu->a) - WORD_LO_BITS(word) - (buf_t)cpu->cy) & BUF_BIT_MSB != 0;
+    cpu->acy = (WORD_LO_BITS(cpu->a) - WORD_LO_BITS(word) - (buf_t)cpu->cy) & BIT_MSB_BUF != 0;
     // Perform SBB
     buf_t acc_buf = (buf_t)cpu->a - (buf_t)word - (buf_t)cpu->cy;
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
-    cpu->cy = acc_buf & BUF_BIT_MSB != 0;
+    cpu->cy = acc_buf & BIT_MSB_BUF != 0;
     update_ZSP(cpu, acc_buf);
 }
 
 static void i8080_ana(i8080 * const cpu, word_t word) {
-    
+    /* In the 8080, AND logical instructions always set auxiliary carry to the logical OR of bit 3 of the values involved:
+     * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 24 */
+    cpu->acy = ((buf_t)cpu->a & BIT_MSB_HALF_WORD) | ((buf_t)word & BIT_MSB_HALF_WORD);
+    // Perform ANA
+    cpu->a &= word;
+    // Update remaining flags
+    update_ZSP(cpu, (buf_t)cpu->a);
+    /* In the 8080, AND logical instructions always reset carry:
+     * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 63 */
+    cpu->cy = false;
 }
