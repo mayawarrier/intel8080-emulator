@@ -44,6 +44,8 @@ static void i8080_ana(i8080 * const cpu, word_t word);
 static void i8080_xra(i8080 * const cpu, word_t word);
 // Performs bitwise inclusive OR with accumulator, and updates flags.
 static void i8080_ora(i8080 * const cpu, word_t word);
+// Updates flags after subtraction from accumulator, without modifying it.
+static void i8080_cmp(i8080 * const cpu, word_t word);
 
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
@@ -300,7 +302,8 @@ static void i8080_sub(i8080 * const cpu, word_t word) {
     buf_t acc_buf = (buf_t)cpu->a - (buf_t)word;
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
-    cpu->cy = acc_buf & BIT_MSB_BUF != 0;
+    // Carry is the borrow flag for SUB, SBB etc, invert carry 
+    cpu->cy = acc_buf & BIT_MSB_BUF == 0;
     update_ZSP(cpu, acc_buf);
 }
 
@@ -310,7 +313,7 @@ static void i8080_sbb(i8080 * const cpu, word_t word) {
     buf_t acc_buf = (buf_t)cpu->a - (buf_t)word - (buf_t)cpu->cy;
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
-    cpu->cy = acc_buf & BIT_MSB_BUF != 0;
+    cpu->cy = acc_buf & BIT_MSB_BUF == 0;
     update_ZSP(cpu, acc_buf);
 }
 
@@ -343,4 +346,8 @@ static void i8080_ora(i8080 * const cpu, word_t word) {
     update_ZSP(cpu, (buf_t)cpu->a);
     cpu->acy = false;
     cpu->cy = false;
+}
+
+static void i8080_cmp(i8080 * const cpu, word_t word) {
+    
 }
