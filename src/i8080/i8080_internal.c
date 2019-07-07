@@ -42,6 +42,8 @@ static void i8080_sbb(i8080 * const cpu, word_t word);
 static void i8080_ana(i8080 * const cpu, word_t word);
 // Performs bitwise exclusive OR with accumulator, and updates flags.
 static void i8080_xra(i8080 * const cpu, word_t word);
+// Performs bitwise inclusive OR with accumulator, and updates flags.
+static void i8080_ora(i8080 * const cpu, word_t word);
 
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
@@ -156,6 +158,15 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case XRA_L: i8080_xra(cpu, cpu->l); break;
         case XRA_M: i8080_xra(cpu, i8080_read_memory(cpu)); break;
         case XRA_A: i8080_xra(cpu, cpu->a); break;
+        
+        case ORA_B: i8080_ora(cpu, cpu->b); break;
+        case ORA_C: i8080_ora(cpu, cpu->c); break;
+        case ORA_D: i8080_ora(cpu, cpu->d); break;
+        case ORA_E: i8080_ora(cpu, cpu->e); break;
+        case ORA_H: i8080_ora(cpu, cpu->h); break;
+        case ORA_L: i8080_ora(cpu, cpu->l); break;
+        case ORA_M: i8080_ora(cpu, i8080_read_memory(cpu)); break;
+        case ORA_A: i8080_ora(cpu, cpu->a); break;
     }
 }
 
@@ -320,8 +331,16 @@ static void i8080_xra(i8080 * const cpu, word_t word) {
     // Perform XRA
     cpu->a ^= word;
     update_ZSP(cpu, (buf_t)cpu->a);
-    /* In the 8080, XRA resets the carry and auxiliary carry flags to 0:
+    /* In the 8080, OR logical instructions always reset the carry and auxiliary carry flags to 0:
      * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 122 */
+    cpu->acy = false;
+    cpu->cy = false;
+}
+
+static void i8080_ora(i8080 * const cpu, word_t word) {
+    // Perform ORA
+    cpu->a |= word;
+    update_ZSP(cpu, (buf_t)cpu->a);
     cpu->acy = false;
     cpu->cy = false;
 }
