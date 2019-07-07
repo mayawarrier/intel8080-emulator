@@ -14,9 +14,12 @@
 #define TYPES_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef uint8_t word_t;
 typedef uint16_t addr_t;
+// A type that is larger than word_t and addr_t
+typedef size_t buf_t; 
 
 #define HALF_WORD_SIZE 4
 #define HALF_ADDR_SIZE 8
