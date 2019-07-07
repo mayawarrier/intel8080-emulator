@@ -74,43 +74,23 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case MOV_A_B: case MOV_A_C: case MOV_A_D: case MOV_A_E: case MOV_A_H: case MOV_A_L: case MOV_A_A:
             i8080_mov_registers(cpu, opcode); break;    
             
-        // All move operations from memory to registers
-        case MOV_B_M: case MOV_C_M: case MOV_D_M: case MOV_E_M: case MOV_H_M: case MOV_L_M: case MOV_A_M:
-        {
-            // Read a word at address [HL]
-            word_t mem_word = i8080_read_memory(cpu);
-            
-            switch(opcode) {
-                case MOV_B_M: cpu->b = mem_word; break;
-                case MOV_C_M: cpu->c = mem_word; break;
-                case MOV_D_M: cpu->d = mem_word; break;
-                case MOV_E_M: cpu->e = mem_word; break;
-                case MOV_H_M: cpu->h = mem_word; break;
-                case MOV_L_M: cpu->l = mem_word; break;
-                case MOV_A_M: cpu->a = mem_word; break;
-            }
-            break;
-        }
+        // All move operations from memory to registers        
+        case MOV_B_M: cpu->b = i8080_read_memory(cpu); break;
+        case MOV_C_M: cpu->c = i8080_read_memory(cpu); break;
+        case MOV_D_M: cpu->d = i8080_read_memory(cpu); break;
+        case MOV_E_M: cpu->e = i8080_read_memory(cpu); break;
+        case MOV_H_M: cpu->h = i8080_read_memory(cpu); break;
+        case MOV_L_M: cpu->l = i8080_read_memory(cpu); break;
+        case MOV_A_M: cpu->a = i8080_read_memory(cpu); break;
         
-        // All move operations from registers to memory
-        case MOV_M_B: case MOV_M_C: case MOV_M_D: case MOV_M_E: case MOV_M_H: case MOV_M_L: case MOV_M_A:
-        {
-            word_t word_to_write = 0x0;
-            
-            switch(opcode) {
-                case MOV_M_B: word_to_write = cpu->b; break;
-                case MOV_M_C: word_to_write = cpu->c; break;
-                case MOV_M_D: word_to_write = cpu->d; break;
-                case MOV_M_E: word_to_write = cpu->e; break;
-                case MOV_M_H: word_to_write = cpu->h; break;
-                case MOV_M_L: word_to_write = cpu->l; break;
-                case MOV_M_A: word_to_write = cpu->a; break;
-            }
-            
-            // Write a word at address [HL]
-            i8080_write_memory(cpu, word_to_write);
-            break;
-        }
+        // All move operations from registers to memory        
+        case MOV_M_B: i8080_write_memory(cpu, cpu->b); break;
+        case MOV_M_C: i8080_write_memory(cpu, cpu->c); break;
+        case MOV_M_D: i8080_write_memory(cpu, cpu->d); break;
+        case MOV_M_E: i8080_write_memory(cpu, cpu->e); break;
+        case MOV_M_H: i8080_write_memory(cpu, cpu->h); break;
+        case MOV_M_L: i8080_write_memory(cpu, cpu->l); break;
+        case MOV_M_A: i8080_write_memory(cpu, cpu->a); break;
         
         // Regular addition
         case ADD_B: i8080_add(cpu, cpu->b); break;
