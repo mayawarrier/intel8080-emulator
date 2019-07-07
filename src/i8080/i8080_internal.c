@@ -21,8 +21,9 @@ static const buf_t WORD_LO_F = pow(2, HALF_WORD_SIZE) - 1;
 
 // Returns pointers to the left and right registers for a mov operation.
 static struct register_pair mov_get_register_pair(i8080 * const cpu, word_t opcode);
-// Updates the Z, S, P flags based on accumulator value
-static inline void update_ZSP(i8080 * const cpu);
+// Updates the Z, S, P flags based on accumulator value.
+// This must be buffered to preserve the bits produced after acc's MSB
+static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf);
 
 // Performs a mov operation from register to register.
 static void i8080_mov_registers(i8080 * const cpu, word_t opcode);
@@ -30,6 +31,8 @@ static void i8080_mov_registers(i8080 * const cpu, word_t opcode);
 static void i8080_add(i8080 * const cpu, word_t word);
 // Performs an add with carry to accumulator and updates flags
 static void i8080_adc(i8080 * const cpu, word_t word);
+// Performs a subtract from accumulator and updates flags
+static void i8080_sub(i8080 * const cpu, word_t word);
 
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
@@ -207,18 +210,23 @@ static void i8080_mov_registers(i8080 * const cpu, word_t opcode) {
     *regs.left = *regs.right;
 }
 
-static inline void update_ZSP(i8080 * const cpu) {
-    cpu->z = (cpu->a == 0);
-    cpu->s = (cpu->a < 0);
-    cpu->p = 0; buf_t buf = (buf_t)cpu->a; 
+static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf) {
+    cpu->z = (acc_buf == 0);
+    /* If the number has gone above WORD_T_MAX, this indicates overflow or
+    /* an underflow. In both cases, the 8080 sets the sign bit 
+    /* since it doesn't have an overflow bit. */
+    cpu->s = (acc_buf > WORD_T_MAX);
+    // The truncated accumulator only keeps the word bits
+    buf_t trun_acc_buf = (buf_t)cpu->a; 
     /* Until all 8 bits have been shifted out,
      * shift each bit to the left and XNOR it with cpu->p.
      * while(buf & (word_t)WORD_T_MAX != 0): check if word bits are zero yet
      * (buff<<=1): shift the buffer to the left
      * & BIT_PAST_WORD: select the bit we just shifted
      * == 0: invert the bit before the XOR */
-    while(buf & (buf_t)WORD_T_MAX != 0) { 
-        cpu->p ^= ((buf<<=1) & BIT_PAST_WORD == 0); 
+    cpu->p = 0; // reset before calculating parity again
+    while(trun_acc_buf & (buf_t)WORD_T_MAX != 0) { 
+        cpu->p ^= ((trun_acc_buf<<=1) & BIT_PAST_WORD == 0); 
     }
 }
 
@@ -231,7 +239,7 @@ static void i8080_add(i8080 * const cpu, word_t word) {
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX); // this is more implementation-safe than (word_t)acc_buf
     // Update remaining flags
     cpu->cy = acc_buf & BIT_PAST_WORD != 0;
-    update_ZSP(cpu);
+    update_ZSP(cpu, acc_buf);
 }
 
 static void i8080_adc(i8080 * const cpu, word_t word) {
@@ -241,5 +249,9 @@ static void i8080_adc(i8080 * const cpu, word_t word) {
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
     cpu->cy = acc_buf & BIT_PAST_WORD != 0;
-    update_ZSP(cpu);
+    update_ZSP(cpu, acc_buf);
+}
+
+static void i8080_sub(i8080 * const cpu, word_t word) {
+    
 }
