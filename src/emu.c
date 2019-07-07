@@ -145,8 +145,15 @@ bool emu_runtime(i8080 * const cpu, mem_t * const memory) {
     
     cpu->cycles_taken = 0;
     
+    cpu->pc = 0x40;
+    cpu->a = 0x10;
+    cpu->b = 0x20;
+    // exec one instruction
+    i8080_next(cpu);
+    
     // debug
     dump_memory(memory->mem, memory->highest_addr);
+    dump_cpu_stats(cpu);
 }
 
 void emu_cleanup(i8080 * cpu, mem_t * memory_handle) {
