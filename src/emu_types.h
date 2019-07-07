@@ -5,7 +5,7 @@
  * Provides word and address types, defines
  * max values, and provides formatting specifiers.
  * 
- * buf_t should be a type whose width is at least
+ * buf_t should be a byte-aligned type whose width is at least
  * 8 bits, and larger than the widths of word_t
  * and addr_t.
  * 
