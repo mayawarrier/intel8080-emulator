@@ -107,7 +107,7 @@ size_t memory_load(const char * file_loc, word_t * memory, addr_t start_loc) {
         return SIZE_MAX;
     }
     
-    printf("Success: %zd words read.", words_read);
+    printf("Success: %zu words read.", words_read);
     
     fclose(f_ptr);
     return words_read;

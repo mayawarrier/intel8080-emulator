@@ -5,6 +5,10 @@
  * Provides word and address types, defines
  * max values, and provides formatting specifiers.
  * 
+ * buf_t should be a type whose width is at least
+ * 8 bits, and larger than the widths of word_t
+ * and addr_t.
+ * 
  * Modify to port to different architectures.
  *
  * Created on June 30, 2019, 2:56 PM
@@ -18,7 +22,6 @@
 
 typedef uint8_t word_t;
 typedef uint16_t addr_t;
-// A type that is larger than word_t and addr_t
 typedef size_t buf_t; 
 
 #define HALF_WORD_SIZE 4
