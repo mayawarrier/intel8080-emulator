@@ -40,6 +40,8 @@ static void i8080_sub(i8080 * const cpu, word_t word);
 static void i8080_sbb(i8080 * const cpu, word_t word);
 // Perform bitwise AND with accumulator, and update flags
 static void i8080_ana(i8080 * const cpu, word_t word);
+// Performs bitwise exclusive OR with accumulator, and updates flags.
+static void i8080_xra(i8080 * const cpu, word_t word);
 
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
@@ -145,6 +147,15 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case ANA_M: i8080_ana(cpu, i8080_read_memory(cpu)); break;
         case ANA_A: i8080_ana(cpu, cpu->a); break;
         
+        // Logical XRA with accumulator
+        case XRA_B: i8080_xra(cpu, cpu->b); break;
+        case XRA_C: i8080_xra(cpu, cpu->c); break;
+        case XRA_D: i8080_xra(cpu, cpu->d); break;
+        case XRA_E: i8080_xra(cpu, cpu->e); break;
+        case XRA_H: i8080_xra(cpu, cpu->h); break;
+        case XRA_L: i8080_xra(cpu, cpu->l); break;
+        case XRA_M: i8080_xra(cpu, i8080_read_memory(cpu)); break;
+        case XRA_A: i8080_xra(cpu, cpu->a); break;
     }
 }
 
@@ -302,5 +313,15 @@ static void i8080_ana(i8080 * const cpu, word_t word) {
     update_ZSP(cpu, (buf_t)cpu->a);
     /* In the 8080, AND logical instructions always reset carry:
      * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 63 */
+    cpu->cy = false;
+}
+
+static void i8080_xra(i8080 * const cpu, word_t word) {
+    // Perform XRA
+    cpu->a ^= word;
+    update_ZSP(cpu, (buf_t)cpu->a);
+    /* In the 8080, XRA resets the carry and auxiliary carry flags to 0:
+     * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 122 */
+    cpu->acy = false;
     cpu->cy = false;
 }
