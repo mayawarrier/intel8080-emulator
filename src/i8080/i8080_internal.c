@@ -6,15 +6,17 @@
 #include "i8080_internal.h"
 #include "i8080_opcodes.h"
 #include <math.h>
+#include <limits.h>
 
 struct register_pair {
     word_t * left;
     word_t * right;
 };
 
-static const buf_t BIT_PAST_WORD = 1 << (HALF_WORD_SIZE * 2);
-static const buf_t BIT_PAST_HALF_WORD = 1 << (HALF_WORD_SIZE);
-static const buf_t WORD_LO_F = pow(2, HALF_WORD_SIZE) - 1;
+static const buf_t BIT_PAST_WORD = (buf_t)1 << (HALF_WORD_SIZE * 2);
+static const buf_t BIT_PAST_HALF_WORD = (buf_t)1 << (HALF_WORD_SIZE);
+static const buf_t WORD_LO_F = ((buf_t)1 << (HALF_WORD_SIZE)) - (buf_t)1;
+static const buf_t BUF_BIT_MSB = (buf_t)1 << ((sizeof(buf_t) / sizeof(char)) * CHAR_BIT - 1);
 
 // Picks the lower half of the word
 #define WORD_LO_BITS(expr) ((buf_t)expr & WORD_LO_F)
@@ -127,6 +129,16 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case ADC_L: i8080_adc(cpu, cpu->l); break;
         case ADC_M: i8080_adc(cpu, i8080_read_memory(cpu)); break;
         case ADC_A: i8080_adc(cpu, cpu->b); break;
+        
+        // Regular subtraction
+        case SUB_B: i8080_sub(cpu, cpu->b); break;
+        case SUB_C: i8080_sub(cpu, cpu->c); break;
+        case SUB_D: i8080_sub(cpu, cpu->d); break;
+        case SUB_E: i8080_sub(cpu, cpu->e); break;
+        case SUB_H: i8080_sub(cpu, cpu->h); break;
+        case SUB_L: i8080_sub(cpu, cpu->l); break;
+        case SUB_M: i8080_sub(cpu, i8080_read_memory(cpu)); break;
+        case SUB_A: i8080_sub(cpu, cpu->a); break;
     }
 }
 
@@ -253,4 +265,13 @@ static void i8080_adc(i8080 * const cpu, word_t word) {
 }
 
 static void i8080_sub(i8080 * const cpu, word_t word) {
+    // Subtraction borrows a bit from buf_t's MSB on underflow and
+    // not the bit just past the left most column
+    cpu->acy = (WORD_LO_BITS(cpu->a) - WORD_LO_BITS(word)) & BUF_BIT_MSB != 0;
+    // Perform SUB
+    buf_t acc_buf = (buf_t)cpu->a - (buf_t)word;
+    cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
+    // Update remaining flags
+    cpu->cy = acc_buf & BUF_BIT_MSB != 0;
+    update_ZSP(cpu, acc_buf);
 }
