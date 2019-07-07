@@ -37,6 +37,8 @@ static void i8080_adc(i8080 * const cpu, word_t word);
 static void i8080_sub(i8080 * const cpu, word_t word);
 // Perform a subtract with carry borrow from the accumulator, and updates flags. 
 static void i8080_sbb(i8080 * const cpu, word_t word);
+// Perform bitwise AND with accumulator, and update flags
+static void i8080_ana(i8080 * const cpu, word_t word);
 
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
@@ -274,6 +276,10 @@ static void i8080_sbb(i8080 * const cpu, word_t word) {
     buf_t acc_buf = (buf_t)cpu->a - (buf_t)word - (buf_t)cpu->cy;
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
-    cpu->cy = acc_buf & BIT_PAST_WORD != 0;
+    cpu->cy = acc_buf & BUF_BIT_MSB != 0;
     update_ZSP(cpu, acc_buf);
+}
+
+static void i8080_ana(i8080 * const cpu, word_t word) {
+    
 }
