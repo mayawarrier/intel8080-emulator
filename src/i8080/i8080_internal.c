@@ -35,6 +35,8 @@ static void i8080_add(i8080 * const cpu, word_t word);
 static void i8080_adc(i8080 * const cpu, word_t word);
 // Performs a subtract from accumulator and updates flags
 static void i8080_sub(i8080 * const cpu, word_t word);
+// Perform a subtract with carry borrow from the accumulator, and updates flags. 
+static void i8080_sbb(i8080 * const cpu, word_t word);
 
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
@@ -139,6 +141,16 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case SUB_L: i8080_sub(cpu, cpu->l); break;
         case SUB_M: i8080_sub(cpu, i8080_read_memory(cpu)); break;
         case SUB_A: i8080_sub(cpu, cpu->a); break;
+        
+        // Subtraction with borrowed carry
+        case SBB_B: i8080_sbb(cpu, cpu->b); break;
+        case SBB_C: i8080_sbb(cpu, cpu->c); break;
+        case SBB_D: i8080_sbb(cpu, cpu->d); break;
+        case SBB_E: i8080_sbb(cpu, cpu->e); break;
+        case SBB_H: i8080_sbb(cpu, cpu->h); break;
+        case SBB_L: i8080_sbb(cpu, cpu->l); break;
+        case SBB_M: i8080_sbb(cpu, i8080_read_memory(cpu)); break;
+        case SBB_A: i8080_sbb(cpu, cpu->a); break;
     }
 }
 
@@ -273,5 +285,15 @@ static void i8080_sub(i8080 * const cpu, word_t word) {
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
     cpu->cy = acc_buf & BUF_BIT_MSB != 0;
+    update_ZSP(cpu, acc_buf);
+}
+
+static void i8080_sbb(i8080 * const cpu, word_t word) {
+    cpu->acy = (WORD_LO_BITS(cpu->a) - WORD_LO_BITS(word) - (buf_t)cpu->cy) & BUF_BIT_MSB != 0;
+    // Perform SBB
+    buf_t acc_buf = (buf_t)cpu->a - (buf_t)word - (buf_t)cpu->cy;
+    cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
+    // Update remaining flags
+    cpu->cy = acc_buf & BIT_PAST_WORD != 0;
     update_ZSP(cpu, acc_buf);
 }
