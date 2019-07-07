@@ -224,9 +224,9 @@ static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf) {
      * (buff<<=1): shift the buffer to the left
      * & BIT_PAST_WORD: select the bit we just shifted
      * == 0: invert the bit before the XOR */
-    cpu->p = 0; // reset before calculating parity again
-    while(trun_acc_buf & (buf_t)WORD_T_MAX != 0) { 
-        cpu->p ^= ((trun_acc_buf<<=1) & BIT_PAST_WORD == 0); 
+    cpu->p = true; // reset before calculating parity again
+    while((trun_acc_buf & (buf_t)WORD_T_MAX) != (buf_t)0x0) {
+        cpu->p ^= (((trun_acc_buf<<=1) & BIT_PAST_WORD) == 0); 
     }
 }
 
@@ -253,5 +253,4 @@ static void i8080_adc(i8080 * const cpu, word_t word) {
 }
 
 static void i8080_sub(i8080 * const cpu, word_t word) {
-    
 }
