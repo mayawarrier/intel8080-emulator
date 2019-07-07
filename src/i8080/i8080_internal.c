@@ -211,9 +211,13 @@ static inline void update_ZSP(i8080 * const cpu) {
 }
 
 static void i8080_add(i8080 * const cpu, word_t word) {
-    cpu->a += word;
-    // Update flags
-    update_ZSP(cpu);
+    // this cannot be determined from acc_buf, do this before
     cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(word)) & BIT_PAST_HALF_WORD != 0;
-    cpu->cy = ((buf_t)cpu->a + (buf_t)word) & BIT_PAST_WORD != 0;
+    // We need a larger type so buffer overflow does not occur
+    buf_t acc_buf = (buf_t)cpu->a + (buf_t)word;
+    // The accumulator only needs to keep the word bits
+    cpu->a = (word_t)(acc_buf & (word_t)WORD_T_MAX); // this is more implementation-safe than (word_t)acc_buf
+    // Update remaining flags
+    cpu->cy = acc_buf & BIT_PAST_WORD != 0;
+    update_ZSP(cpu);
 }
