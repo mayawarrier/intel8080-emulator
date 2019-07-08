@@ -14,13 +14,16 @@ struct register_pair {
 };
 
 static const buf_t BIT_PAST_WORD = (buf_t)1 << (HALF_WORD_SIZE * 2);
-static const buf_t BIT_PAST_HALF_WORD = (buf_t)1 << (HALF_WORD_SIZE);
-static const buf_t BIT_MSB_HALF_WORD = (buf_t)1 << (HALF_WORD_SIZE - 1);
-static const buf_t WORD_LO_F = ((buf_t)1 << HALF_WORD_SIZE) - (buf_t)1;
-static const buf_t BIT_MSB_BUF = (buf_t)1 << ((sizeof(buf_t) / sizeof(char)) * CHAR_BIT - 1);
+static const word_t BIT_PAST_HALF_WORD = (word_t)1 << HALF_WORD_SIZE;
+static const word_t BIT_MSB_HALF_WORD = (word_t)1 << (HALF_WORD_SIZE - 1);
+static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
 
 // Picks the lower half of the word
-#define WORD_LO_BITS(expr) ((buf_t)expr & WORD_LO_F)
+#define WORD_LO_BITS(expr) ((word_t)(expr) & WORD_LO_F)
+// Perform 2's complement on the lower half of the word
+#define TWOS_COMP_LO_WORD(expr) ((word_t)(expr) ^ WORD_LO_F + (word_t)1)
+// Perform 2's complement on the entire word, up-scaling to a buf_t
+#define TWOS_COMP_WORD(expr) ((buf_t)(expr) ^ (buf_t)WORD_T_MAX + (buf_t)1)
 
 // Returns pointers to the left and right registers for a mov operation.
 static struct register_pair mov_get_register_pair(i8080 * const cpu, word_t opcode);
@@ -285,7 +288,7 @@ static void i8080_add(i8080 * const cpu, word_t word) {
 }
 
 static void i8080_adc(i8080 * const cpu, word_t word) {
-    cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(word) + (buf_t)cpu->cy) & BIT_PAST_HALF_WORD != 0;
+    cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(word) + (word_t)cpu->cy) & BIT_PAST_HALF_WORD != 0;
     // Perform ADC
     buf_t acc_buf =  (buf_t)cpu->a + (buf_t)word + (buf_t)cpu->cy;
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
@@ -295,32 +298,31 @@ static void i8080_adc(i8080 * const cpu, word_t word) {
 }
 
 static void i8080_sub(i8080 * const cpu, word_t word) {
-    // Subtraction borrows a bit from buf_t's MSB on underflow and
-    // not the bit just past the left most column
-    cpu->acy = (WORD_LO_BITS(cpu->a) - WORD_LO_BITS(word)) & BIT_MSB_BUF != 0;
+    // Perform 2's complement subtraction on the lo bits of the word
+    cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(TWOS_COMP_LO_WORD(word))) & BIT_PAST_HALF_WORD != 0;
     // Perform SUB
-    buf_t acc_buf = (buf_t)cpu->a - (buf_t)word;
+    buf_t acc_buf = (buf_t)cpu->a + TWOS_COMP_WORD(word);
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
     // Update remaining flags
     // Carry is the borrow flag for SUB, SBB etc, invert carry 
-    cpu->cy = acc_buf & BIT_MSB_BUF == 0;
+    cpu->cy = acc_buf & BIT_PAST_WORD == 0;
     update_ZSP(cpu, acc_buf);
 }
 
 static void i8080_sbb(i8080 * const cpu, word_t word) {
-    cpu->acy = (WORD_LO_BITS(cpu->a) - WORD_LO_BITS(word) - (buf_t)cpu->cy) & BIT_MSB_BUF != 0;
+    cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(TWOS_COMP_LO_WORD(word + (word_t)cpu->cy))) & BIT_PAST_HALF_WORD != 0;
     // Perform SBB
-    buf_t acc_buf = (buf_t)cpu->a - (buf_t)word - (buf_t)cpu->cy;
+    buf_t acc_buf = (buf_t)cpu->a + TWOS_COMP_WORD(word + (buf_t)cpu->cy);
     cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
-    // Update remaining flags
-    cpu->cy = acc_buf & BIT_MSB_BUF == 0;
+    // Update remaining flags, carry inverted for borrow
+    cpu->cy = acc_buf & BIT_PAST_WORD == 0;
     update_ZSP(cpu, acc_buf);
 }
 
 static void i8080_ana(i8080 * const cpu, word_t word) {
     /* In the 8080, AND logical instructions always set auxiliary carry to the logical OR of bit 3 of the values involved:
      * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 24 */
-    cpu->acy = ((buf_t)cpu->a & BIT_MSB_HALF_WORD) | ((buf_t)word & BIT_MSB_HALF_WORD);
+    cpu->acy = (cpu->a & BIT_MSB_HALF_WORD) | (word & BIT_MSB_HALF_WORD);
     // Perform ANA
     cpu->a &= word;
     // Update remaining flags
@@ -349,5 +351,4 @@ static void i8080_ora(i8080 * const cpu, word_t word) {
 }
 
 static void i8080_cmp(i8080 * const cpu, word_t word) {
-    
 }
