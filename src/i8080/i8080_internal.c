@@ -37,13 +37,13 @@ static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf);
 static void i8080_mov_registers(i8080 * const cpu, word_t opcode);
 // Performs an add to accumulator and updates flags.
 static void i8080_add(i8080 * const cpu, word_t word);
-// Performs an add with carry to accumulator and updates flags
-static void i8080_adc(i8080 * const cpu, word_t word);
 // Performs a subtract from accumulator and updates flags
 static void i8080_sub(i8080 * const cpu, word_t word);
+// Performs an add with carry to accumulator and updates flags.
+static inline void i8080_adc(i8080 * const cpu, word_t word);
 // Perform a subtract with carry borrow from the accumulator, and updates flags. 
-static void i8080_sbb(i8080 * const cpu, word_t word);
-// Perform bitwise AND with accumulator, and update flags
+static inline void i8080_sbb(i8080 * const cpu, word_t word);
+// Perform bitwise AND with accumulator, and update flags.
 static void i8080_ana(i8080 * const cpu, word_t word);
 // Performs bitwise exclusive OR with accumulator, and updates flags.
 static void i8080_xra(i8080 * const cpu, word_t word);
@@ -301,14 +301,8 @@ static void i8080_add(i8080 * const cpu, word_t word) {
     update_ZSP(cpu, acc_buf);
 }
 
-static void i8080_adc(i8080 * const cpu, word_t word) {
-    cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(word) + (word_t)cpu->cy) & BIT_PAST_HALF_WORD != 0;
-    // Perform ADC
-    buf_t acc_buf =  (buf_t)cpu->a + (buf_t)word + (buf_t)cpu->cy;
-    cpu->a = (word_t)WORD_BITS(acc_buf);
-    // Update remaining flags
-    cpu->cy = acc_buf & BIT_PAST_WORD != 0;
-    update_ZSP(cpu, acc_buf);
+static inline void i8080_adc(i8080 * const cpu, word_t word) {
+    i8080_add(cpu, word + (word_t)cpu->cy);
 }
 
 static void i8080_sub(i8080 * const cpu, word_t word) {
@@ -323,14 +317,8 @@ static void i8080_sub(i8080 * const cpu, word_t word) {
     update_ZSP(cpu, acc_buf);
 }
 
-static void i8080_sbb(i8080 * const cpu, word_t word) {
-    cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(TWOS_COMP_LO_WORD(word + (word_t)cpu->cy))) & BIT_PAST_HALF_WORD != 0;
-    // Perform SBB
-    buf_t acc_buf = (buf_t)cpu->a + TWOS_COMP_WORD(word + (buf_t)cpu->cy);
-    cpu->a = (word_t)WORD_BITS(acc_buf);
-    // Update remaining flags, carry inverted for borrow
-    cpu->cy = acc_buf & BIT_PAST_WORD == 0;
-    update_ZSP(cpu, acc_buf);
+static inline void i8080_sbb(i8080 * const cpu, word_t word) {
+    i8080_sub(cpu, word + (word_t)cpu->cy);
 }
 
 static void i8080_ana(i8080 * const cpu, word_t word) {
