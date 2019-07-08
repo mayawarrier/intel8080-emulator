@@ -20,6 +20,8 @@ static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
 
 // Picks the lower half of the word
 #define WORD_LO_BITS(expr) ((word_t)(expr) & WORD_LO_F)
+// Picks the word bits only from a buf_t, this is safer than just (word_t)buf
+#define WORD_BITS(expr) ((buf_t)(expr) & (buf_t)WORD_T_MAX)
 // Perform 2's complement on the lower half of the word
 #define TWOS_COMP_LO_WORD(expr) ((word_t)(expr) ^ WORD_LO_F + (word_t)1)
 // Perform 2's complement on the entire word, up-scaling to a buf_t
@@ -27,8 +29,8 @@ static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
 
 // Returns pointers to the left and right registers for a mov operation.
 static struct register_pair mov_get_register_pair(i8080 * const cpu, word_t opcode);
-// Updates the Z, S, P flags based on accumulator value.
-// This must be buffered to preserve the bits produced after acc's MSB
+// Updates the Z, S, P flags based on the word provided.
+// This must be buffered to preserve the bits produced after word's MSB
 static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf);
 
 // Performs a mov operation from register to register.
@@ -154,7 +156,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case ANA_M: i8080_ana(cpu, i8080_read_memory(cpu)); break;
         case ANA_A: i8080_ana(cpu, cpu->a); break;
         
-        // Logical XRA with accumulator
+        // Exclusive logical OR with accumulator
         case XRA_B: i8080_xra(cpu, cpu->b); break;
         case XRA_C: i8080_xra(cpu, cpu->c); break;
         case XRA_D: i8080_xra(cpu, cpu->d); break;
@@ -164,6 +166,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case XRA_M: i8080_xra(cpu, i8080_read_memory(cpu)); break;
         case XRA_A: i8080_xra(cpu, cpu->a); break;
         
+        // Inclusive logical OR with accumulator
         case ORA_B: i8080_ora(cpu, cpu->b); break;
         case ORA_C: i8080_ora(cpu, cpu->c); break;
         case ORA_D: i8080_ora(cpu, cpu->d); break;
@@ -172,6 +175,17 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case ORA_L: i8080_ora(cpu, cpu->l); break;
         case ORA_M: i8080_ora(cpu, i8080_read_memory(cpu)); break;
         case ORA_A: i8080_ora(cpu, cpu->a); break;
+        
+        // Compare with accumulator
+        case CMP_B: i8080_cmp(cpu, cpu->b); break;
+        case CMP_C: i8080_cmp(cpu, cpu->c); break;
+        case CMP_D: i8080_cmp(cpu, cpu->d); break;
+        case CMP_E: i8080_cmp(cpu, cpu->e); break;
+        case CMP_H: i8080_cmp(cpu, cpu->h); break;
+        case CMP_L: i8080_cmp(cpu, cpu->l); break;
+        case CMP_M: i8080_cmp(cpu, i8080_read_memory(cpu)); break;
+        case CMP_A: i8080_cmp(cpu, cpu->a); break;
+        
     }
 }
 
@@ -255,14 +269,14 @@ static void i8080_mov_registers(i8080 * const cpu, word_t opcode) {
     *regs.left = *regs.right;
 }
 
-static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf) {
-    cpu->z = (acc_buf == 0);
+static inline void update_ZSP(i8080 * const cpu, buf_t word) {
+    cpu->z = (word == 0);
     /* If the number has gone above WORD_T_MAX, this indicates overflow or
     /* an underflow. In both cases, the 8080 sets the sign bit 
     /* since it doesn't have an overflow bit. */
-    cpu->s = (acc_buf > WORD_T_MAX);
-    // The truncated accumulator only keeps the word bits
-    buf_t trun_acc_buf = (buf_t)cpu->a; 
+    cpu->s = (word > WORD_T_MAX);
+    // The truncated word only keeps the word bits
+    buf_t trun_word_buf = (buf_t)WORD_BITS(word);
     /* Until all 8 bits have been shifted out,
      * shift each bit to the left and XNOR it with cpu->p.
      * while(buf & (word_t)WORD_T_MAX != 0): check if word bits are zero yet
@@ -270,8 +284,8 @@ static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf) {
      * & BIT_PAST_WORD: select the bit we just shifted
      * == 0: invert the bit before the XOR */
     cpu->p = true; // reset before calculating parity again
-    while((trun_acc_buf & (buf_t)WORD_T_MAX) != (buf_t)0x0) {
-        cpu->p ^= (((trun_acc_buf<<=1) & BIT_PAST_WORD) == 0); 
+    while((trun_word_buf & (buf_t)WORD_T_MAX) != (buf_t)0x0) {
+        cpu->p ^= (((trun_word_buf<<=1) & BIT_PAST_WORD) == 0); 
     }
 }
 
@@ -281,7 +295,7 @@ static void i8080_add(i8080 * const cpu, word_t word) {
     // We need a larger type so buffer overflow does not occur
     buf_t acc_buf = (buf_t)cpu->a + (buf_t)word;
     // The accumulator only needs to keep the word bits
-    cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX); // this is more implementation-safe than (word_t)acc_buf
+    cpu->a = (word_t)WORD_BITS(acc_buf);
     // Update remaining flags
     cpu->cy = acc_buf & BIT_PAST_WORD != 0;
     update_ZSP(cpu, acc_buf);
@@ -291,7 +305,7 @@ static void i8080_adc(i8080 * const cpu, word_t word) {
     cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(word) + (word_t)cpu->cy) & BIT_PAST_HALF_WORD != 0;
     // Perform ADC
     buf_t acc_buf =  (buf_t)cpu->a + (buf_t)word + (buf_t)cpu->cy;
-    cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
+    cpu->a = (word_t)WORD_BITS(acc_buf);
     // Update remaining flags
     cpu->cy = acc_buf & BIT_PAST_WORD != 0;
     update_ZSP(cpu, acc_buf);
@@ -302,7 +316,7 @@ static void i8080_sub(i8080 * const cpu, word_t word) {
     cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(TWOS_COMP_LO_WORD(word))) & BIT_PAST_HALF_WORD != 0;
     // Perform SUB
     buf_t acc_buf = (buf_t)cpu->a + TWOS_COMP_WORD(word);
-    cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
+    cpu->a = (word_t)WORD_BITS(acc_buf);
     // Update remaining flags
     // Carry is the borrow flag for SUB, SBB etc, invert carry 
     cpu->cy = acc_buf & BIT_PAST_WORD == 0;
@@ -313,7 +327,7 @@ static void i8080_sbb(i8080 * const cpu, word_t word) {
     cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(TWOS_COMP_LO_WORD(word + (word_t)cpu->cy))) & BIT_PAST_HALF_WORD != 0;
     // Perform SBB
     buf_t acc_buf = (buf_t)cpu->a + TWOS_COMP_WORD(word + (buf_t)cpu->cy);
-    cpu->a = (word_t)(acc_buf & (buf_t)WORD_T_MAX);
+    cpu->a = (word_t)WORD_BITS(acc_buf);
     // Update remaining flags, carry inverted for borrow
     cpu->cy = acc_buf & BIT_PAST_WORD == 0;
     update_ZSP(cpu, acc_buf);
@@ -351,4 +365,10 @@ static void i8080_ora(i8080 * const cpu, word_t word) {
 }
 
 static void i8080_cmp(i8080 * const cpu, word_t word) {
+    // This is almost identical to i8080_sub, with the exception that the accumulator is not affected
+    cpu->acy = (WORD_LO_BITS(cpu->a) + WORD_LO_BITS(TWOS_COMP_LO_WORD(word))) & BIT_PAST_HALF_WORD != 0;
+    buf_t acc_buf = (buf_t)cpu->a + TWOS_COMP_WORD(word);
+    // Carry is inverted for borrow
+    cpu->cy = acc_buf & BIT_PAST_WORD == 0;
+    update_ZSP(cpu, acc_buf);
 }
