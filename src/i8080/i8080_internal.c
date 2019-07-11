@@ -54,11 +54,11 @@ static void i8080_ora(i8080 * const cpu, word_t word);
 // Updates flags after subtraction from accumulator, without modifying it.
 static void i8080_cmp(i8080 * const cpu, word_t word);
 
-// Increments the register and updates flags.
-static void i8080_inr_reg(i8080 * const cpu, word_t * reg);
+// Increments and updates flags, and returns the incremented word.
+static word_t i8080_inr(i8080 * const cpu, word_t word);
+// Decrements and updates flags, and returns the decremented word.
+static word_t i8080_dcr(i8080 * const cpu, word_t word);
 
-// Increments the word at [HL], and updates flags
-static void i8080_inr_m(i8080 * const cpu);
 
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
@@ -194,15 +194,25 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case CMP_M: i8080_cmp(cpu, i8080_read_memory(cpu)); break;
         case CMP_A: i8080_cmp(cpu, cpu->a); break;
         
-        case INR_B: i8080_inr_reg(cpu, &cpu->b); break;
-        case INR_C: i8080_inr_reg(cpu, &cpu->c); break;
-        case INR_D: i8080_inr_reg(cpu, &cpu->d); break;
-        case INR_E: i8080_inr_reg(cpu, &cpu->e); break;
-        case INR_H: i8080_inr_reg(cpu, &cpu->h); break;
-        case INR_L: i8080_inr_reg(cpu, &cpu->l); break;
-        case INR_M: i8080_inr_m(cpu); break;
-        case INR_A: i8080_inr_reg(cpu, &cpu->a); break;
+        // Increment registers/memory
+        case INR_B: cpu->b = i8080_inr(cpu, cpu->b); break;
+        case INR_C: cpu->c = i8080_inr(cpu, cpu->c); break;
+        case INR_D: cpu->d = i8080_inr(cpu, cpu->d); break;
+        case INR_E: cpu->e = i8080_inr(cpu, cpu->e); break;
+        case INR_H: cpu->h = i8080_inr(cpu, cpu->h); break;
+        case INR_L: cpu->l = i8080_inr(cpu, cpu->l); break;
+        case INR_M: i8080_write_memory(cpu, i8080_inr(cpu, i8080_read_memory(cpu))); break;
+        case INR_A: i8080_inr(cpu, cpu->a); break;
         
+        // Decrement registers/memory
+        case DCR_B: cpu->b = i8080_dcr(cpu, cpu->b); break;
+        case DCR_C: cpu->c = i8080_dcr(cpu, cpu->c); break;
+        case DCR_D: cpu->d = i8080_dcr(cpu, cpu->d); break;
+        case DCR_E: cpu->e = i8080_dcr(cpu, cpu->e); break;
+        case DCR_H: cpu->h = i8080_dcr(cpu, cpu->h); break;
+        case DCR_L: cpu->l = i8080_dcr(cpu, cpu->l); break;
+        case DCR_M: i8080_write_memory(cpu, i8080_dcr(cpu, i8080_read_memory(cpu))); break;
+        case DCR_A: i8080_dcr(cpu, cpu->a); break;
     }
 }
 
@@ -378,21 +388,16 @@ static void i8080_cmp(i8080 * const cpu, word_t word) {
     update_ZSP(cpu, acc_buf);
 }
 
-static void i8080_inr_reg(i8080 * const cpu, word_t * reg) {
-    // Update auxiliary carry based on the register passed in
-    cpu->acy = AUX_CARRY(*reg, (word_t)1);
-    // Perform INR
-    (*reg)++;
-    update_ZSP(cpu, (buf_t)(*reg));
+static word_t i8080_inr(i8080 * const cpu, word_t word) {
+    cpu->acy = AUX_CARRY(word, 1);
+    word++; // no need to buffer since overflow is allowed without sign change
+    update_ZSP(cpu, (buf_t)word);
+    return word;
 }
 
-static void i8080_inr_m(i8080 * const cpu) {
-    // Read memory
-    word_t mem_word = i8080_read_memory(cpu);
-    // Update flags
-    cpu->acy = AUX_CARRY(mem_word, (word_t)1);
-    mem_word++;
-    update_ZSP(cpu, (buf_t)mem_word);
-    // Write incremented word to memory
-    i8080_write_memory(cpu, mem_word);
+static word_t i8080_dcr(i8080 * const cpu, word_t word) {
+    cpu->acy = AUX_CARRY(word, TWOS_COMP_LO_WORD(1));
+    word--; // no need to buffer since underflow is allowed without sign change
+    update_ZSP(cpu, (buf_t)word);
+    return word;
 }
