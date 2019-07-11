@@ -30,13 +30,13 @@ static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
 #define AUX_CARRY(expr1, expr2) ((WORD_LO_BITS(expr1) + WORD_LO_BITS(expr2)) & BIT_PAST_HALF_WORD != 0)
 
 // Returns pointers to the left and right registers for a mov operation.
-static struct register_pair mov_get_register_pair(i8080 * const cpu, word_t opcode);
+static struct register_pair i8080_mov_get_register_pair(i8080 * const cpu, word_t opcode);
 // Updates the Z, S, P flags based on the word provided.
 // This must be buffered to preserve the bits produced after word's MSB
 static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf);
 
-// Performs a mov operation from register to register.
-static void i8080_mov_registers(i8080 * const cpu, word_t opcode);
+// Performs a move operation from register to register.
+static inline void i8080_mov_reg(i8080 * const cpu, word_t opcode);
 // Performs an add to accumulator and updates flags.
 static void i8080_add(i8080 * const cpu, word_t word);
 // Performs a subtract from accumulator and updates flags
@@ -66,9 +66,14 @@ static inline void i8080_write_memory(i8080 * const cpu, word_t word);
 // Get address represented by {HL}
 static inline addr_t i8080_get_hl(i8080 * const cpu);
 
-static word_t i8080_advance_read_word(i8080 * const cpu) {
+static inline word_t i8080_advance_read_word(i8080 * const cpu) {
     // Read a word and advance program counter
     return cpu->read_memory(cpu->pc++);
+}
+
+static inline addr_t i8080_advance_read_addr(i8080 * const cpu) {
+    return (addr_t)i8080_advance_read_word(cpu) << HALF_ADDR_SIZE | 
+           (addr_t)i8080_advance_read_word(cpu);
 }
 
 void i8080_reset(i8080 * const cpu) {
@@ -86,7 +91,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
     
     switch(opcode) {
         
-        // All move operations between registers
+        // Move between registers
         case MOV_B_B: case MOV_B_C: case MOV_B_D: case MOV_B_E: case MOV_B_H: case MOV_B_L: case MOV_B_A:
         case MOV_C_B: case MOV_C_C: case MOV_C_D: case MOV_C_E: case MOV_C_H: case MOV_C_L: case MOV_C_A:
         case MOV_D_B: case MOV_D_C: case MOV_D_D: case MOV_D_E: case MOV_D_H: case MOV_D_L: case MOV_D_A:
@@ -94,9 +99,9 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case MOV_H_B: case MOV_H_C: case MOV_H_D: case MOV_H_E: case MOV_H_H: case MOV_H_L: case MOV_H_A:
         case MOV_L_B: case MOV_L_C: case MOV_L_D: case MOV_L_E: case MOV_L_H: case MOV_L_L: case MOV_L_A:
         case MOV_A_B: case MOV_A_C: case MOV_A_D: case MOV_A_E: case MOV_A_H: case MOV_A_L: case MOV_A_A:
-            i8080_mov_registers(cpu, opcode); break;    
+            i8080_mov_reg(cpu, opcode); break;    
             
-        // All move operations from memory to registers        
+        // Move from memory to registers      
         case MOV_B_M: cpu->b = i8080_read_memory(cpu); break;
         case MOV_C_M: cpu->c = i8080_read_memory(cpu); break;
         case MOV_D_M: cpu->d = i8080_read_memory(cpu); break;
@@ -105,7 +110,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case MOV_L_M: cpu->l = i8080_read_memory(cpu); break;
         case MOV_A_M: cpu->a = i8080_read_memory(cpu); break;
         
-        // All move operations from registers to memory        
+        // Move from registers to memory       
         case MOV_M_B: i8080_write_memory(cpu, cpu->b); break;
         case MOV_M_C: i8080_write_memory(cpu, cpu->c); break;
         case MOV_M_D: i8080_write_memory(cpu, cpu->d); break;
@@ -113,6 +118,16 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case MOV_M_H: i8080_write_memory(cpu, cpu->h); break;
         case MOV_M_L: i8080_write_memory(cpu, cpu->l); break;
         case MOV_M_A: i8080_write_memory(cpu, cpu->a); break;
+        
+        // Move immediate
+        case MVI_B: cpu->b = i8080_advance_read_word(cpu); break;
+        case MVI_C: cpu->c = i8080_advance_read_word(cpu); break;
+        case MVI_D: cpu->d = i8080_advance_read_word(cpu); break;
+        case MVI_E: cpu->e = i8080_advance_read_word(cpu); break;
+        case MVI_H: cpu->h = i8080_advance_read_word(cpu); break;
+        case MVI_L: cpu->l = i8080_advance_read_word(cpu); break;
+        case MVI_M: i8080_write_memory(cpu, i8080_advance_read_word(cpu)); break;
+        case MVI_A: cpu->a = i8080_advance_read_word(cpu); break;
         
         // Regular addition
         case ADD_B: i8080_add(cpu, cpu->b); break;
@@ -216,19 +231,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
     }
 }
 
-static inline word_t i8080_read_memory(i8080 * const cpu) {
-    return cpu->read_memory(i8080_get_hl(cpu));
-}
-
-static inline void i8080_write_memory(i8080 * const cpu, word_t word) {
-    cpu->write_memory(i8080_get_hl(cpu), word);
-}
-
-static inline addr_t i8080_get_hl(i8080 * const cpu) {
-    return (addr_t)cpu->h << HALF_ADDR_SIZE | (addr_t)cpu->l;
-}
-
-static struct register_pair mov_get_register_pair(i8080 * const cpu, word_t opcode) {
+static struct register_pair i8080_mov_get_register_pair(i8080 * const cpu, word_t opcode) {
     
     struct register_pair regs;
     regs.left = NULL;
@@ -289,13 +292,6 @@ static struct register_pair mov_get_register_pair(i8080 * const cpu, word_t opco
     return regs;
 }
 
-static void i8080_mov_registers(i8080 * const cpu, word_t opcode) {
-    // get the register pair from this opcode
-    struct register_pair regs = mov_get_register_pair(cpu, opcode);
-    // perform move
-    *regs.left = *regs.right;
-}
-
 static inline void update_ZSP(i8080 * const cpu, buf_t word) {
     cpu->z = (word == 0);
     /* If the number has gone above WORD_T_MAX, this indicates overflow or
@@ -314,6 +310,25 @@ static inline void update_ZSP(i8080 * const cpu, buf_t word) {
     while((trun_word_buf & (buf_t)WORD_T_MAX) != (buf_t)0x0) {
         cpu->p ^= (((trun_word_buf<<=1) & BIT_PAST_WORD) == 0); 
     }
+}
+
+static inline word_t i8080_read_memory(i8080 * const cpu) {
+    return cpu->read_memory(i8080_get_hl(cpu));
+}
+
+static inline void i8080_write_memory(i8080 * const cpu, word_t word) {
+    cpu->write_memory(i8080_get_hl(cpu), word);
+}
+
+static inline addr_t i8080_get_hl(i8080 * const cpu) {
+    return (addr_t)cpu->h << HALF_ADDR_SIZE | (addr_t)cpu->l;
+}
+
+static inline void i8080_mov_reg(i8080 * const cpu, word_t opcode) {
+    // get the register pair from this opcode
+    struct register_pair regs = i8080_mov_get_register_pair(cpu, opcode);
+    // perform move
+    *regs.left = *regs.right;
 }
 
 static void i8080_add(i8080 * const cpu, word_t word) {
