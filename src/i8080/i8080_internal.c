@@ -15,6 +15,7 @@ struct register_pair {
 
 static const buf_t BIT_PAST_WORD = (buf_t)1 << (HALF_WORD_SIZE * 2);
 static const word_t BIT_PAST_HALF_WORD = (word_t)1 << HALF_WORD_SIZE;
+static const buf_t BIT_PAST_ADDR = (buf_t)1 << (HALF_ADDR_SIZE * 2);
 static const word_t BIT_MSB_HALF_WORD = (word_t)1 << (HALF_WORD_SIZE - 1);
 static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
 static const addr_t ADDR_LO_F = ((word_t)1 << HALF_ADDR_SIZE) - (word_t)1;
@@ -24,6 +25,8 @@ static const addr_t ADDR_HI_F = (((word_t)1 << HALF_ADDR_SIZE) - (word_t)1) << H
 #define WORD_LO_BITS(expr) ((word_t)(expr) & WORD_LO_F)
 // Picks the word bits only from a buf_t, this is safer than just (word_t)buf
 #define WORD_BITS(expr) ((buf_t)(expr) & (buf_t)WORD_T_MAX)
+// Picks the address bits only from a buf_t, this is safer than just (addr_t)buf
+#define ADDR_BITS(expr) ((buf_t)(expr) & (buf_t)ADDR_T_MAX)
 // Perform 2's complement on the lower half of the word
 #define TWOS_COMP_LO_WORD(expr) ((word_t)(expr) ^ WORD_LO_F + (word_t)1)
 // Perform 2's complement on the entire word, up-scaling to a buf_t
@@ -265,6 +268,15 @@ static word_t i8080_dcr(i8080 * const cpu, word_t word) {
     return word;
 }
 
+// Adds the reg_pair to HL and updates flags.
+static void i8080_dad(i8080 * const cpu, addr_t reg_pair) {
+    // Adds reg_pair, buffering to compute carry
+    addr_t hl = i8080_get_hl(cpu);
+    buf_t hl_buf = (buf_t)hl + (buf_t)reg_pair;
+    i8080_set_hl(cpu, (addr_t)ADDR_BITS(hl_buf));
+    cpu->cy = hl_buf & BIT_PAST_ADDR;
+}
+
 static inline word_t i8080_advance_read_word(i8080 * const cpu) {
     // Read a word and advance program counter
     return cpu->read_memory(cpu->pc++);
@@ -437,5 +449,11 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case DCX_D: i8080_set_de(cpu, i8080_get_de(cpu) - (addr_t)1); break;
         case DCX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) - (addr_t)1); break;
         case DCX_SP: cpu->sp -= 1;
+        
+        // Double register add (16-bit addition)
+        case DAD_B: i8080_dad(cpu, concatenate(cpu->b, cpu->c)); break;
+        case DAD_D: i8080_dad(cpu, concatenate(cpu->d, cpu->e)); break;
+        case DAD_H: i8080_dad(cpu, concatenate(cpu->h, cpu->l)); break;
+        case DAD_SP: i8080_dad(cpu, cpu->sp); break;
     }
 }
