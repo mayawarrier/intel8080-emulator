@@ -17,6 +17,8 @@ static const buf_t BIT_PAST_WORD = (buf_t)1 << (HALF_WORD_SIZE * 2);
 static const word_t BIT_PAST_HALF_WORD = (word_t)1 << HALF_WORD_SIZE;
 static const word_t BIT_MSB_HALF_WORD = (word_t)1 << (HALF_WORD_SIZE - 1);
 static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
+static const addr_t ADDR_LO_F = ((word_t)1 << HALF_ADDR_SIZE) - (word_t)1;
+static const addr_t ADDR_HI_F = (((word_t)1 << HALF_ADDR_SIZE) - (word_t)1) << HALF_ADDR_SIZE;
 
 // Picks the lower half of the word
 #define WORD_LO_BITS(expr) ((word_t)(expr) & WORD_LO_F)
@@ -34,6 +36,8 @@ static struct register_pair i8080_mov_get_register_pair(i8080 * const cpu, word_
 // Updates the Z, S, P flags based on the word provided.
 // This must be buffered to preserve the bits produced after word's MSB
 static inline void update_ZSP(i8080 * const cpu, buf_t acc_buf);
+// Concatenates two words and returns a double word.
+static inline addr_t concatenate(word_t word1, word_t word2);
 
 // Performs a move operation from register to register.
 static inline void i8080_mov_reg(i8080 * const cpu, word_t opcode);
@@ -63,8 +67,18 @@ static word_t i8080_dcr(i8080 * const cpu, word_t word);
 static inline word_t i8080_read_memory(i8080 * const cpu);
 static inline void i8080_write_memory(i8080 * const cpu, word_t word);
 
+// Get address represented by {BC}
+static inline addr_t i8080_get_bc(i8080 * const cpu);
+// Get address represented by {DE}
+static inline addr_t i8080_get_de(i8080 * const cpu);
 // Get address represented by {HL}
 static inline addr_t i8080_get_hl(i8080 * const cpu);
+// Sets B to hi dbl_word, and C to lo dbl_word
+static inline void i8080_set_bc(i8080 * const cpu, addr_t dbl_word);
+// Sets D to hi dbl_word, and E to lo dbl_word
+static inline void i8080_set_de(i8080 * const cpu, addr_t dbl_word);
+// Sets H to hi dbl_word, and L to lo dbl_word
+static inline void i8080_set_hl(i8080 * const cpu, addr_t dbl_word);
 
 static inline word_t i8080_advance_read_word(i8080 * const cpu) {
     // Read a word and advance program counter
@@ -228,6 +242,16 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case DCR_L: cpu->l = i8080_dcr(cpu, cpu->l); break;
         case DCR_M: i8080_write_memory(cpu, i8080_dcr(cpu, i8080_read_memory(cpu))); break;
         case DCR_A: i8080_dcr(cpu, cpu->a); break;
+        
+        // Increment/decrement register pairs
+        case INX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) + (addr_t)1); break;
+        case INX_D: i8080_set_de(cpu, i8080_get_de(cpu) + (addr_t)1); break;
+        case INX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) + (addr_t)1); break;
+        case INX_SP: cpu->sp += 1;
+        case DCX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) - (addr_t)1); break;
+        case DCX_D: i8080_set_de(cpu, i8080_get_de(cpu) - (addr_t)1); break;
+        case DCX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) - (addr_t)1); break;
+        case DCX_SP: cpu->sp -= 1;
     }
 }
 
@@ -312,6 +336,10 @@ static inline void update_ZSP(i8080 * const cpu, buf_t word) {
     }
 }
 
+static inline addr_t concatenate(word_t word1, word_t word2) {
+    return (addr_t)word1 << HALF_ADDR_SIZE | (addr_t)word2;
+}
+
 static inline word_t i8080_read_memory(i8080 * const cpu) {
     return cpu->read_memory(i8080_get_hl(cpu));
 }
@@ -320,8 +348,31 @@ static inline void i8080_write_memory(i8080 * const cpu, word_t word) {
     cpu->write_memory(i8080_get_hl(cpu), word);
 }
 
+static inline addr_t i8080_get_bc(i8080 * const cpu) {
+    return concatenate(cpu->b, cpu->c);
+}
+
+static inline addr_t i8080_get_de(i8080 * const cpu) {
+    return concatenate(cpu->d, cpu->e);
+}
+
 static inline addr_t i8080_get_hl(i8080 * const cpu) {
-    return (addr_t)cpu->h << HALF_ADDR_SIZE | (addr_t)cpu->l;
+    return concatenate(cpu->h, cpu->l);
+}
+
+static inline void i8080_set_bc(i8080 * const cpu, addr_t dbl_word) {
+    cpu->b = dbl_word & ADDR_HI_F;
+    cpu->c = dbl_word & ADDR_LO_F;
+}
+
+static inline void i8080_set_de(i8080 * const cpu, addr_t dbl_word) {
+    cpu->d = dbl_word & ADDR_HI_F;
+    cpu->e = dbl_word & ADDR_LO_F;
+}
+
+static inline void i8080_set_hl(i8080 * const cpu, addr_t dbl_word) {
+    cpu->h = dbl_word & ADDR_HI_F;
+    cpu->l = dbl_word & ADDR_LO_F;
 }
 
 static inline void i8080_mov_reg(i8080 * const cpu, word_t opcode) {
