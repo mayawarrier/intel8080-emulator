@@ -274,7 +274,7 @@ static void i8080_dad(i8080 * const cpu, addr_t reg_pair) {
     addr_t hl = i8080_get_hl(cpu);
     buf_t hl_buf = (buf_t)hl + (buf_t)reg_pair;
     i8080_set_hl(cpu, (addr_t)ADDR_BITS(hl_buf));
-    cpu->cy = hl_buf & BIT_PAST_ADDR;
+    cpu->cy = hl_buf & BIT_PAST_ADDR == 0;
 }
 
 static inline word_t i8080_advance_read_word(i8080 * const cpu) {
@@ -444,16 +444,50 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case INX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) + (addr_t)1); break;
         case INX_D: i8080_set_de(cpu, i8080_get_de(cpu) + (addr_t)1); break;
         case INX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) + (addr_t)1); break;
-        case INX_SP: cpu->sp += 1;
+        case INX_SP: cpu->sp += 1; break;
         case DCX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) - (addr_t)1); break;
         case DCX_D: i8080_set_de(cpu, i8080_get_de(cpu) - (addr_t)1); break;
         case DCX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) - (addr_t)1); break;
-        case DCX_SP: cpu->sp -= 1;
+        case DCX_SP: cpu->sp -= 1; break;
         
         // Double register add (16-bit addition)
-        case DAD_B: i8080_dad(cpu, concatenate(cpu->b, cpu->c)); break;
-        case DAD_D: i8080_dad(cpu, concatenate(cpu->d, cpu->e)); break;
-        case DAD_H: i8080_dad(cpu, concatenate(cpu->h, cpu->l)); break;
+        case DAD_B: i8080_dad(cpu, i8080_get_bc(cpu)); break;
+        case DAD_D: i8080_dad(cpu, i8080_get_de(cpu)); break;
+        case DAD_H: i8080_dad(cpu, i8080_get_hl(cpu)); break;
         case DAD_SP: i8080_dad(cpu, cpu->sp); break;
+        
+        // Load register pair immediate
+        case LXI_B: cpu->c = i8080_advance_read_word(cpu); cpu->b = i8080_advance_read_word(cpu); break;
+        case LXI_D: cpu->e = i8080_advance_read_word(cpu); cpu->d = i8080_advance_read_word(cpu); break;
+        case LXI_H: cpu->l = i8080_advance_read_word(cpu); cpu->h = i8080_advance_read_word(cpu); break;
+        case LXI_SP: cpu->sp = i8080_advance_read_addr(cpu); break;
+        
+        // Load/store accumulator <-> register pair
+        case STAX_B: cpu->write_memory(i8080_get_bc(cpu), cpu->a); break;
+        case STAX_D: cpu->write_memory(i8080_get_de(cpu), cpu->a); break;
+        case LDAX_B: cpu->a = cpu->read_memory(i8080_get_bc(cpu)); break;
+        case LDAX_D: cpu->a = cpu->read_memory(i8080_get_de(cpu)); break;
+        
+        // Load/store accumulator immediate
+        case STA: cpu->write_memory(i8080_advance_read_addr(cpu), cpu->a); break;
+        case LDA: cpu->a = cpu->read_memory(i8080_advance_read_addr(cpu)); break;
+        
+        // Store HL to memory address
+        case SHLD:
+        {
+            addr_t addr = i8080_advance_read_addr(cpu);
+            cpu->write_memory(addr, cpu->l);
+            cpu->write_memory(addr + (addr_t) 1, cpu->h);
+            break;
+        }
+        
+        // Read HL from memory address
+        case LHLD:
+        {
+            addr_t addr = i8080_advance_read_addr(cpu);
+            cpu->l = cpu->read_memory(addr);
+            cpu->h = cpu->read_memory(addr + (addr_t) 1);
+            break;
+        }
     }
 }
