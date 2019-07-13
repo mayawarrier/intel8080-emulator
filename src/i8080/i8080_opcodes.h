@@ -235,7 +235,7 @@
 #define CMP_M 0xbe        /*      1       Z,S,P,CY,AC  A - [HL]                             7    */
 #define CMP_A 0xbf        /*      1       Z,S,P,CY,AC  A - A                                4    */
 
-// --- Subroutines, stack, conditionals, I/O -----
+// --- Subroutines, stack, conditionals, I/O, misc -----
 #define RNZ 0xc0          /*      1                    if NZ, perform RET                   11/5 */
 #define POP_B 0xc1        /*      1                    BC = {[SP + 1], [SP]}, SP <- SP + 2  10   */
 #define JNZ 0xc2          /*      3                    if NZ, PC <- adr                     10   */
