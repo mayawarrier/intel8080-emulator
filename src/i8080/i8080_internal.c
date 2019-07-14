@@ -86,15 +86,18 @@ static inline void update_ZSP(i8080 * const cpu, buf_t word) {
     // The truncated word only keeps the word bits
     buf_t trun_word_buf = (buf_t)WORD_BITS(word);
     /* Until all 8 bits have been shifted out,
-     * shift each bit to the left and XNOR it with cpu->p.
+     * shift each bit to the left and XOR it with cpu->p.
+     * This indicates odd number of ones if high.
      * while(buf & (word_t)WORD_T_MAX != 0): check if word bits are zero yet
      * (buff<<=1): shift the buffer to the left
      * get_word_bit(,): select the bit we just shifted out */
-    cpu->p = true; // reset before calculating parity again
+    cpu->p = false; // reset before starting calculation again
     while((trun_word_buf & (buf_t)WORD_T_MAX) != (buf_t)0x0) {
         trun_word_buf <<= 1;
-        cpu->p ^= !get_word_bit(trun_word_buf, HALF_WORD_SIZE * 2); 
+        cpu->p ^= get_buf_bit(trun_word_buf, HALF_WORD_SIZE * 2);
     }
+    // invert since we want even number of ones
+    cpu->p = !cpu->p;
 }
 
 // Concatenates two words and returns a double word.
