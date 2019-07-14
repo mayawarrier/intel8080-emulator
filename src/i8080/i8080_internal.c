@@ -8,11 +8,6 @@
 #include <math.h>
 #include <limits.h>
 
-struct register_pair {
-    word_t * left;
-    word_t * right;
-};
-
 static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
 static const addr_t ADDR_LO_F = ((word_t)1 << HALF_ADDR_SIZE) - (word_t)1;
 static const addr_t ADDR_HI_F = (((word_t)1 << HALF_ADDR_SIZE) - (word_t)1) << HALF_ADDR_SIZE;
@@ -134,73 +129,73 @@ static inline void i8080_write_memory(i8080 * const cpu, word_t word) {
 }
 
 // Returns pointers to the left and right registers for a mov operation.
-static struct register_pair i8080_mov_get_register_pair(i8080 * const cpu, word_t opcode) {
+static void i8080_mov_get_reg_pair(i8080 * const cpu, word_t opcode, word_t ** left, word_t ** right) {
     
-    struct register_pair regs;
-    regs.left = NULL;
-    regs.right = NULL;
+    *left = NULL; *right = NULL;
     
     word_t lo_opcode = opcode & 0x0f;
     word_t hi_opcode = opcode & 0xf0;
     
     switch(lo_opcode) {
         case 0x00: case 0x08:
-            regs.right = &cpu->b; break;
+            *right = &cpu->b; break;
         case 0x01: case 0x09: 
-            regs.right = &cpu->c; break;
+            *right = &cpu->c; break;
         case 0x02: case 0x0a:
-            regs.right = &cpu->d; break;
+            *right = &cpu->d; break;
         case 0x03: case 0x0b:
-            regs.right = &cpu->e; break;
+            *right = &cpu->e; break;
         case 0x04: case 0x0c:
-            regs.right = &cpu->h; break;
+            *right = &cpu->h; break;
         case 0x05: case 0x0d:
-            regs.right = &cpu->l; break;
+            *right = &cpu->l; break;
         case 0x07: case 0x0f:
-            regs.right = &cpu->a; break;
+            *right = &cpu->a; break;
         // Moving from M = [HL] should be dealt with separately
-        default: regs.right = NULL; break;
+        default: *right = NULL; break;
     }
     
     switch(hi_opcode) {
         case 0x40:
             if (lo_opcode >= 0x00 && lo_opcode <= 0x07) {
-                regs.left = &cpu->b;
+                *left = &cpu->b;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
-                regs.left = &cpu->c;
+                *left = &cpu->c;
             }
             break;
         case 0x50:
             if (lo_opcode >= 0x00 && lo_opcode <= 0x07) {
-                regs.left = &cpu->d;
+                *left = &cpu->d;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
-                regs.left = &cpu->e;
+                *left = &cpu->e;
             }
             break;
         case 0x60:
             if (lo_opcode >= 0x00 && lo_opcode <= 0x07) {
-                regs.left = &cpu->h;
+                *left = &cpu->h;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
-                regs.left = &cpu->l;
+                *left = &cpu->l;
             }
         case 0x70:
             // Moving into M = [HL] should be dealt with separately
             if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
-                regs.left = &cpu->a;
+                *left = &cpu->a;
             }
             break;
-        default: regs.left = NULL;
+        default: *left = NULL;
     }
-    
-    return regs;
 }
 
 // Performs a move operation from register to register.
-static inline void i8080_mov_reg(i8080 * const cpu, word_t opcode) {
+static void i8080_mov_reg(i8080 * const cpu, word_t opcode) {
     // get the register pair from this opcode
-    struct register_pair regs = i8080_mov_get_register_pair(cpu, opcode);
+    word_t ** left_pptr = (word_t **)malloc(sizeof(word_t *));
+    word_t ** right_pptr = (word_t **)malloc(sizeof(word_t *));
+    i8080_mov_get_reg_pair(cpu, opcode, left_pptr, right_pptr);
     // perform move
-    *regs.left = *regs.right;
+    *(*left_pptr) = *(*right_pptr);
+    free(left_pptr);
+    free(right_pptr);
 }
 
 // Performs an add to accumulator and updates flags.
@@ -311,25 +306,43 @@ static void i8080_dad(i8080 * const cpu, addr_t reg_pair) {
 // Rotates accumulator left and sets carry to acc MSB.
 static void i8080_rlc(i8080 * const cpu) {
     bool msb = get_word_bit(cpu->a, HALF_WORD_SIZE * 2 - 1);
-    bool lsb = get_word_bit(cpu->a, 0);
     // shift left
     cpu->a <<= 1;
-    
+    // set lsb to msb
+    set_word_bit(&cpu->a, 0, msb);
+    cpu->cy = msb;
 }
 
 // Rotates accumulator right and sets carry to acc LSB.
 static void i8080_rrc(i8080 * const cpu) {
-    
+    bool lsb = get_word_bit(cpu->a, 0);
+    // shift right
+    cpu->a >>= 1;
+    // set msb to lsb
+    set_word_bit(&cpu->a, 2 * HALF_WORD_SIZE - 1, lsb);
+    cpu->cy = lsb;
 }
 
 // Rotates accumulator left through carry.
 static void i8080_ral(i8080 * const cpu) {
-    
+    // Save previous cy to become new lsb
+    bool prev_cy = cpu->cy;
+    // save previous msb to become new carry
+    bool msb = get_word_bit(cpu->a, 2 * HALF_WORD_SIZE - 1);
+    cpu->a <<= 1;
+    cpu->cy = msb;
+    set_word_bit(&cpu->a, 0, prev_cy);
 }
 
 // Rotates accumulator right through carry.
 static void i8080_rar(i8080 * const cpu) {
-    
+    bool prev_cy = cpu->cy;
+    bool lsb = get_word_bit(cpu->a, 0);
+    cpu->a >>= 1;
+    // set carry to previous lsb
+    cpu->cy = lsb;
+    // set MSB to previous carry
+    set_word_bit(&cpu->a, 2 * HALF_WORD_SIZE - 1, prev_cy);
 }
 
 static inline word_t i8080_advance_read_word(i8080 * const cpu) {
@@ -357,7 +370,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
     
     switch(opcode) {
         
-        // No operation + undocumented NOPs
+        // No operation + undocumented NOPs. Does nothing.
         case NOP: case ALT_NOP0: case ALT_NOP1: case ALT_NOP2: case ALT_NOP3: case ALT_NOP4: case ALT_NOP5: case ALT_NOP6:
             break;
         
@@ -550,10 +563,10 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         }
         
         // Rotate instructions
-        case RLC: i8080_rlc(cpu); break;
-        case RRC: i8080_rrc(cpu); break;
-        case RAL: i8080_ral(cpu); break;
-        case RAR: i8080_rar(cpu); break;
+        case RLC: i8080_rlc(cpu); break;  // rotate accumulator left
+        case RRC: i8080_rrc(cpu); break;  // rotate accumulator right
+        case RAL: i8080_ral(cpu); break;  // rotate accumulator left through carry
+        case RAR: i8080_rar(cpu); break;  // rotate accumulator right through carry
         
         // Special instructions
         case DAA: break;
