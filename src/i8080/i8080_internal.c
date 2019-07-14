@@ -9,11 +9,14 @@
 #include <limits.h>
 
 static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
+static const word_t WORD_HI_F = (((word_t)1 << HALF_WORD_SIZE) - (word_t)1) << HALF_WORD_SIZE;
 static const addr_t ADDR_LO_F = ((word_t)1 << HALF_ADDR_SIZE) - (word_t)1;
 static const addr_t ADDR_HI_F = (((word_t)1 << HALF_ADDR_SIZE) - (word_t)1) << HALF_ADDR_SIZE;
 
 // Picks the lower half of the word
 #define WORD_LO_BITS(expr) ((word_t)(expr) & WORD_LO_F)
+// Picks the upper half of the word
+#define WORD_HI_BITS(expr) ((word_t)(expr) & WORD_HI_F)
 // Picks the word bits only from a buf_t, this is safer than just (word_t)buf
 #define WORD_BITS(expr) ((buf_t)(expr) & (buf_t)WORD_T_MAX)
 // Picks the address bits only from a buf_t, this is safer than just (addr_t)buf
@@ -345,6 +348,26 @@ static void i8080_rar(i8080 * const cpu) {
     set_word_bit(&cpu->a, 2 * HALF_WORD_SIZE - 1, prev_cy);
 }
 
+// Performs a decimal adjust on the accumulator (converts to BCD) and updates flags.
+static void i8080_daa(i8080 * const cpu) {
+    word_t lo_acc = WORD_LO_BITS(cpu->a);
+    // if lo bits are greater than 9 or 15, add 6 to accumulator
+    if ((lo_acc > (word_t)9) || cpu->acy) {
+        i8080_add(cpu, (word_t)6); // this is lo 6
+    }
+    // We want to preserve the original auxiliary carry
+    // from here because DAA adds 6 only to the hi bits,
+    // and the auxiliary carry is not affected.
+    bool prev_acy = cpu->acy;
+    // if hi bits are greater than 9 or 15, add 6 to hi bits
+    word_t hi_acc = WORD_HI_BITS(cpu->a) >> HALF_WORD_SIZE;
+    if ((hi_acc > (word_t)9) || cpu->cy) {
+        i8080_add(cpu, (word_t)96); // this is hi 6
+    }
+    // bring back previous acy
+    cpu->acy = prev_acy;
+}
+
 static inline word_t i8080_advance_read_word(i8080 * const cpu) {
     // Read a word and advance program counter
     return cpu->read_memory(cpu->pc++);
@@ -563,13 +586,13 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         }
         
         // Rotate instructions
-        case RLC: i8080_rlc(cpu); break;  // rotate accumulator left
-        case RRC: i8080_rrc(cpu); break;  // rotate accumulator right
-        case RAL: i8080_ral(cpu); break;  // rotate accumulator left through carry
-        case RAR: i8080_rar(cpu); break;  // rotate accumulator right through carry
+        case RLC: i8080_rlc(cpu); break;  // Rotate accumulator left
+        case RRC: i8080_rrc(cpu); break;  // Rotate accumulator right
+        case RAL: i8080_ral(cpu); break;  // Rotate accumulator left through carry
+        case RAR: i8080_rar(cpu); break;  // Rotate accumulator right through carry
         
         // Special instructions
-        case DAA: break;
+        case DAA: i8080_daa(cpu); break;      // Decimal adjust acc (convert acc to BCD)
         case CMA: cpu->a = ~cpu->a; break;    // Complement accumulator
         case STC: cpu->cy = true; break;      // Set carry
         case CMC: cpu->cy = !cpu->cy; break;  // Complement carry
