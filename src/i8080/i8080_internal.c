@@ -445,12 +445,17 @@ static buf_t i8080_pop(i8080 * const cpu) {
     return concatenate(left_word, right_word);
 }
 
-// Stacks the current PC and jumps to immediate address.
+// Pushes the current PC and jumps to immediate address.
 static inline void i8080_call(i8080 * const cpu) {
     // saves the current program counter
     i8080_push(cpu, (buf_t)cpu->pc);
     // jumps to immediate address
     cpu->pc = i8080_advance_read_addr(cpu);
+}
+
+// Pops the last PC and jumps to it.
+static inline void i8080_ret(i8080 * const cpu) {
+    cpu->pc = (addr_t)ADDR_BITS(i8080_pop(cpu));
 }
 
 void i8080_reset(i8080 * const cpu) {
@@ -703,5 +708,17 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case CPE: if (cpu->p) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // CALL on P i.e. acc parity even
         case CP: if (!cpu->s) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // CALL on !S i.e. acc positive
         case CM: if (cpu->s) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // CALL on S i.e. acc negative
+        
+        // Subroutine returns
+        // Conditional RETs take 6 cycles longer if the condition is met
+        case RET: case ALT_RET0: i8080_ret(cpu); break;
+        case RNZ: if (!cpu->z) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // RET on !Z i.e. non-zero acc
+        case RZ: if (cpu->z) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;     // RET on Z i.e. zero acc
+        case RNC: if (!cpu->cy) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;  // RET on !CY i.e. carry reset
+        case RC: if (cpu->cy) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // RET on CY i.e. carry set
+        case RPO: if (!cpu->p) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // RET on !P i.e. acc parity odd
+        case RPE: if (cpu->p) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // RET on P i.e. acc parity even
+        case RP: if (!cpu->s) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // RET on !S i.e. acc positive
+        case RM: if (cpu->s) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;     // RET on S i.e. acc negative
     }
 }
