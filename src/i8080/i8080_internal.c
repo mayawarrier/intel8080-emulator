@@ -714,10 +714,10 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case PUSH_D: i8080_push(cpu, i8080_get_de(cpu)); break;
         case PUSH_H: i8080_push(cpu, i8080_get_hl(cpu)); break;
         case PUSH_PSW: i8080_push(cpu, i8080_get_psw(cpu)); break;
-        case POP_B: i8080_set_bc(cpu, i8080_pop(cpu)); break;
-        case POP_D: i8080_set_de(cpu, i8080_pop(cpu)); break;
-        case POP_H: i8080_set_hl(cpu, i8080_pop(cpu)); break;
-        case POP_PSW: i8080_set_psw(cpu, i8080_pop(cpu)); break;
+        case POP_B: i8080_set_bc(cpu, (addr_t)ADDR_BITS(i8080_pop(cpu))); break;
+        case POP_D: i8080_set_de(cpu, (addr_t)ADDR_BITS(i8080_pop(cpu))); break;
+        case POP_H: i8080_set_hl(cpu, (addr_t)ADDR_BITS(i8080_pop(cpu))); break;
+        case POP_PSW: i8080_set_psw(cpu, (addr_t)ADDR_BITS(i8080_pop(cpu))); break;
         
         // Subroutine calls
         // Conditional CALLs take 6 cycles longer if the condition is met
