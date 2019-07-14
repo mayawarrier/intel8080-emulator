@@ -181,11 +181,12 @@ static inline void i8080_write_memory(i8080 * const cpu, word_t word) {
     cpu->write_memory(i8080_get_hl(cpu), word);
 }
 
+// Reads a word and advances PC by 1.
 static inline word_t i8080_advance_read_word(i8080 * const cpu) {
-    // Read a word and advance program counter
     return cpu->read_memory(cpu->pc++);
 }
 
+// Reads address (a double word) and advances PC by 2.
 static inline addr_t i8080_advance_read_addr(i8080 * const cpu) {
     word_t hi_addr = i8080_advance_read_word(cpu);
     word_t lo_addr = i8080_advance_read_word(cpu);
@@ -445,6 +446,11 @@ static buf_t i8080_pop(i8080 * const cpu) {
     return concatenate(left_word, right_word);
 }
 
+// Jumps to immediate address.
+static inline void i8080_jmp(i8080 * const cpu) {
+    cpu->pc = i8080_advance_read_addr(cpu);
+}
+
 // Pushes the current PC and jumps to immediate address.
 static inline void i8080_call(i8080 * const cpu) {
     // saves the current program counter
@@ -458,9 +464,24 @@ static inline void i8080_ret(i8080 * const cpu) {
     cpu->pc = (addr_t)ADDR_BITS(i8080_pop(cpu));
 }
 
-// Jumps to immediate address.
-static inline void i8080_jmp(i8080 * const cpu) {
-    cpu->pc = i8080_advance_read_addr(cpu);
+// Exchanges the top 2 words of the stack with {HL}.
+static inline void i8080_xthl(i8080 * const cpu) {
+    // Gets the top two words on the stack
+    word_t prev_right_word = cpu->read_memory(cpu->sp);
+    word_t prev_left_word = cpu->read_memory(cpu->sp + (addr_t)1);
+    // Overwrites the top 2 words with H and L
+    cpu->write_memory(cpu->sp, cpu->l);
+    cpu->write_memory(cpu->sp + (addr_t)1, cpu->h);
+    // Sets HL to the previous top 2 words on the stack 
+    cpu->h = prev_left_word;
+    cpu->l = prev_right_word;
+}
+
+// Exchanges the contents of BC and DE.
+static inline void i8080_xchg(i8080 * const cpu) {
+    addr_t bc = i8080_get_bc(cpu);
+    i8080_set_bc(cpu, i8080_get_de(cpu));
+    i8080_set_de(cpu, bc);
 }
 
 void i8080_reset(i8080 * const cpu) {
@@ -676,12 +697,6 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case RAL: i8080_ral(cpu); break;  // Rotate accumulator left through carry
         case RAR: i8080_rar(cpu); break;  // Rotate accumulator right through carry
         
-        // Special instructions
-        case DAA: i8080_daa(cpu); break;      // Decimal adjust acc (convert acc to BCD)
-        case CMA: cpu->a = ~cpu->a; break;    // Complement accumulator
-        case STC: cpu->cy = true; break;      // Set carry
-        case CMC: cpu->cy = !cpu->cy; break;  // Complement carry
-        
         // Arithmetic / logical / compare immediate
         case ADI: i8080_add(cpu, i8080_advance_read_word(cpu)); break;
         case ACI: i8080_adc(cpu, i8080_advance_read_word(cpu)); break;
@@ -736,5 +751,15 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case JPE: if (cpu->p) {i8080_jmp(cpu); } break;     // JMP on P i.e. acc parity even
         case JP: if (!cpu->s) {i8080_jmp(cpu); } break;     // JMP on !S i.e. acc positive
         case JM: if (cpu->s) {i8080_jmp(cpu); } break;      // JMP on S i.e. acc negative
+        
+        // Special instructions
+        case DAA: i8080_daa(cpu); break;      // Decimal adjust acc (convert acc to BCD)
+        case CMA: cpu->a = ~cpu->a; break;    // Complement accumulator
+        case STC: cpu->cy = true; break;      // Set carry
+        case CMC: cpu->cy = !cpu->cy; break;  // Complement carry
+        case PCHL: cpu->pc = i8080_get_hl(cpu); break; // Move HL into PC
+        case SPHL: cpu->sp = i8080_get_hl(cpu); break; // Move HL into SP
+        case XTHL: i8080_xthl(cpu); break;             // Exchange top of stack with H&L
+        case XCHG: i8080_xchg(cpu); break;             // Exchanges the contents of BC and DE
     }
 }
