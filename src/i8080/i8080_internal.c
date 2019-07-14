@@ -448,17 +448,25 @@ static buf_t i8080_pop(i8080 * const cpu) {
     return concatenate(left_word, right_word);
 }
 
+// Jumps to address addr.
+static inline void i8080_jmp_addr(i8080 * const cpu, addr_t addr) {
+    cpu->pc = addr;
+} 
+
+// Pushes the current PC and jumps to addr.
+static inline void i8080_call_addr(i8080 * const cpu, addr_t addr) {
+    i8080_push(cpu, (buf_t)cpu->pc);
+    i8080_jmp_addr(cpu, addr);
+}
+
 // Jumps to immediate address.
 static inline void i8080_jmp(i8080 * const cpu) {
-    cpu->pc = i8080_advance_read_addr(cpu);
+    i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
 }
 
 // Pushes the current PC and jumps to immediate address.
 static inline void i8080_call(i8080 * const cpu) {
-    // saves the current program counter
-    i8080_push(cpu, (buf_t)cpu->pc);
-    // jumps to immediate address
-    i8080_jmp(cpu);
+    i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
 }
 
 // Pops the last PC and jumps to it.
@@ -489,13 +497,14 @@ static inline void i8080_xchg(i8080 * const cpu) {
 void i8080_reset(i8080 * const cpu) {
     // start executing from beginning again
     cpu->pc = 0;
+    cpu->is_halted = false;
 }
 
-void i8080_next(i8080 * const cpu) {
-    i8080_exec(cpu, i8080_advance_read_word(cpu));
+bool i8080_next(i8080 * const cpu) {
+    return i8080_exec(cpu, i8080_advance_read_word(cpu));
 }
 
-void i8080_exec(i8080 * const cpu, word_t opcode) {
+bool i8080_exec(i8080 * const cpu, word_t opcode) {
     
     cpu->cycles_taken += OPCODES_CYCLES[opcode];
     
@@ -764,7 +773,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case XTHL: i8080_xthl(cpu); break;             // Exchange top of stack with H&L
         case XCHG: i8080_xchg(cpu); break;             // Exchanges the contents of BC and DE
         
-        // I/O
+        // I/O, accumulator <-> word
         /* In the 8080, the port address is duplicated across the 16-bit address bus:
          * https://stackoverflow.com/questions/13551973/intel-8080-instruction-out
          * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 97 */
@@ -778,5 +787,28 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
             word_t port_addr = i8080_advance_read_word(cpu);
             cpu->port_out((addr_t)concatenate(port_addr, port_addr), cpu->a);
         }
+        
+        // Restart / software interrupts
+        case RST_0: i8080_call_addr(cpu, INTERRUPT_TABLE[0]); break;
+        case RST_1: i8080_call_addr(cpu, INTERRUPT_TABLE[1]); break;
+        case RST_2: i8080_call_addr(cpu, INTERRUPT_TABLE[2]); break;
+        case RST_3: i8080_call_addr(cpu, INTERRUPT_TABLE[3]); break;
+        case RST_4: i8080_call_addr(cpu, INTERRUPT_TABLE[4]); break;
+        case RST_5: i8080_call_addr(cpu, INTERRUPT_TABLE[5]); break;
+        case RST_6: i8080_call_addr(cpu, INTERRUPT_TABLE[6]); break;
+        case RST_7: i8080_call_addr(cpu, INTERRUPT_TABLE[7]); break;
+        
+        // Enable / disable interrupts
+        case EI: cpu->ie = true; break;
+        case DI: cpu->ie = false; break;
+        
+        // HALT processor
+        // Can only be brought out by interrupt or RESET.
+        case HLT: cpu->is_halted = true; break;
+        
+        default: return false;
     }
+    
+    // successful execution
+    return true;
 }
