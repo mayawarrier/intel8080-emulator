@@ -18,8 +18,9 @@ enum flag_bit {
 
 static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
 static const word_t WORD_HI_F = (((word_t)1 << HALF_WORD_SIZE) - (word_t)1) << HALF_WORD_SIZE;
-static const buf_t BUF_LO_WORD_MAX = (buf_t)WORD_T_MAX;
 static const buf_t BUF_HI_WORD_MAX = (buf_t)WORD_T_MAX << (HALF_WORD_SIZE * 2);
+// Conditional RETs and CALLs (subroutine ops) take 6 cycles longer if the condition is true.
+static const size_t CYCLES_OFFSET_COND_SUB_OPS = (size_t)6;
 
 // Picks the lower half of the word
 #define WORD_LO_BITS(expr) ((word_t)(expr) & WORD_LO_F)
@@ -91,7 +92,8 @@ static inline void update_ZSP(i8080 * const cpu, buf_t word) {
      * get_word_bit(,): select the bit we just shifted out */
     cpu->p = true; // reset before calculating parity again
     while((trun_word_buf & (buf_t)WORD_T_MAX) != (buf_t)0x0) {
-        cpu->p ^= !get_word_bit(trun_word_buf<<=1, HALF_WORD_SIZE * 2); 
+        trun_word_buf <<= 1;
+        cpu->p ^= !get_word_bit(trun_word_buf, HALF_WORD_SIZE * 2); 
     }
 }
 
@@ -100,6 +102,7 @@ static inline buf_t concatenate(word_t word1, word_t word2) {
     return ((buf_t)word1 << HALF_ADDR_SIZE | (buf_t)word2);
 }
 
+// Gets the flags register from the internal emulator bool values.
 static word_t i8080_get_flags_reg(i8080 * const cpu) {
     word_t flags = (word_t)0;
     set_word_bit(&flags, (int)CARRY_BIT, cpu->cy);
@@ -115,6 +118,7 @@ static word_t i8080_get_flags_reg(i8080 * const cpu) {
     return flags;
 }
 
+// Sets the internal emulator bool values from a flags register.
 static void i8080_set_flags_reg(i8080 * const cpu, word_t flags_reg) {
     cpu->cy = get_word_bit(flags_reg, (int)CARRY_BIT);
     cpu->p = get_word_bit(flags_reg, (int)PARITY_BIT);
@@ -161,17 +165,31 @@ static inline void i8080_set_hl(i8080 * const cpu, buf_t dbl_word) {
     cpu->l = (word_t)WORD_BITS(dbl_word);
 }
 
+// Sets the accumulator and flags register from the program status word.
 static inline void i8080_set_psw(i8080 * const cpu, buf_t dbl_word) {
     cpu->a = (word_t)WORD_DBL_BITS(dbl_word);
     i8080_set_flags_reg(cpu, (word_t)WORD_BITS(dbl_word));
 }
 
+// Reads a word from [HL]
 static inline word_t i8080_read_memory(i8080 * const cpu) {
     return cpu->read_memory(i8080_get_hl(cpu));
 }
 
+// Writes a word to [HL]
 static inline void i8080_write_memory(i8080 * const cpu, word_t word) {
     cpu->write_memory(i8080_get_hl(cpu), word);
+}
+
+static inline word_t i8080_advance_read_word(i8080 * const cpu) {
+    // Read a word and advance program counter
+    return cpu->read_memory(cpu->pc++);
+}
+
+static inline addr_t i8080_advance_read_addr(i8080 * const cpu) {
+    word_t hi_addr = i8080_advance_read_word(cpu);
+    word_t lo_addr = i8080_advance_read_word(cpu);
+    return (addr_t)concatenate(hi_addr, lo_addr);
 }
 
 // Returns pointers to the left and right registers for a mov operation.
@@ -427,14 +445,12 @@ static buf_t i8080_pop(i8080 * const cpu) {
     return concatenate(left_word, right_word);
 }
 
-static inline word_t i8080_advance_read_word(i8080 * const cpu) {
-    // Read a word and advance program counter
-    return cpu->read_memory(cpu->pc++);
-}
-
-static inline addr_t i8080_advance_read_addr(i8080 * const cpu) {
-    return (addr_t)i8080_advance_read_word(cpu) << HALF_ADDR_SIZE | 
-           (addr_t)i8080_advance_read_word(cpu);
+// Stacks the current PC and jumps to immediate address.
+static inline void i8080_call(i8080 * const cpu) {
+    // saves the current program counter
+    i8080_push(cpu, (buf_t)cpu->pc);
+    // jumps to immediate address
+    cpu->pc = i8080_advance_read_addr(cpu);
 }
 
 void i8080_reset(i8080 * const cpu) {
@@ -675,5 +691,17 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case POP_D: i8080_set_de(cpu, i8080_pop(cpu)); break;
         case POP_H: i8080_set_hl(cpu, i8080_pop(cpu)); break;
         case POP_PSW: i8080_set_psw(cpu, i8080_pop(cpu)); break;
+        
+        // Subroutine calls
+        // Conditional CALLs take 6 cycles longer if the condition is met
+        case CALL: case ALT_CALL0: case ALT_CALL1: case ALT_CALL2: i8080_call(cpu); break;
+        case CNZ: if (!cpu->z) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;  // CALL on !Z i.e. non-zero acc
+        case CZ: if (cpu->z) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // CALL on Z i.e. zero acc
+        case CNC: if (!cpu->cy) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break; // CALL on !CY i.e. carry reset
+        case CC: if (cpu->cy) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // CALL on CY i.e. carry set
+        case CPO: if (!cpu->p) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;  // CALL on !P i.e. acc parity odd
+        case CPE: if (cpu->p) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // CALL on P i.e. acc parity even
+        case CP: if (!cpu->s) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // CALL on !S i.e. acc positive
+        case CM: if (cpu->s) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // CALL on S i.e. acc negative
     }
 }

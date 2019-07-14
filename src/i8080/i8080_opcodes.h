@@ -348,6 +348,7 @@ static const char * DEBUG_DISASSEMBLY_TABLE[] = {
     "rst 6", "rm", "sphl", "jm $", "ei", "cm $", "undocumented", "cpi #", "rst 7"
 };
 
+// For conditional RETs and CALLs, add 6 to the cycles if the condition is true.
 static const word_t OPCODES_CYCLES[] = {
 //  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 0
@@ -367,31 +368,5 @@ static const word_t OPCODES_CYCLES[] = {
     5,  10, 10, 18, 11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11, // E
     5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  // F
 };
-
-// For conditional RETs and CALLs, 6 extra cycles are taken
-static word_t get_cycle_offset_conditional_opcode(word_t opcode) {
-    
-    if (opcode > 0xff) {
-        // invalid opcode
-        return WORD_T_MAX;
-    }
-    
-    // Adjust by 6 if action taken for
-    // conditional RETs and CALLs
-    switch(opcode) {
-        case RNZ: case CNZ:
-        case RZ: case CZ:
-        case RNC: case CNC:
-        case RC: case CC:
-        case RPO: case CPO:
-        case RPE: case CPE:
-        case RP: case CP:
-        case RM: case CM:
-            return 6;
-            
-        default:
-            return 0;
-    }
-}
 
 #endif /* OPCODES_H */
