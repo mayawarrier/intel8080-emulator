@@ -299,14 +299,14 @@ static inline void i8080_sbb(i8080 * const cpu, word_t word) {
 // Perform bitwise AND with accumulator, and update flags.
 static void i8080_ana(i8080 * const cpu, word_t word) {
     /* In the 8080, AND logical instructions always set auxiliary carry to the logical OR of bit 3 of the values involved:
-     * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 24 */
+     * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 24 */
     cpu->acy = get_word_bit(cpu->a, HALF_WORD_SIZE - 1) | get_word_bit(word, HALF_WORD_SIZE - 1);
     // Perform ANA
     cpu->a &= word;
     // Update remaining flags
     update_ZSP(cpu, (buf_t)cpu->a);
     /* In the 8080, AND logical instructions always reset carry:
-     * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 63 */
+     * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 63 */
     cpu->cy = false;
 }
 
@@ -316,7 +316,7 @@ static void i8080_xra(i8080 * const cpu, word_t word) {
     cpu->a ^= word;
     update_ZSP(cpu, (buf_t)cpu->a);
     /* In the 8080, OR logical instructions always reset the carry and auxiliary carry flags to 0:
-     * https://www.tramm.li/i8080/Intel%208080-8085%20Assembly%20Language%20Programming%201977%20Intel.pdf, pg 122 */
+     * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 122 */
     cpu->acy = false;
     cpu->cy = false;
 }
@@ -326,6 +326,8 @@ static void i8080_ora(i8080 * const cpu, word_t word) {
     // Perform ORA
     cpu->a |= word;
     update_ZSP(cpu, (buf_t)cpu->a);
+    /* In the 8080, OR logical instructions always reset the carry and auxiliary carry flags to 0:
+     * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 122 */
     cpu->acy = false;
     cpu->cy = false;
 }
@@ -761,5 +763,20 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case SPHL: cpu->sp = i8080_get_hl(cpu); break; // Move HL into SP
         case XTHL: i8080_xthl(cpu); break;             // Exchange top of stack with H&L
         case XCHG: i8080_xchg(cpu); break;             // Exchanges the contents of BC and DE
+        
+        // I/O
+        /* In the 8080, the port address is duplicated across the 16-bit address bus:
+         * https://stackoverflow.com/questions/13551973/intel-8080-instruction-out
+         * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 97 */
+        case IN: 
+        {
+            word_t port_addr = i8080_advance_read_word(cpu);
+            cpu->a = cpu->port_in((addr_t)concatenate(port_addr, port_addr));
+        }
+        case OUT: 
+        {
+            word_t port_addr = i8080_advance_read_word(cpu);
+            cpu->port_out((addr_t)concatenate(port_addr, port_addr), cpu->a);
+        }
     }
 }
