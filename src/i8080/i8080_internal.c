@@ -450,12 +450,17 @@ static inline void i8080_call(i8080 * const cpu) {
     // saves the current program counter
     i8080_push(cpu, (buf_t)cpu->pc);
     // jumps to immediate address
-    cpu->pc = i8080_advance_read_addr(cpu);
+    i8080_jmp(cpu);
 }
 
 // Pops the last PC and jumps to it.
 static inline void i8080_ret(i8080 * const cpu) {
     cpu->pc = (addr_t)ADDR_BITS(i8080_pop(cpu));
+}
+
+// Jumps to immediate address.
+static inline void i8080_jmp(i8080 * const cpu) {
+    cpu->pc = i8080_advance_read_addr(cpu);
 }
 
 void i8080_reset(i8080 * const cpu) {
@@ -720,5 +725,16 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case RPE: if (cpu->p) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // RET on P i.e. acc parity even
         case RP: if (!cpu->s) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // RET on !S i.e. acc positive
         case RM: if (cpu->s) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;     // RET on S i.e. acc negative
+        
+        // Jumps
+        case JMP: case ALT_JMP0: i8080_jmp(cpu); break;     
+        case JNZ: if (!cpu->z) {i8080_jmp(cpu); } break;    // JMP on !Z i.e. non-zero acc
+        case JZ: if (cpu->z) {i8080_jmp(cpu); } break;      // JMP on Z i.e. zero acc
+        case JNC: if (!cpu->cy) {i8080_jmp(cpu); } break;   // JMP on !CY i.e. carry reset
+        case JC: if (cpu->cy) {i8080_jmp(cpu); } break;     // JMP on CY i.e. carry set
+        case JPO: if (!cpu->p) {i8080_jmp(cpu); } break;    // JMP on !P i.e. acc parity odd
+        case JPE: if (cpu->p) {i8080_jmp(cpu); } break;     // JMP on P i.e. acc parity even
+        case JP: if (!cpu->s) {i8080_jmp(cpu); } break;     // JMP on !S i.e. acc positive
+        case JM: if (cpu->s) {i8080_jmp(cpu); } break;      // JMP on S i.e. acc negative
     }
 }

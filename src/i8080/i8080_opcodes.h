@@ -248,11 +248,11 @@
 #define RET 0xc9          /*      1                    PC = {[SP + 1], [SP]}, SP <- SP + 2  10   */
 #define JZ 0xca           /*      3                    if Z, perform JMP                    10   */
 #define ALT_JMP0 0xcb
-
 #define CZ 0xcc           /*      3                    if Z, CALL adr                       17/11*/
 #define CALL 0xcd         /*      3                    PUSH PC, PC <- adr                   17   */
 #define ACI 0xce          /*      2       Z,S,P,CY,AC  A <- A + byte 2 + CY                 7    */
 #define RST_1 0xcf        /*      1                    CALL $8 interrupt vector             11   */
+
 #define RNC 0xd0          /*      1                    if NCY, perform RET                  11/5 */
 #define POP_D 0xd1        /*      1                    DE = {[SP + 1], [SP]}, SP <- SP + 2  10   */
 #define JNC 0xd2          /*      3                    if NCY, perform JMP                  10   */
@@ -263,14 +263,13 @@
 #define RST_2 0xd7        /*      1                    CALL $10 interrupt vector            11   */
 #define RC 0xd8           /*      1                    if CY, perform RET                   11/5 */
 #define ALT_RET0 0xd9
-
 #define JC 0xda           /*      3                    if CY, perform JMP                   10   */
 #define IN 0xdb           /*      2                    Serial I/O in, byte 2 is 8-bit adr   10   */
 #define CC 0xdc           /*      3                    if CY, CALL adr                      17/11*/
 #define ALT_CALL0 0xdd
-
 #define SBI 0xde          /*      2       Z,S,P,CY,AC  A <- A - byte 2 - CY                 7    */
 #define RST_3 0xdf        /*      1                    CALL $18 interrupt vector            11   */
+
 #define RPO 0xe0          /*      1                    if P odd, perform RET                11/5 */
 #define POP_H 0xe1        /*      1                    HL = {[SP + 1], [SP]}, SP <- SP + 2  10   */
 #define JPO 0xe2          /*      3                    if P odd, perform JMP                10   */
@@ -285,9 +284,9 @@
 #define XCHG 0xeb         /*      1                    HL <-> DE                            5    */
 #define CPE 0xec          /*      3                    if P even, CALL adr                  17/11*/
 #define ALT_CALL1 0xed
-
 #define XRI 0xee          /*      2       Z,S,P,CY,AC  A <- A ^ byte 2                      7    */
 #define RST_5 0xef        /*      1                    CALL $28 interrupt vector            11   */
+
 #define RP 0xf0           /*      1                    if !S i.e. positive, perform RET     11/5 */
 #define POP_PSW 0xf1      /*      1                    {A,flags}={[SP+1],[SP]},SP<-SP+2     10   */
 #define JP 0xf2           /*      3                    if !S i.e. positive, perform JMP     10   */
@@ -302,7 +301,6 @@
 #define EI 0xfb           /*      1                    enable interrupts, set interrupt bit 4    */
 #define CM 0xfc           /*      3                    if S i.e. negative, CALL adr         17/11*/
 #define ALT_CALL2 0xfd
-
 #define CPI 0xfe          /*      2       Z,S,P,CY,AC  A - byte 2                           7    */
 #define RST_7 0xff        /*      1                    CALL $38 interrupt vector            11   */
 
