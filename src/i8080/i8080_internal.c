@@ -8,17 +8,27 @@
 #include <math.h>
 #include <limits.h>
 
+enum flag_bit {
+    CARRY_BIT = 0,
+    PARITY_BIT = 2,
+    AUX_CARRY_BIT = 4,
+    ZERO_BIT = 6,
+    SIGN_BIT = 7
+};
+
 static const word_t WORD_LO_F = ((word_t)1 << HALF_WORD_SIZE) - (word_t)1;
 static const word_t WORD_HI_F = (((word_t)1 << HALF_WORD_SIZE) - (word_t)1) << HALF_WORD_SIZE;
-static const addr_t ADDR_LO_F = ((word_t)1 << HALF_ADDR_SIZE) - (word_t)1;
-static const addr_t ADDR_HI_F = (((word_t)1 << HALF_ADDR_SIZE) - (word_t)1) << HALF_ADDR_SIZE;
+static const buf_t BUF_LO_WORD_MAX = (buf_t)WORD_T_MAX;
+static const buf_t BUF_HI_WORD_MAX = (buf_t)WORD_T_MAX << (HALF_WORD_SIZE * 2);
 
 // Picks the lower half of the word
 #define WORD_LO_BITS(expr) ((word_t)(expr) & WORD_LO_F)
 // Picks the upper half of the word
 #define WORD_HI_BITS(expr) ((word_t)(expr) & WORD_HI_F)
-// Picks the word bits only from a buf_t, this is safer than just (word_t)buf
+// Picks the lower word bits only from a buf_t, this is safer than just (word_t)buf
 #define WORD_BITS(expr) ((buf_t)(expr) & (buf_t)WORD_T_MAX)
+// Picks the word bits from the hi part of buf_t.
+#define WORD_DBL_BITS(expr) (WORD_BITS(((buf_t)(expr) & BUF_HI_WORD_MAX) >> (2 * HALF_WORD_SIZE)))
 // Picks the address bits only from a buf_t, this is safer than just (addr_t)buf
 #define ADDR_BITS(expr) ((buf_t)(expr) & (buf_t)ADDR_T_MAX)
 // Perform 2's complement on the lower half of the word
@@ -86,41 +96,74 @@ static inline void update_ZSP(i8080 * const cpu, buf_t word) {
 }
 
 // Concatenates two words and returns a double word.
-static inline addr_t concatenate(word_t word1, word_t word2) {
-    return (addr_t)word1 << HALF_ADDR_SIZE | (addr_t)word2;
+static inline buf_t concatenate(word_t word1, word_t word2) {
+    return (buf_t)ADDR_BITS((buf_t)word1 << HALF_ADDR_SIZE | (buf_t)word2);
 }
+
+static word_t i8080_get_flags_reg(i8080 * const cpu) {
+    word_t flags = (word_t)0;
+    set_word_bit(&flags, (int)CARRY_BIT, cpu->cy);
+    set_word_bit(&flags, (int)PARITY_BIT, cpu->p);
+    set_word_bit(&flags, (int)AUX_CARRY_BIT, cpu->acy);
+    set_word_bit(&flags, (int)ZERO_BIT, cpu->z);
+    set_word_bit(&flags, (int)SIGN_BIT, cpu->s);
+    /* Bits 1, 3, 5 are always set to the following values:
+     * http://pastraiser.com/cpu/i8080/i8080_opcodes.html */
+    set_word_bit(&flags, 1, true);
+    set_word_bit(&flags, 3, false);
+    set_word_bit(&flags, 5, false);
+    return flags;
+}
+
+static void i8080_set_flags_reg(i8080 * const cpu, word_t flags_reg) {
+    cpu->cy = get_word_bit(flags_reg, (int)CARRY_BIT);
+    cpu->p = get_word_bit(flags_reg, (int)PARITY_BIT);
+    cpu->acy = get_word_bit(flags_reg, (int)AUX_CARRY_BIT);
+    cpu->z = get_word_bit(flags_reg, (int)ZERO_BIT);
+    cpu->s = get_word_bit(flags_reg, (int)SIGN_BIT);
+} 
 
 // Get address represented by {BC}
 static inline addr_t i8080_get_bc(i8080 * const cpu) {
-    return concatenate(cpu->b, cpu->c);
+    return (addr_t)ADDR_BITS(concatenate(cpu->b, cpu->c));
 }
 
 // Get address represented by {DE}
 static inline addr_t i8080_get_de(i8080 * const cpu) {
-    return concatenate(cpu->d, cpu->e);
+    return (addr_t)ADDR_BITS(concatenate(cpu->d, cpu->e));
 }
 
 // Get address represented by {HL}
 static inline addr_t i8080_get_hl(i8080 * const cpu) {
-    return concatenate(cpu->h, cpu->l);
+    return (addr_t)ADDR_BITS(concatenate(cpu->h, cpu->l));
+}
+
+// Gets the program status word {A, flags}
+static inline addr_t i8080_get_psw(i8080 * const cpu) {
+    return (addr_t)ADDR_BITS(concatenate(cpu->a, i8080_get_flags_reg(cpu)));
 }
 
 // Sets B to hi dbl_word, and C to lo dbl_word
-static inline void i8080_set_bc(i8080 * const cpu, addr_t dbl_word) {
-    cpu->b = dbl_word & ADDR_HI_F;
-    cpu->c = dbl_word & ADDR_LO_F;
+static inline void i8080_set_bc(i8080 * const cpu, buf_t dbl_word) {
+    cpu->b = (word_t)WORD_DBL_BITS(dbl_word);
+    cpu->c = (word_t)WORD_BITS(dbl_word);
 }
 
 // Sets D to hi dbl_word, and E to lo dbl_word
-static inline void i8080_set_de(i8080 * const cpu, addr_t dbl_word) {
-    cpu->d = dbl_word & ADDR_HI_F;
-    cpu->e = dbl_word & ADDR_LO_F;
+static inline void i8080_set_de(i8080 * const cpu, buf_t dbl_word) {
+    cpu->d = (word_t)WORD_DBL_BITS(dbl_word);
+    cpu->e = (word_t)WORD_BITS(dbl_word);
 }
 
 // Sets H to hi dbl_word, and L to lo dbl_word
-static inline void i8080_set_hl(i8080 * const cpu, addr_t dbl_word) {
-    cpu->h = dbl_word & ADDR_HI_F;
-    cpu->l = dbl_word & ADDR_LO_F;
+static inline void i8080_set_hl(i8080 * const cpu, buf_t dbl_word) {
+    cpu->h = (word_t)WORD_DBL_BITS(dbl_word);
+    cpu->l = (word_t)WORD_BITS(dbl_word);
+}
+
+static inline void i8080_set_psw(i8080 * const cpu, buf_t dbl_word) {
+    cpu->a = (word_t)WORD_DBL_BITS(dbl_word);
+    i8080_set_flags_reg(cpu, (word_t)WORD_BITS(dbl_word));
 }
 
 static inline word_t i8080_read_memory(i8080 * const cpu) {
@@ -192,13 +235,10 @@ static void i8080_mov_get_reg_pair(i8080 * const cpu, word_t opcode, word_t ** l
 // Performs a move operation from register to register.
 static void i8080_mov_reg(i8080 * const cpu, word_t opcode) {
     // get the register pair from this opcode
-    word_t ** left_pptr = (word_t **)malloc(sizeof(word_t *));
-    word_t ** right_pptr = (word_t **)malloc(sizeof(word_t *));
+    word_t * left_pptr[1], * right_pptr[1];
     i8080_mov_get_reg_pair(cpu, opcode, left_pptr, right_pptr);
     // perform move
     *(*left_pptr) = *(*right_pptr);
-    free(left_pptr);
-    free(right_pptr);
 }
 
 // Performs an add to accumulator and updates flags.
@@ -366,6 +406,25 @@ static void i8080_daa(i8080 * const cpu) {
     }
     // bring back previous acy
     cpu->acy = prev_acy;
+}
+
+// Pushes two words to the stack, and decrements the stack pointer by 2.
+// Pushes higher word before lower word.
+static void i8080_push(i8080 * const cpu, buf_t dbl_word) {
+    word_t left_word = (word_t)WORD_DBL_BITS(dbl_word);
+    word_t right_word = (word_t)WORD_BITS(dbl_word);
+    cpu->write_memory(cpu->sp - (addr_t)1, left_word);
+    cpu->write_memory(cpu->sp - (addr_t)2, right_word);
+    cpu->sp -= 2;
+}
+
+// Pops last two words from the stack and increments the stack pointer by 2.
+// Pops lower word before higher word.
+static buf_t i8080_pop(i8080 * const cpu) {
+    word_t right_word = cpu->read_memory(cpu->sp);
+    word_t left_word = cpu->read_memory(cpu->sp + (addr_t)1);
+    cpu->sp += 2;
+    return concatenate(left_word, right_word);
 }
 
 static inline word_t i8080_advance_read_word(i8080 * const cpu) {
@@ -585,7 +644,7 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
             break;
         }
         
-        // Rotate instructions
+        // Rotate
         case RLC: i8080_rlc(cpu); break;  // Rotate accumulator left
         case RRC: i8080_rrc(cpu); break;  // Rotate accumulator right
         case RAL: i8080_ral(cpu); break;  // Rotate accumulator left through carry
@@ -596,5 +655,25 @@ void i8080_exec(i8080 * const cpu, word_t opcode) {
         case CMA: cpu->a = ~cpu->a; break;    // Complement accumulator
         case STC: cpu->cy = true; break;      // Set carry
         case CMC: cpu->cy = !cpu->cy; break;  // Complement carry
+        
+        // Arithmetic / logical / compare immediate
+        case ADI: i8080_add(cpu, i8080_advance_read_word(cpu)); break;
+        case ACI: i8080_adc(cpu, i8080_advance_read_word(cpu)); break;
+        case SUI: i8080_sub(cpu, i8080_advance_read_word(cpu)); break;
+        case SBI: i8080_sbb(cpu, i8080_advance_read_word(cpu)); break;
+        case ANI: i8080_ana(cpu, i8080_advance_read_word(cpu)); break;
+        case XRI: i8080_xra(cpu, i8080_advance_read_word(cpu)); break;
+        case ORI: i8080_ora(cpu, i8080_advance_read_word(cpu)); break;
+        case CPI: i8080_cmp(cpu, i8080_advance_read_word(cpu)); break;
+        
+        // Stack push / pop
+        case PUSH_B: i8080_push(cpu, i8080_get_bc(cpu)); break;
+        case PUSH_D: i8080_push(cpu, i8080_get_de(cpu)); break;
+        case PUSH_H: i8080_push(cpu, i8080_get_hl(cpu)); break;
+        case PUSH_PSW: i8080_push(cpu, i8080_get_psw(cpu)); break;
+        case POP_B: i8080_set_bc(cpu, i8080_pop(cpu)); break;
+        case POP_D: i8080_set_de(cpu, i8080_pop(cpu)); break;
+        case POP_H: i8080_set_hl(cpu, i8080_pop(cpu)); break;
+        case POP_PSW: i8080_set_psw(cpu, i8080_pop(cpu)); break;
     }
 }
