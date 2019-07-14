@@ -80,14 +80,14 @@ static inline void set_buf_bit(buf_t * buf, int bit, bool val) {
 // This must be buffered to preserve the bits produced after word's MSB.
 // All subtracting instructions must invert sign.
 static inline void update_ZSP(i8080 * const cpu, buf_t word, bool invert_sign) {
-    cpu->z = (word == 0);
+    // The truncated word only keeps the word bits
+    buf_t trun_word_buf = (buf_t)WORD_BITS(word);
+    cpu->z = (trun_word_buf == 0);
     /* If the number has gone above WORD_T_MAX, this indicates overflow or
     /* an underflow. The sign is inverted on underflow, so any instructions
      * that subtract from the acc should set invert_sign = true */
     bool s = (word > (buf_t)WORD_T_MAX);
     cpu->s = invert_sign ? !s : s;
-    // The truncated word only keeps the word bits
-    buf_t trun_word_buf = (buf_t)WORD_BITS(word);
     /* Until all 8 bits have been shifted out,
      * shift each bit to the left and XOR it with cpu->p.
      * This indicates odd number of ones if high.

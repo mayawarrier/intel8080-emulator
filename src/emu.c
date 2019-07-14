@@ -132,9 +132,10 @@ bool emu_runtime(i8080 * const cpu, mem_t * const memory) {
     cpu->cycles_taken = 0;
     
     cpu->pc = 0x40;
-    cpu->a = 0x03;
-    cpu->b = 0x02;
     // exec one instruction
+    i8080_debug_next(cpu);
+    i8080_debug_next(cpu);
+    i8080_debug_next(cpu);
     i8080_debug_next(cpu);
     
     // debug
