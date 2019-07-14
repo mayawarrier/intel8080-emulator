@@ -81,7 +81,7 @@ static inline void update_ZSP(i8080 * const cpu, buf_t word) {
     /* If the number has gone above WORD_T_MAX, this indicates overflow or
     /* an underflow. In both cases, the 8080 sets the sign bit 
     /* since it doesn't have an overflow bit. */
-    cpu->s = (word > WORD_T_MAX);
+    cpu->s = (word > (buf_t)WORD_T_MAX);
     // The truncated word only keeps the word bits
     buf_t trun_word_buf = (buf_t)WORD_BITS(word);
     /* Until all 8 bits have been shifted out,
@@ -97,7 +97,7 @@ static inline void update_ZSP(i8080 * const cpu, buf_t word) {
 
 // Concatenates two words and returns a double word.
 static inline buf_t concatenate(word_t word1, word_t word2) {
-    return (buf_t)ADDR_BITS((buf_t)word1 << HALF_ADDR_SIZE | (buf_t)word2);
+    return ((buf_t)word1 << HALF_ADDR_SIZE | (buf_t)word2);
 }
 
 static word_t i8080_get_flags_reg(i8080 * const cpu) {
