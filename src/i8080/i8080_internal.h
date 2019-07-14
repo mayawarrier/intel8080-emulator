@@ -33,6 +33,9 @@ void i8080_reset(i8080 * const cpu);
 // True is successfully executed
 bool i8080_next(i8080 * const cpu);
 
+// i8080_next(), but also pretty prints the instr executed.
+bool i8080_debug_next(i8080 * const cpu);
+
 // Executes the opcode on cpu, updating its cycle count, registers and flags.
 // True if successfully executed
 bool i8080_exec(i8080 * const cpu, word_t opcode);
