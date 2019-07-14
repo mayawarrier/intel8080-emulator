@@ -18,20 +18,6 @@ static const word_t DEFAULT_BOOTLOADER[] = {
 
 static const int DEFAULT_BOOTLOADER_SIZE = 3;
 
-// Reserved locations for interrupt vector table
-static const addr_t VECTOR_TABLE_RESERVED_LOCATIONS[] = {
-    0x00, // RESET, RST 0
-    0x08, // RST 1
-    0x10, // RST 2
-    0x18, // RST 3
-    0x20, // RST 4
-    0x28, // RST 5
-    0x30, // RST 6
-    0x38 // RST 7
-};
-
-static const int NUM_VECTOR_TABLE_RESERVED_LOCATIONS = 8;
-
 bool memory_init(mem_t * const memory_handle) {
     // Allocate memory
     memory_handle->mem = (word_t *)malloc(sizeof(word_t) * (ADDR_T_MAX + 1));
@@ -52,9 +38,9 @@ bool memory_init(mem_t * const memory_handle) {
 addr_t memory_setup_IVT(mem_t * const memory_handle) {
     
     // Create the interrupt vector table
-    for (int i = 0; i < NUM_VECTOR_TABLE_RESERVED_LOCATIONS; ++i) {
+    for (int i = 0; i < NUM_IVT_LOCATIONS; ++i) {
         // HLT for all interrupts
-        memory_handle->mem[VECTOR_TABLE_RESERVED_LOCATIONS[i]] = HLT;
+        memory_handle->mem[INTERRUPT_TABLE[i]] = HLT;
     }
     
     return DEFAULT_START_OF_PROGRAM_MEMORY;

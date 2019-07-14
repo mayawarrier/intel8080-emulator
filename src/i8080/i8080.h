@@ -26,6 +26,10 @@ typedef struct i8080 {
     // carry, parity, interrupt enable
     bool s, z, acy, cy, p, ie;
     
+    // True if in HALT state. Only interrupts
+    // and RESET can bring i8080 out of this state. 
+    bool is_halted;
+    
     // provide your own read/write streams
     
     // Read and write to a memory stream
