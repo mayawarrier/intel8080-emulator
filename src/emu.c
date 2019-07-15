@@ -137,6 +137,9 @@ bool emu_runtime(i8080 * const cpu, mem_t * const memory) {
     i8080_debug_next(cpu);
     i8080_debug_next(cpu);
     i8080_debug_next(cpu);
+    i8080_debug_next(cpu);
+    i8080_debug_next(cpu);
+    i8080_debug_next(cpu);
     
     // debug
     dump_memory(memory->mem, memory->highest_addr);

@@ -78,16 +78,12 @@ static inline void set_buf_bit(buf_t * buf, int bit, bool val) {
 
 // Updates the Z, S, P flags based on the word provided.
 // This must be buffered to preserve the bits produced after word's MSB.
-// All subtracting instructions must invert sign.
-static inline void update_ZSP(i8080 * const cpu, buf_t word, bool invert_sign) {
-    // The truncated word only keeps the word bits
-    buf_t trun_word_buf = (buf_t)WORD_BITS(word);
-    cpu->z = (trun_word_buf == 0);
-    /* If the number has gone above WORD_T_MAX, this indicates overflow or
-    /* an underflow. The sign is inverted on underflow, so any instructions
-     * that subtract from the acc should set invert_sign = true */
-    bool s = (word > (buf_t)WORD_T_MAX);
-    cpu->s = invert_sign ? !s : s;
+static inline void update_ZSP(i8080 * const cpu, word_t word) {
+    buf_t word_buf = (buf_t)word;
+    cpu->z = (word == 0);
+    /* Bit 7 of the accumulator is used for signing, so the 8080
+     * can only deal with -127 to 127 if using signed numbers */
+    cpu->s = get_word_bit(word, 2 * HALF_WORD_SIZE - 1);
     /* Until all 8 bits have been shifted out,
      * shift each bit to the left and XOR it with cpu->p.
      * This indicates odd number of ones if high.
@@ -95,9 +91,9 @@ static inline void update_ZSP(i8080 * const cpu, buf_t word, bool invert_sign) {
      * (buff<<=1): shift the buffer to the left
      * get_word_bit(,): select the bit we just shifted out */
     cpu->p = false; // reset before starting calculation again
-    while((trun_word_buf & (buf_t)WORD_T_MAX) != (buf_t)0x0) {
-        trun_word_buf <<= 1;
-        cpu->p ^= get_buf_bit(trun_word_buf, HALF_WORD_SIZE * 2);
+    while((word_buf & (buf_t)WORD_T_MAX) != (buf_t)0x0) {
+        word_buf <<= 1;
+        cpu->p ^= get_buf_bit(word_buf, HALF_WORD_SIZE * 2);
     }
     // invert since we want even number of ones
     cpu->p = !cpu->p;
@@ -276,7 +272,7 @@ static void i8080_add(i8080 * const cpu, word_t word) {
     cpu->a = (word_t)WORD_BITS(acc_buf);
     // Update remaining flags
     cpu->cy = get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
-    update_ZSP(cpu, acc_buf, false);
+    update_ZSP(cpu, cpu->a);
 }
 
 // Performs an add with carry to accumulator and updates flags.
@@ -294,8 +290,7 @@ static void i8080_sub(i8080 * const cpu, word_t word) {
     // Update remaining flags
     // Carry is the borrow flag for SUB, SBB etc, invert carry 
     cpu->cy = !get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
-    // We want to invert the sign here as well to indicate borrow from 0
-    update_ZSP(cpu, acc_buf, true);
+    update_ZSP(cpu, cpu->a);
 }
 
 // Perform a subtract with carry borrow from the accumulator, and updates flags. 
@@ -311,7 +306,7 @@ static void i8080_ana(i8080 * const cpu, word_t word) {
     // Perform ANA
     cpu->a &= word;
     // Update remaining flags
-    update_ZSP(cpu, (buf_t)cpu->a, false);
+    update_ZSP(cpu, cpu->a);
     /* In the 8080, AND logical instructions always reset carry:
      * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 63 */
     cpu->cy = false;
@@ -321,7 +316,7 @@ static void i8080_ana(i8080 * const cpu, word_t word) {
 static void i8080_xra(i8080 * const cpu, word_t word) {
     // Perform XRA
     cpu->a ^= word;
-    update_ZSP(cpu, (buf_t)cpu->a, false);
+    update_ZSP(cpu, cpu->a);
     /* In the 8080, OR logical instructions always reset the carry and auxiliary carry flags to 0:
      * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 122 */
     cpu->acy = false;
@@ -332,7 +327,7 @@ static void i8080_xra(i8080 * const cpu, word_t word) {
 static void i8080_ora(i8080 * const cpu, word_t word) {
     // Perform ORA
     cpu->a |= word;
-    update_ZSP(cpu, (buf_t)cpu->a, false);
+    update_ZSP(cpu, cpu->a);
     /* In the 8080, OR logical instructions always reset the carry and auxiliary carry flags to 0:
      * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 122 */
     cpu->acy = false;
@@ -346,14 +341,14 @@ static void i8080_cmp(i8080 * const cpu, word_t word) {
     buf_t acc_buf = (buf_t)cpu->a + TWOS_COMP_WORD(word);
     // Carry is inverted for borrow
     cpu->cy = !get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
-    update_ZSP(cpu, acc_buf, true);
+    update_ZSP(cpu, cpu->a);
 }
 
 // Increments and updates flags, and returns the incremented word.
 static word_t i8080_inr(i8080 * const cpu, word_t word) {
     cpu->acy = AUX_CARRY(word, 1);
     word++; // no need to buffer since overflow is allowed without sign change
-    update_ZSP(cpu, (buf_t)word, false);
+    update_ZSP(cpu, word);
     return word;
 }
 
@@ -361,7 +356,7 @@ static word_t i8080_inr(i8080 * const cpu, word_t word) {
 static word_t i8080_dcr(i8080 * const cpu, word_t word) {
     cpu->acy = AUX_CARRY(word, TWOS_COMP_LO_WORD(1));
     word--; // no need to buffer since underflow is allowed without sign change
-    update_ZSP(cpu, (buf_t)word, true);
+    update_ZSP(cpu, word);
     return word;
 }
 
