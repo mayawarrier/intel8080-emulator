@@ -6,17 +6,17 @@
 #include "src/emu.h"
 
 // Emulator main memory
-static word_t * MEMORY = NULL;
+static emu_word_t * MEMORY = NULL;
 
 /* Called when emulator fails to boot. Prints error message
  * and cleans up before exit. */
 int boot_failure(i8080 * cpu, mem_t * memory_handle);
 
 // Default memory and I/O streams
-static word_t rw_from_memory(addr_t addr);
-static void ww_to_memory(addr_t addr, word_t word);
-static void ww_to_stdout(addr_t addr, word_t word);
-static word_t rw_from_stdin(addr_t addr);
+static emu_word_t rw_from_memory(emu_addr_t addr);
+static void ww_to_memory(emu_addr_t addr, emu_word_t word);
+static void ww_to_stdout(emu_addr_t addr, emu_word_t word);
+static emu_word_t rw_from_stdin(emu_addr_t addr);
 
 int main(int argc, char ** argv) {
     
@@ -31,7 +31,7 @@ int main(int argc, char ** argv) {
     
     if(memory_init(&memory_handle)) {
         // Setup interrupt vector table and default bootloader
-       addr_t program_start_loc = memory_setup_IVT(&memory_handle);
+       emu_addr_t program_start_loc = memory_setup_IVT(&memory_handle);
        memory_write_bootloader_default(&memory_handle);
        
        // Read file into memory
@@ -65,24 +65,24 @@ int boot_failure(i8080 * cpu, mem_t * memory_handle) {
     return EXIT_FAILURE;
 }
 
-static word_t rw_from_memory(addr_t addr) {
+static emu_word_t rw_from_memory(emu_addr_t addr) {
     return MEMORY[addr];
 }
 
-static void ww_to_memory(addr_t addr, word_t word) {
+static void ww_to_memory(emu_addr_t addr, emu_word_t word) {
     MEMORY[addr] = word;
 }
 
-static void ww_to_stdout(addr_t addr, word_t word) {
+static void ww_to_stdout(emu_addr_t addr, emu_word_t word) {
     // don't need the port address to write to stdout
     (void)addr;
     printf(WORD_T_FORMAT, word);
 }
 
-static word_t rw_from_stdin(addr_t addr) {
+static emu_word_t rw_from_stdin(emu_addr_t addr) {
     // don't need the port address to read from stdin
     (void)addr;
-    word_t rw;
+    emu_word_t rw;
     scanf(WORD_T_FORMAT, &rw);
     return rw;
 }

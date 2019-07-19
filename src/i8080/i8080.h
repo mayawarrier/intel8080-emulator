@@ -6,21 +6,21 @@
 #include <stdlib.h>
 
 // Define types of read/write streams
-typedef word_t (* read_word_fp)(addr_t);
-typedef void (* write_word_fp)(addr_t, word_t);
+typedef emu_word_t (* read_word_fp)(emu_addr_t);
+typedef void (* write_word_fp)(emu_addr_t, emu_word_t);
 
 typedef struct mem_t {
     // the memory space
-    word_t * mem;
+    emu_word_t * mem;
     // the highest address in this memory space
-    addr_t highest_addr;
+    emu_addr_t highest_addr;
 } mem_t;
 
 typedef struct i8080 {   
     // registers
-    word_t a, b, c, d, e, h, l;
+    emu_word_t a, b, c, d, e, h, l;
     // stack pointer, program counter
-    addr_t sp, pc;
+    emu_addr_t sp, pc;
     
     // flags: sign, zero, auxiliary carry,
     // carry, parity, interrupt enable

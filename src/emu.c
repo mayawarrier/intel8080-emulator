@@ -10,7 +10,7 @@
 #include "i8080/i8080_opcodes.h"
 
 // Jumps to start of program memory
-static const word_t DEFAULT_BOOTLOADER[] = {
+static const emu_word_t DEFAULT_BOOTLOADER[] = {
     JMP,
     0x00,
     DEFAULT_START_OF_PROGRAM_MEMORY
@@ -20,7 +20,7 @@ static const int DEFAULT_BOOTLOADER_SIZE = 3;
 
 bool memory_init(mem_t * const memory_handle) {
     // Allocate memory
-    memory_handle->mem = (word_t *)malloc(sizeof(word_t) * (ADDR_T_MAX + 1));
+    memory_handle->mem = (emu_word_t *)malloc(sizeof(emu_word_t) * (ADDR_T_MAX + 1));
     
     if (memory_handle->mem == NULL) {
         printf("Error: Could not allocate enough memory to emulate.");
@@ -35,7 +35,7 @@ bool memory_init(mem_t * const memory_handle) {
     return true;
 }
 
-addr_t memory_setup_IVT(mem_t * const memory_handle) {
+emu_addr_t memory_setup_IVT(mem_t * const memory_handle) {
     
     // Create the interrupt vector table
     for (int i = 0; i < NUM_IVT_LOCATIONS; ++i) {
@@ -46,7 +46,7 @@ addr_t memory_setup_IVT(mem_t * const memory_handle) {
     return DEFAULT_START_OF_PROGRAM_MEMORY;
 }
 
-bool memory_write_bootloader(mem_t * const memory_handle, const word_t * bootloader, size_t bootloader_size) {
+bool memory_write_bootloader(mem_t * const memory_handle, const emu_word_t * bootloader, size_t bootloader_size) {
     
     if (bootloader_size > 8) {
         printf("Error: bootloader too large.");
@@ -63,7 +63,7 @@ void memory_write_bootloader_default(mem_t * const memory_handle) {
     memory_write_bootloader(memory_handle, DEFAULT_BOOTLOADER, DEFAULT_BOOTLOADER_SIZE);
 }
 
-size_t memory_load(const char * file_loc, word_t * memory, addr_t start_loc) {
+size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc) {
     
     size_t file_size = 0;
     
@@ -86,7 +86,7 @@ size_t memory_load(const char * file_loc, word_t * memory, addr_t start_loc) {
     }
     
     // Attempt to read the entire file
-    size_t words_read = fread(&memory[start_loc], sizeof(word_t), file_size, f_ptr);
+    size_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
     
     if (words_read != file_size) {
         printf("Error: file read failure.");

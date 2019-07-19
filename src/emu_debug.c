@@ -10,7 +10,7 @@
 static const char * DUMP_LOCATION = "memory_dump.bin";
 static const char * CPU_STATS_DUMP_LOCATION = "cpu_stats_dump.bin";
 
-void dump_memory(const word_t * memory, addr_t highest_addr) {
+void dump_memory(const emu_word_t * memory, emu_addr_t highest_addr) {
     
     FILE * dumpf_ptr = fopen(DUMP_LOCATION, "w");
     

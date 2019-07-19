@@ -13,7 +13,7 @@
 #include "i8080.h"
 
 // Reserved locations for interrupt vector table
-static const addr_t INTERRUPT_TABLE[] = {
+static const emu_addr_t INTERRUPT_TABLE[] = {
     0x00, // RESET, RST 0
     0x08, // RST 1
     0x10, // RST 2
@@ -38,7 +38,7 @@ bool i8080_debug_next(i8080 * const cpu);
 
 // Executes the opcode on cpu, updating its cycle count, registers and flags.
 // True if successfully executed
-bool i8080_exec(i8080 * const cpu, word_t opcode);
+bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
 
 #endif /* I8080_INTERNAL_H */
 

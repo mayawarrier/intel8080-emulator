@@ -5,8 +5,8 @@
  * Provides word and address types, defines
  * max values, and provides formatting specifiers.
  * 
- * buf_t should be a type that is larger than the 
- * widths of word_t and addr_t.
+ * emu_buf_t should be a type that is larger than the 
+ * widths of emu_word_t and emu_addr_t.
  * 
  * Modify to port to different architectures.
  *
@@ -18,9 +18,9 @@
 
 #include <stdint.h>
 
-typedef uint8_t word_t;
-typedef uint16_t addr_t;
-typedef uint32_t buf_t; 
+typedef uint8_t emu_word_t;
+typedef uint16_t emu_addr_t;
+typedef uint32_t emu_buf_t; 
 
 #define HALF_WORD_SIZE (4)
 #define HALF_ADDR_SIZE (8)
