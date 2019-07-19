@@ -188,11 +188,13 @@ static inline emu_word_t i8080_advance_read_word(i8080 * const cpu) {
     return cpu->read_memory(cpu->pc++);
 }
 
-// Reads address (a double word) and advances PC by 2.
+/* Reads address (a double word) and advances PC by 2.
+/* Address is read backwards, since the assembler inverts the words upon assembly:
+/* https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 84 */
 static inline emu_addr_t i8080_advance_read_addr(i8080 * const cpu) {
     emu_word_t hi_addr = i8080_advance_read_word(cpu);
     emu_word_t lo_addr = i8080_advance_read_word(cpu);
-    return (emu_addr_t)concatenate(hi_addr, lo_addr);
+    return (emu_addr_t)concatenate(lo_addr, hi_addr);
 }
 
 // Returns pointers to the left and right registers for a mov operation.
