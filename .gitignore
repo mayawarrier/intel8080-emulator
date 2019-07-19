@@ -2,6 +2,8 @@
 intel8080-emulator/
 nbproject/
 *.dep.inc
+*.mk
+Makefile
 
 # Prerequisites
 *.d
