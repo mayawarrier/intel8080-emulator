@@ -688,7 +688,7 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case INR_H: cpu->h = i8080_inr(cpu, cpu->h); break;
         case INR_L: cpu->l = i8080_inr(cpu, cpu->l); break;
         case INR_M: i8080_write_memory(cpu, i8080_inr(cpu, i8080_read_memory(cpu))); break;
-        case INR_A: i8080_inr(cpu, cpu->a); break;
+        case INR_A: cpu->a = i8080_inr(cpu, cpu->a); break;
         
         // Decrement registers/memory
         case DCR_B: cpu->b = i8080_dcr(cpu, cpu->b); break;
@@ -698,7 +698,7 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case DCR_H: cpu->h = i8080_dcr(cpu, cpu->h); break;
         case DCR_L: cpu->l = i8080_dcr(cpu, cpu->l); break;
         case DCR_M: i8080_write_memory(cpu, i8080_dcr(cpu, i8080_read_memory(cpu))); break;
-        case DCR_A: i8080_dcr(cpu, cpu->a); break;
+        case DCR_A: cpu->a = i8080_dcr(cpu, cpu->a); break;
         
         // Increment/decrement register pairs
         case INX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) + (emu_addr_t)1); break;
