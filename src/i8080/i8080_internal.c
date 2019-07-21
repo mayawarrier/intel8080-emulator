@@ -491,11 +491,11 @@ static inline void i8080_xthl(i8080 * const cpu) {
     cpu->l = prev_right_word;
 }
 
-// Exchanges the contents of BC and DE.
+// Exchanges the contents of BC and HL.
 static inline void i8080_xchg(i8080 * const cpu) {
-    emu_addr_t bc = i8080_get_bc(cpu);
-    i8080_set_bc(cpu, i8080_get_de(cpu));
-    i8080_set_de(cpu, bc);
+    emu_addr_t hl = i8080_get_hl(cpu);
+    i8080_set_hl(cpu, i8080_get_de(cpu));
+    i8080_set_de(cpu, hl);
 }
 
 void i8080_reset(i8080 * const cpu) {
