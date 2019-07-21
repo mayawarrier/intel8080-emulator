@@ -31,4 +31,6 @@ typedef uint32_t emu_buf_t;
 #define WORD_T_FORMAT "%#04x"
 #define ADDR_T_FORMAT "%#06x"
 
+#define WORD_T_PRT_FORMAT "%c"
+
 #endif /* TYPES_H */
