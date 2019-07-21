@@ -80,11 +80,11 @@
 #define LXI_SP 0x31       /*      3                    SP <- {byte 3, byte 2}               10   */
 #define STA 0x32          /*      3                    [adr] <- A                           13   */
 #define INX_SP 0x33       /*      1                    SP <- SP + 1                         5    */
-#define INR_M 0x34        /*      1       Z,S,P,AC     [HL] <- [HL] + 1                     10    */
-#define DCR_M 0x35        /*      1       Z,S,P,AC     [HL] <- [HL] - 1                     10    */
-#define MVI_M 0x36        /*      2                    [HL] <- byte 2                       10    */
+#define INR_M 0x34        /*      1       Z,S,P,AC     [HL] <- [HL] + 1                     10   */
+#define DCR_M 0x35        /*      1       Z,S,P,AC     [HL] <- [HL] - 1                     10   */
+#define MVI_M 0x36        /*      2                    [HL] <- byte 2                       10   */
 #define STC 0x37          /*      1       CY           CY = 1                               4    */
-#define ALT_NOP6 0x38
+#define EMU_EXT_CALL 0x38 /*      Calls emu_ext_call() with the cpu context.                     */
 
 #define DAD_SP 0x39       /*      1       CY           HL <- HL + SP                        10   */
 #define LDA 0x3a          /*      3                    A <- [adr]                           13   */

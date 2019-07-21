@@ -9,12 +9,12 @@
 typedef emu_word_t (* read_word_fp)(emu_addr_t);
 typedef void (* write_word_fp)(emu_addr_t, emu_word_t);
 
-typedef struct mem_t {
+typedef struct emu_mem_t {
     // the memory space
     emu_word_t * mem;
     // the highest address in this memory space
     emu_addr_t highest_addr;
-} mem_t;
+} emu_mem_t;
 
 typedef struct i8080 {   
     // registers
@@ -39,6 +39,18 @@ typedef struct i8080 {
     // I/O stream in and out
     read_word_fp port_in;
     write_word_fp port_out;
+    
+    /* This is called on opcode 0x38. 0x38
+     * is actually an undocumented NOP, but is
+     * re-purposed for this instead.
+     * It pushes the return address to the stack. 
+     * This fn is called with a ptr to the i8080.
+     * It should return true if i8080 should
+     * continue execution. */
+    bool (* emu_ext_call)(void * const);
+    // Records the last instruction executed.
+    // Can be used to debug upon emu_ext_call.
+    emu_word_t last_instr_exec;
     
     // Cycles taken for last emu_runtime
     size_t cycles_taken;

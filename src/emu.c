@@ -18,12 +18,12 @@ static const emu_word_t DEFAULT_BOOTLOADER[] = {
 
 static const int DEFAULT_BOOTLOADER_SIZE = 3;
 
-bool memory_init(mem_t * const memory_handle) {
+bool memory_init(emu_mem_t * const memory_handle) {
     // Allocate memory
     memory_handle->mem = (emu_word_t *)malloc(sizeof(emu_word_t) * (ADDR_T_MAX + 1));
     
     if (memory_handle->mem == NULL) {
-        printf("Error: Could not allocate enough memory to emulate.");
+        printf("Error: Could not allocate enough memory to emulate.\n");
         return false;
     }
     
@@ -35,7 +35,7 @@ bool memory_init(mem_t * const memory_handle) {
     return true;
 }
 
-emu_addr_t memory_setup_IVT(mem_t * const memory_handle) {
+emu_addr_t memory_setup_IVT(emu_mem_t * const memory_handle) {
     
     // Create the interrupt vector table
     for (int i = 0; i < NUM_IVT_LOCATIONS; ++i) {
@@ -46,10 +46,10 @@ emu_addr_t memory_setup_IVT(mem_t * const memory_handle) {
     return DEFAULT_START_OF_PROGRAM_MEMORY;
 }
 
-bool memory_write_bootloader(mem_t * const memory_handle, const emu_word_t * bootloader, size_t bootloader_size) {
+bool memory_write_bootloader(emu_mem_t * const memory_handle, const emu_word_t * bootloader, size_t bootloader_size) {
     
     if (bootloader_size > 8) {
-        printf("Error: bootloader too large.");
+        printf("Error: bootloader too large.\n");
         return false;
     }
     
@@ -59,7 +59,7 @@ bool memory_write_bootloader(mem_t * const memory_handle, const emu_word_t * boo
     return true;
 }
 
-void memory_write_bootloader_default(mem_t * const memory_handle) {
+void memory_write_bootloader_default(emu_mem_t * const memory_handle) {
     memory_write_bootloader(memory_handle, DEFAULT_BOOTLOADER, DEFAULT_BOOTLOADER_SIZE);
 }
 
@@ -70,7 +70,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
     FILE * f_ptr = fopen(file_loc, "rb");
     
     if (f_ptr == NULL) {
-        printf("Error: file cannot be opened.");
+        printf("Error: file cannot be opened.\n");
         return SIZE_MAX;
     }
     
@@ -81,7 +81,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
     
     // check if it can fit into memory
     if (file_size + start_loc > ADDR_T_MAX + 1) {
-        printf("Error: file too large.");
+        printf("Error: file too large.\n");
         return SIZE_MAX;
     }
     
@@ -89,11 +89,11 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
     size_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
     
     if (words_read != file_size) {
-        printf("Error: file read failure.");
+        printf("Error: file read failure.\n");
         return SIZE_MAX;
     }
     
-    printf("Success: %zu words read.", words_read);
+    printf("Success: %zu words read.\n\n", words_read);
     
     fclose(f_ptr);
     return words_read;
@@ -105,18 +105,19 @@ void emu_init_i8080(i8080 * const cpu) {
     cpu->write_memory = NULL;
     cpu->port_in = NULL;
     cpu->port_out = NULL;
+    cpu->emu_ext_call = NULL;
 }
 
 bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_fp write_memory, 
         read_word_fp port_in, write_word_fp port_out) {
     
     if (read_memory == NULL || write_memory == NULL) {
-        printf("Error. Memory stream functions NULL.");
+        printf("Error. Memory stream functions NULL.\n");
         return false;
     }
     
     if (port_in == NULL || port_out == NULL) {
-        printf("Warning: I/O stream functions NULL.");
+        printf("Warning: I/O stream functions NULL.\n");
     }
     
     cpu->read_memory = read_memory;
@@ -127,26 +128,31 @@ bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_f
     return true;
 }
 
-bool emu_runtime(i8080 * const cpu, mem_t * const memory) {
+bool emu_runtime(i8080 * const cpu, emu_mem_t * const memory) {
     
     cpu->cycles_taken = 0;
     
-    cpu->pc = 0x40;
-    // exec one instruction
-    i8080_debug_next(cpu);
-    i8080_debug_next(cpu);
-    i8080_debug_next(cpu);
-    i8080_debug_next(cpu);
-    i8080_debug_next(cpu);
-    i8080_debug_next(cpu);
-    i8080_debug_next(cpu);
+    cpu->pc = 0x100;
     
     // debug
     dump_memory(memory->mem, memory->highest_addr);
+    
+    // exec one instruction
+    while(true) {
+        if (!i8080_debug_next(cpu)) {
+            break;
+        }
+//        if (!i8080_next(cpu)) {
+//            break;
+//        }
+    }
+    
+    printf("\n\nEmulator quit successfully.\n");
+    
     dump_cpu_stats(cpu);
 }
 
-void emu_cleanup(i8080 * cpu, mem_t * memory_handle) {
+void emu_cleanup(i8080 * cpu, emu_mem_t * memory_handle) {
     cpu->read_memory = NULL;
     cpu->write_memory = NULL;
     cpu->port_in = NULL;

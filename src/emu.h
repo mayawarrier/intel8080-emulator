@@ -18,19 +18,19 @@
 #define DEFAULT_START_OF_PROGRAM_MEMORY 0x40
 
 // Allocates the largest amount of memory addressable (in this case 64KB)
-bool memory_init(mem_t * const memory_handle);
+bool memory_init(emu_mem_t * const memory_handle);
 // Loads a file into memory. Call only after memory_init(). Returns number of words read.
 size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
 
 // Create a default interrupt vector table at the top 64 bytes of memory.
 // Returns the address from which it is safe to load the program without overwriting the IVT.
-emu_addr_t memory_setup_IVT(mem_t * const memory_handle);
+emu_addr_t memory_setup_IVT(emu_mem_t * const memory_handle);
 // Write a bootloader to the RESET/RST 0 interrupt sequence.
 // This must be no more than 8 bytes.
 // Returns false if the bootloader is too large.
-bool memory_write_bootloader(mem_t * const memory_handle, const emu_word_t * bootloader, size_t bootloader_size);
+bool memory_write_bootloader(emu_mem_t * const memory_handle, const emu_word_t * bootloader, size_t bootloader_size);
 // Writes a bootloader that simply jumps to the DEFAULT_START_OF_PROGRAM_MEMORY.
-void memory_write_bootloader_default(mem_t * const memory_handle);
+void memory_write_bootloader_default(emu_mem_t * const memory_handle);
 
 // Initialize an i8080
 void emu_init_i8080(i8080 * const cpu);
@@ -40,10 +40,10 @@ bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_f
         read_word_fp io_port_in, write_word_fp io_port_out);
 
 // Begin the emulator. Must have properly set up memory and streams first!
-bool emu_runtime(i8080 * const cpu, mem_t * const memory_handle);
+bool emu_runtime(i8080 * const cpu, emu_mem_t * const memory_handle);
 
 // Cleans up memory
-void emu_cleanup(i8080 * cpu, mem_t * memory_handle);
+void emu_cleanup(i8080 * cpu, emu_mem_t * memory_handle);
 
 #endif /* EMU_H */
 
