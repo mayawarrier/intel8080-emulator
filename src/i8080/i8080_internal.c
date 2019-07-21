@@ -245,6 +245,7 @@ static void i8080_mov_get_reg_pair(i8080 * const cpu, emu_word_t opcode, emu_wor
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
                 *left = &cpu->l;
             }
+            break;
         case 0x70:
             // Moving into M = [HL] should be dealt with separately
             if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
