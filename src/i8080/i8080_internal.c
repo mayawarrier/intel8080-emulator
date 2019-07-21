@@ -463,19 +463,38 @@ static inline void i8080_call_addr(i8080 * const cpu, emu_addr_t addr) {
     i8080_jmp_addr(cpu, addr);
 }
 
-// Jumps to immediate address.
-static inline void i8080_jmp(i8080 * const cpu) {
-    i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
+// Jumps to immediate address, given condition is satisfied.
+static inline void i8080_jmp(i8080 * const cpu, bool condition) {
+    if (condition) {
+        i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
+    } else {
+        // advance to word after address
+        cpu->pc += 2;
+    }
 }
 
-// Pushes the current PC and jumps to immediate address.
-static inline void i8080_call(i8080 * const cpu) {
-    i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
+// Pushes the current PC and jumps to immediate address, given condition is satisfied.
+// Conditional calls take 6 cycles longer if condition is satisfied.
+static inline void i8080_call(i8080 * const cpu, bool condition) {
+    if (condition) {
+        i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
+        cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS;
+    } else {
+        // advance to word after address
+        cpu->pc += 2;
+    }
 }
 
-// Pops the last PC and jumps to it.
-static inline void i8080_ret(i8080 * const cpu) {
-    cpu->pc = (emu_addr_t)ADDR_BITS(i8080_pop(cpu));
+// Pops the last PC and jumps to it, given condition is satisfied.
+// Conditional returns take 6 cycles longer if condition is satisfied.
+static inline void i8080_ret(i8080 * const cpu, bool condition) {
+    if (condition) {
+       cpu->pc = (emu_addr_t)ADDR_BITS(i8080_pop(cpu));
+       cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS;
+    } else {
+        // advance to word after address
+        cpu->pc += 2;
+    }
 }
 
 // Exchanges the top 2 words of the stack with {HL}.
@@ -740,38 +759,41 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         
         // Subroutine calls
         // Conditional CALLs take 6 cycles longer if the condition is met
-        case CALL: case ALT_CALL0: case ALT_CALL1: case ALT_CALL2: i8080_call(cpu); break;
-        case CNZ: if (!cpu->z) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;  // CALL on !Z i.e. non-zero acc
-        case CZ: if (cpu->z) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // CALL on Z i.e. zero acc
-        case CNC: if (!cpu->cy) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break; // CALL on !CY i.e. carry reset
-        case CC: if (cpu->cy) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // CALL on CY i.e. carry set
-        case CPO: if (!cpu->p) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;  // CALL on !P i.e. acc parity odd
-        case CPE: if (cpu->p) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // CALL on P i.e. acc parity even
-        case CP: if (!cpu->s) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // CALL on !S i.e. acc positive
-        case CM: if (cpu->s) {i8080_call(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // CALL on S i.e. acc negative
+        case CALL: case ALT_CALL0: case ALT_CALL1: case ALT_CALL2: 
+            i8080_call(cpu, true); break;
+        case CNZ: i8080_call(cpu, !cpu->z); break;  // CALL on !Z i.e. non-zero acc
+        case CZ: i8080_call(cpu, cpu->z); break;    // CALL on Z i.e. zero acc
+        case CNC: i8080_call(cpu, !cpu->cy); break; // CALL on !CY i.e. carry reset
+        case CC: i8080_call(cpu, cpu->cy); break;   // CALL on CY i.e. carry set
+        case CPO: i8080_call(cpu, !cpu->p); break;  // CALL on !P i.e. acc parity odd
+        case CPE: i8080_call(cpu, cpu->p); break;   // CALL on P i.e. acc parity even
+        case CP:  i8080_call(cpu, !cpu->s); break;  // CALL on !S i.e. acc positive
+        case CM: i8080_call(cpu, cpu->s); break;    // CALL on S i.e. acc negative
         
         // Subroutine returns
         // Conditional RETs take 6 cycles longer if the condition is met
-        case RET: case ALT_RET0: i8080_ret(cpu); break;
-        case RNZ: if (!cpu->z) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // RET on !Z i.e. non-zero acc
-        case RZ: if (cpu->z) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;     // RET on Z i.e. zero acc
-        case RNC: if (!cpu->cy) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;  // RET on !CY i.e. carry reset
-        case RC: if (cpu->cy) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // RET on CY i.e. carry set
-        case RPO: if (!cpu->p) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;   // RET on !P i.e. acc parity odd
-        case RPE: if (cpu->p) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // RET on P i.e. acc parity even
-        case RP: if (!cpu->s) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;    // RET on !S i.e. acc positive
-        case RM: if (cpu->s) {i8080_ret(cpu); cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS; } break;     // RET on S i.e. acc negative
+        case RET: case ALT_RET0: 
+            i8080_ret(cpu, true); break;
+        case RNZ: i8080_ret(cpu, !cpu->z); break;   // RET on !Z i.e. non-zero acc
+        case RZ: i8080_ret(cpu, cpu->z); break;     // RET on Z i.e. zero acc
+        case RNC: i8080_ret(cpu, !cpu->cy); break;  // RET on !CY i.e. carry reset
+        case RC: i8080_ret(cpu, cpu->cy); break;    // RET on CY i.e. carry set
+        case RPO: i8080_ret(cpu, !cpu->p); break;   // RET on !P i.e. acc parity odd
+        case RPE: i8080_ret(cpu, cpu->p); break;    // RET on P i.e. acc parity even
+        case RP: i8080_ret(cpu, !cpu->s); break;    // RET on !S i.e. acc positive
+        case RM: i8080_ret(cpu, cpu->s); break;     // RET on S i.e. acc negative
         
         // Jumps
-        case JMP: case ALT_JMP0: i8080_jmp(cpu); break;     
-        case JNZ: if (!cpu->z) {i8080_jmp(cpu); } break;    // JMP on !Z i.e. non-zero acc
-        case JZ: if (cpu->z) {i8080_jmp(cpu); } break;      // JMP on Z i.e. zero acc
-        case JNC: if (!cpu->cy) {i8080_jmp(cpu); } break;   // JMP on !CY i.e. carry reset
-        case JC: if (cpu->cy) {i8080_jmp(cpu); } break;     // JMP on CY i.e. carry set
-        case JPO: if (!cpu->p) {i8080_jmp(cpu); } break;    // JMP on !P i.e. acc parity odd
-        case JPE: if (cpu->p) {i8080_jmp(cpu); } break;     // JMP on P i.e. acc parity even
-        case JP: if (!cpu->s) {i8080_jmp(cpu); } break;     // JMP on !S i.e. acc positive
-        case JM: if (cpu->s) {i8080_jmp(cpu); } break;      // JMP on S i.e. acc negative
+        case JMP: case ALT_JMP0: 
+            i8080_jmp(cpu, true); break;     
+        case JNZ: i8080_jmp(cpu, !cpu->z); break;    // JMP on !Z i.e. non-zero acc
+        case JZ: i8080_jmp(cpu, cpu->z); break;      // JMP on Z i.e. zero acc
+        case JNC: i8080_jmp(cpu, !cpu->cy); break;   // JMP on !CY i.e. carry reset
+        case JC: i8080_jmp(cpu, cpu->cy); break;     // JMP on CY i.e. carry set
+        case JPO: i8080_jmp(cpu, !cpu->p); break;    // JMP on !P i.e. acc parity odd
+        case JPE: i8080_jmp(cpu, cpu->p); break;     // JMP on P i.e. acc parity even
+        case JP: i8080_jmp(cpu, !cpu->s); break;     // JMP on !S i.e. acc positive
+        case JM: i8080_jmp(cpu, cpu->s); break;      // JMP on S i.e. acc negative
         
         // Special instructions
         case DAA: i8080_daa(cpu); break;      // Decimal adjust acc (convert acc to BCD)
