@@ -343,7 +343,7 @@ static void i8080_cmp(i8080 * const cpu, emu_word_t word) {
     emu_buf_t acc_buf = (emu_buf_t)cpu->a + TWOS_COMP_WORD(word);
     // Carry is inverted for borrow
     cpu->cy = !get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
-    update_ZSP(cpu, cpu->a);
+    update_ZSP(cpu, acc_buf);
 }
 
 // Increments and updates flags, and returns the incremented word.
@@ -491,9 +491,6 @@ static inline void i8080_ret(i8080 * const cpu, bool condition) {
     if (condition) {
        cpu->pc = (emu_addr_t)ADDR_BITS(i8080_pop(cpu));
        cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS;
-    } else {
-        // advance to word after address
-        cpu->pc += 2;
     }
 }
 
@@ -517,6 +514,21 @@ static inline void i8080_xchg(i8080 * const cpu) {
     i8080_set_de(cpu, hl);
 }
 
+// Makes a call to an external function provided by the user, if it exists.
+// Returns false if the external call has indicated the i8080 to be stopped.
+static inline bool emu_ext_call(i8080 * const cpu) {
+    bool should_continue = true;
+    if (emu_ext_call != NULL) {
+        i8080_push(cpu, (emu_buf_t)cpu->pc);
+        // Quit the emulator if indicated
+        should_continue = cpu->emu_ext_call(cpu);
+        cpu->pc = (emu_addr_t)ADDR_BITS(i8080_pop(cpu));
+        // Subtract cycles added by this opcode since this is an external call
+        cpu->cycles_taken -= 4;
+    }
+    return should_continue;
+}
+
 void i8080_reset(i8080 * const cpu) {
     // start executing from beginning again
     cpu->pc = 0;
@@ -529,7 +541,11 @@ bool i8080_next(i8080 * const cpu) {
 
 bool i8080_debug_next(i8080 * const cpu) {
     emu_word_t opcode = i8080_advance_read_word(cpu);
-    printf("\n%s", DEBUG_DISASSEMBLY_TABLE[opcode]);
+    
+    // Do not print the opcode for an external call
+    if (opcode != EMU_EXT_CALL) {
+        printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
+    }
     return i8080_exec(cpu, opcode);
 }
 
@@ -540,9 +556,12 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
     switch(opcode) {
         
         // No operation + undocumented NOPs. Does nothing.
-        case NOP: case ALT_NOP0: case ALT_NOP1: case ALT_NOP2: case ALT_NOP3: case ALT_NOP4: case ALT_NOP5: case ALT_NOP6:
+        case NOP: case ALT_NOP0: case ALT_NOP1: case ALT_NOP2: case ALT_NOP3: case ALT_NOP4: case ALT_NOP5:
             break;
-        
+            
+        // Calls cpu->emu_ext_call() on 0x38. This is for debugging and further emulation purposes.
+        case EMU_EXT_CALL: if (!emu_ext_call(cpu)) { return false; } break;
+            
         // Move between registers
         case MOV_B_B: case MOV_B_C: case MOV_B_D: case MOV_B_E: case MOV_B_H: case MOV_B_L: case MOV_B_A:
         case MOV_C_B: case MOV_C_C: case MOV_C_D: case MOV_C_E: case MOV_C_H: case MOV_C_L: case MOV_C_A:
@@ -840,6 +859,8 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         
         default: return false;
     }
+    
+    cpu->last_instr_exec = opcode;
     
     // successful execution
     return true;
