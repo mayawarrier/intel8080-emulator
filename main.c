@@ -120,7 +120,7 @@ int main(int argc, char ** argv) {
     if (memory_init(&memory_handle)) {
 
         // Read file into memory after 256 bytes reserved by CP/M
-        words_read = memory_load("tests/TST8080.COM", memory_handle.mem, 0x100);
+        words_read = memory_load("tests/CPUTEST.COM", memory_handle.mem, 0x100);
 
         // File read error
         if (words_read == SIZE_MAX) {
