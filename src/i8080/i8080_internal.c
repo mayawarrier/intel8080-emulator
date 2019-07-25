@@ -417,10 +417,15 @@ static void i8080_rar(i8080 * const cpu) {
 // Performs a decimal adjust on the accumulator (converts to BCD) and updates flags.
 static void i8080_daa(i8080 * const cpu) {
     emu_word_t lo_acc = WORD_LO_BITS(cpu->a);
+    // If the lower bits are adjusted, we will end up
+    // modifying the carry, which we don't want
+    bool prev_cy = cpu->cy;
     // if lo bits are greater than 9 or 15, add 6 to accumulator
     if ((lo_acc > (emu_word_t)9) || cpu->acy) {
         i8080_add(cpu, (emu_word_t)6); // this is lo 6
     }
+    // Bring back the old carry
+    cpu->cy = prev_cy;
     // We want to preserve the original auxiliary carry
     // from here because DAA adds 6 only to the hi bits,
     // and the auxiliary carry is not affected.
