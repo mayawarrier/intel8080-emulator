@@ -369,7 +369,7 @@ static void i8080_dad(i8080 * const cpu, emu_addr_t reg_pair) {
     emu_addr_t hl = i8080_get_hl(cpu);
     emu_buf_t hl_buf = (emu_buf_t)hl + (emu_buf_t)reg_pair;
     i8080_set_hl(cpu, (emu_addr_t)ADDR_BITS(hl_buf));
-    cpu->cy = !get_buf_bit(hl_buf, HALF_ADDR_SIZE * 2);
+    cpu->cy = get_buf_bit(hl_buf, HALF_ADDR_SIZE * 2);
 }
 
 // Rotates accumulator left and sets carry to acc MSB.
