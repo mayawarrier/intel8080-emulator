@@ -8,58 +8,27 @@
 // Emulator main memory
 static emu_word_t * MEMORY = NULL;
 
-/* Called when emulator fails to boot. Prints error message
- * and cleans up before exit. */
-int boot_failure(i8080 * const cpu, emu_mem_t * const memory_handle);
-// Sets up the environment for some basic CP/M 2.2 operating system emulation.
-void set_cpm_env(i8080 * const cpu);
-// Loads the CP/M 2.2 ROM, assuming 64K of memory.
-void load_cpm_rom(i8080 * const cpu, emu_mem_t * const memory_handle);
-
 // Default memory and I/O streams
-static emu_word_t rw_from_memory(emu_addr_t addr);
-static void ww_to_memory(emu_addr_t addr, emu_word_t word);
-static void ww_to_stdout(emu_addr_t addr, emu_word_t word);
-static emu_word_t rw_from_stdin(emu_addr_t addr);
+static emu_word_t rw_from_memory(emu_addr_t addr) {
+    return MEMORY[addr];
+}
 
-int main(int argc, char ** argv) {
+static void ww_to_memory(emu_addr_t addr, emu_word_t word) {
+    MEMORY[addr] = word;
+}
 
-    // ---------------- Set up memory and boot emulator ------------------
+static void ww_to_stdout(emu_addr_t addr, emu_word_t word) {
+    // don't need the port address to write to stdout
+    (void) addr;
+    printf(WORD_T_FORMAT, word);
+}
 
-    // CPU and main memory
-    i8080 cpu;
-    emu_mem_t memory_handle;
-
-    // Program bytes read
-    size_t words_read = 0;
-
-    if (memory_init(&memory_handle)) {
-
-        // Read file into memory after 256 bytes reserved by CP/M
-        words_read = memory_load("tests/TST8080.COM", memory_handle.mem, 0x100);
-
-        // File read error
-        if (words_read == SIZE_MAX) {
-            return boot_failure(&cpu, &memory_handle);
-        }
-
-        // Memory load was successful, save reference to memory stream
-        MEMORY = memory_handle.mem;
-
-        // Initialize i8080 and setup default memory + IO streams
-        emu_init_i8080(&cpu);
-        emu_setup_streams(&cpu, rw_from_memory, ww_to_memory, rw_from_stdin, ww_to_stdout);
-
-        set_cpm_env(&cpu);
-
-        // Begin the emulator. Does not return until complete.
-        emu_runtime(&cpu, &memory_handle);
-
-    } else {
-        return boot_failure(&cpu, &memory_handle);
-    }
-
-    return EXIT_SUCCESS;
+static emu_word_t rw_from_stdin(emu_addr_t addr) {
+    // don't need the port address to read from stdin
+    (void) addr;
+    emu_word_t rw;
+    scanf(WORD_T_FORMAT, &rw);
+    return rw;
 }
 
 // Provides some emulation of CP/M BDOS and zero page.
@@ -120,12 +89,7 @@ bool cpm_zero_page(void * const udata) {
     
 }
 
-void load_cpm_rom(i8080 * const cpu, emu_mem_t * const memory_handle) {
-    // 0xe400 is the starting address for the CP/M
-    // OS when 64K of memory is available.
-    memory_load("tests/cpm2.2.com", memory_handle->mem, 0xe400);
-}
-
+// Sets up the environment for some basic CP/M 2.2 operating system emulation.
 void set_cpm_env(i8080 * const cpu) {
     // 0x38 is a special instruction that calls
     // an external fn outside the emulator.
@@ -142,30 +106,49 @@ void set_cpm_env(i8080 * const cpu) {
     cpu->emu_ext_call = cpm_zero_page;
 }
 
-int boot_failure(i8080 * const cpu, emu_mem_t * const memory_handle) {
+int main(int argc, char ** argv) {
+
+    // ---------------- Set up memory and boot emulator ------------------
+
+    // CPU and main memory
+    i8080 cpu;
+    emu_mem_t memory_handle;
+
+    // Program bytes read
+    size_t words_read = 0;
+
+    if (memory_init(&memory_handle)) {
+
+        // Read file into memory after 256 bytes reserved by CP/M
+        words_read = memory_load("tests/TST8080.COM", memory_handle.mem, 0x100);
+
+        // File read error
+        if (words_read == SIZE_MAX) {
+            goto boot_failure;
+        }
+
+        // Memory load was successful, save reference to memory stream
+        MEMORY = memory_handle.mem;
+
+        // Initialize i8080 and setup default memory + IO streams
+        emu_init_i8080(&cpu);
+        emu_setup_streams(&cpu, rw_from_memory, ww_to_memory, rw_from_stdin, ww_to_stdout);
+
+        set_cpm_env(&cpu);
+
+        // Begin the emulator. Does not return until complete.
+        emu_runtime(&cpu, &memory_handle);
+
+    } else {
+        goto boot_failure;
+    }
+
+    emu_cleanup(&cpu, &memory_handle);    
+    return EXIT_SUCCESS;
+    
+    boot_failure:
     printf("Emulator boot failure.");
-    emu_cleanup(cpu, memory_handle);
+    emu_cleanup(&cpu, &memory_handle);
     return EXIT_FAILURE;
-}
-
-static emu_word_t rw_from_memory(emu_addr_t addr) {
-    return MEMORY[addr];
-}
-
-static void ww_to_memory(emu_addr_t addr, emu_word_t word) {
-    MEMORY[addr] = word;
-}
-
-static void ww_to_stdout(emu_addr_t addr, emu_word_t word) {
-    // don't need the port address to write to stdout
-    (void) addr;
-    printf(WORD_T_FORMAT, word);
-}
-
-static emu_word_t rw_from_stdin(emu_addr_t addr) {
-    // don't need the port address to read from stdin
-    (void) addr;
-    emu_word_t rw;
-    scanf(WORD_T_FORMAT, &rw);
-    return rw;
+    
 }
