@@ -77,6 +77,7 @@ bool cpm_zero_page(void * const udata) {
                 {
                     // Writes the character in register E
                     printf(WORD_T_PRT_FORMAT, cpu->e);
+                    break;
                 }
             }
             
@@ -85,8 +86,6 @@ bool cpm_zero_page(void * const udata) {
         
         default: return true;
     }
-    
-    
 }
 
 // Sets up the environment for some basic CP/M 2.2 operating system emulation.
@@ -110,6 +109,13 @@ int main(int argc, char ** argv) {
 
     // ---------------- Set up memory and boot emulator ------------------
 
+    const char * test_file_location = (argc > 1) ? argv[1] : NULL;
+    
+    if (test_file_location == NULL) {
+        printf("No file provided.");
+        goto boot_failure;
+    }
+    
     // CPU and main memory
     i8080 cpu;
     emu_mem_t memory_handle;
@@ -120,7 +126,7 @@ int main(int argc, char ** argv) {
     if (memory_init(&memory_handle)) {
 
         // Read file into memory after 256 bytes reserved by CP/M
-        words_read = memory_load("tests/CPUTEST.COM", memory_handle.mem, 0x100);
+        words_read = memory_load(test_file_location, memory_handle.mem, 0x100);
 
         // File read error
         if (words_read == SIZE_MAX) {
