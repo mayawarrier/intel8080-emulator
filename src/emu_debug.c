@@ -7,8 +7,8 @@
 #include "emu_debug.h"
 #include "i8080/i8080.h"
 
-static const char * DUMP_LOCATION = "memory_dump.bin";
-static const char * CPU_STATS_DUMP_LOCATION = "cpu_stats_dump.bin";
+static const char * DUMP_LOCATION = "dumps/memory_dump.bin";
+static const char * CPU_STATS_DUMP_LOCATION = "dumps/cpu_stats_dump.bin";
 
 void dump_memory(const emu_word_t * memory, emu_addr_t highest_addr) {
     
