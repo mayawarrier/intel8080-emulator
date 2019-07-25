@@ -137,14 +137,11 @@ bool emu_runtime(i8080 * const cpu, emu_mem_t * const memory) {
     // debug
     dump_memory(memory->mem, memory->highest_addr);
     
-    // exec one instruction
+    // execute all the instructions until told to stop
     while(true) {
-        if (!i8080_debug_next(cpu)) {
+        if (!i8080_next(cpu)) {
             break;
         }
-//        if (!i8080_next(cpu)) {
-//            break;
-//        }
     }
     
     printf("\n\nEmulator quit successfully.\n");
