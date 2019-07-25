@@ -619,7 +619,7 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case ADC_H: i8080_adc(cpu, cpu->h); break;
         case ADC_L: i8080_adc(cpu, cpu->l); break;
         case ADC_M: i8080_adc(cpu, i8080_read_memory(cpu)); break;
-        case ADC_A: i8080_adc(cpu, cpu->b); break;
+        case ADC_A: i8080_adc(cpu, cpu->a); break;
         
         // Regular subtraction
         case SUB_B: i8080_sub(cpu, cpu->b); break;
