@@ -7,6 +7,7 @@
 #include "i8080_opcodes.h"
 #include <math.h>
 #include <limits.h>
+#include <stdio.h>
 
 enum flag_bit {
     CARRY_BIT = 0,
