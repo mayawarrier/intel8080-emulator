@@ -38,9 +38,17 @@ void emu_init_i8080(i8080 * const cpu);
 // I/O read/write are allowed to be NULL, but the emulator will crash if an I/O request is made.
 bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_fp write_memory, 
         read_word_fp io_port_in, write_word_fp io_port_out);
+// Sets up the environment for some basic CP/M 2.2 operating system emulation.
+// Call this only after the streams have been set.
+void emu_set_cpm_env(i8080 * const cpu);
+/* The starting location of the CP/M Transient Program Area i.e. 
+ * the first valid location to load a program written for CP/M. */
+static const emu_addr_t CPM_START_OF_TPA = 0x100;
 
 // Begin the emulator. Must have properly set up memory and streams first!
 bool emu_runtime(i8080 * const cpu, emu_mem_t * const memory_handle);
+
+void emu_i8080_interrupt(i8080 * const cpu);
 
 // Cleans up memory
 void emu_cleanup(i8080 * cpu, emu_mem_t * memory_handle);

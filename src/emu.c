@@ -99,6 +99,83 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
     return words_read;
 }
 
+// Provides limited emulation of CP/M BDOS and zero page. At the moment, this only works with BDOS op 2 and 9, and WBOOT.
+bool i8080_cpm_zero_page(void * const udata) {
+    
+    i8080 * const cpu = (i8080 * const)udata;
+
+    // The return address on the stack
+    emu_addr_t ret_addr = (cpu->read_memory(cpu->sp + (emu_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
+    
+    switch(ret_addr) {
+        
+        case 0x01: 
+        {
+            // This is a warm boot to CP/M. Quit the emulator for now until supported
+            return false;
+        }
+        
+        case 0x06: 
+        {
+            // This is a BDOS call
+            // BDOS arg is stored in C
+            int operation = cpu->c;
+
+            switch(operation) {
+                case 9:
+                {
+                    // Writes an output string terminated by '$'
+                    // Address of string is {DE}
+                    emu_addr_t str_addr = (emu_addr_t)((cpu->d << HALF_ADDR_SIZE) | cpu->e);
+
+                    // Print each character until we hit a '$'
+                    while (true) {
+                        emu_word_t str_char = cpu->read_memory(str_addr);
+                        if (str_char == '$') {
+                            break;
+                        } else {
+                            printf(WORD_T_PRT_FORMAT, str_char);
+                            str_addr++;
+                        }
+                    }
+                    break;
+                }
+
+                case 2: 
+                {
+                    // Writes the character in register E
+                    printf(WORD_T_PRT_FORMAT, cpu->e);
+                    break;
+                }
+            }
+            
+            return true;
+        }
+        
+        default: return true;
+    }
+}
+
+void emu_set_cpm_env(i8080 * const cpu) {
+    // 0x38 is a special instruction that calls
+    // an external fn outside the i8080 runtime.
+    // This is used to emulate a call to CP/M zero page fns.
+    
+    if (cpu->write_memory != NULL) {
+        // Entry for CP/M BDOS is 0x05.
+        cpu->write_memory(0x05, 0x38);
+        cpu->write_memory(0x06, 0xc9);
+
+        // Entry to CP/M WBOOT (warm boot)
+        cpu->write_memory(0x00, 0x38);
+        cpu->write_memory(0x01, 0xc9);
+
+        cpu->emu_ext_call = i8080_cpm_zero_page;
+    } else {
+        printf("i8080 streams have not been initialized yet!");
+    }
+}
+
 void emu_init_i8080(i8080 * const cpu) {
     i8080_reset(cpu);
     cpu->read_memory = NULL;
