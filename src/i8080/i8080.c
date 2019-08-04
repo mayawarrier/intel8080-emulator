@@ -3,11 +3,9 @@
  * 
  */
 
-#include "i8080_internal.h"
+#include <stddef.h>
+#include "i8080.h"
 #include "i8080_opcodes.h"
-#include <math.h>
-#include <limits.h>
-#include <stdio.h>
 
 enum flag_bit {
     CARRY_BIT = 0,
@@ -21,7 +19,7 @@ static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE) - (emu_wor
 static const emu_word_t WORD_HI_F = (((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1) << HALF_WORD_SIZE;
 static const emu_buf_t BUF_HI_WORD_MAX = (emu_buf_t)WORD_T_MAX << (HALF_WORD_SIZE * 2);
 // Conditional RETs and CALLs (subroutine ops) take 6 cycles longer if the condition is true.
-static const size_t CYCLES_OFFSET_COND_SUB_OPS = (size_t)6;
+static const emu_size_t CYCLES_OFFSET_COND_SUB_OPS = (emu_size_t)6;
 
 // Picks the lower half of the word
 #define WORD_LO_BITS(expr) ((emu_word_t)(expr) & WORD_LO_F)
@@ -184,7 +182,7 @@ static inline void i8080_write_memory(i8080 * const cpu, emu_word_t word) {
 }
 
 // Reads a word and advances PC by 1.
-static inline emu_word_t i8080_advance_read_word(i8080 * const cpu) {
+inline emu_word_t i8080_advance_read_word(i8080 * const cpu) {
     return cpu->read_memory(cpu->pc++);
 }
 
@@ -544,18 +542,6 @@ void i8080_reset(i8080 * const cpu) {
 
 _Bool i8080_next(i8080 * const cpu) {
     return i8080_exec(cpu, i8080_advance_read_word(cpu));
-}
-
-_Bool i8080_debug_next(i8080 * const cpu) {
-    emu_word_t opcode = i8080_advance_read_word(cpu);
-    
-    // Do not print the opcode for an external call
-    if (opcode != EMU_EXT_CALL) {
-        printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
-    } else {
-        printf("Emulator external call\n");
-    }
-    return i8080_exec(cpu, opcode);
 }
 
 _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
