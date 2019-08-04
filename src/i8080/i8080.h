@@ -2,7 +2,6 @@
 #define I_8080_H
 
 #include "../emu_types.h"
-#include <stdbool.h>
 #include <stdlib.h>
 
 // Define types of read/write streams
@@ -24,11 +23,11 @@ typedef struct i8080 {
     
     // flags: sign, zero, auxiliary carry,
     // carry, parity, interrupt enable
-    bool s, z, acy, cy, p, ie;
+    _Bool s, z, acy, cy, p, ie;
     
     // True if in HALT state. Only interrupts
     // and RESET can bring i8080 out of this state. 
-    bool is_halted;
+    _Bool is_halted;
     
     // provide your own read/write streams
     
@@ -47,7 +46,7 @@ typedef struct i8080 {
      * and provides a reference to the i8080.
      * It should return true if i8080 should
      * continue execution. */
-    bool (* emu_ext_call)(void * const);
+    _Bool (* emu_ext_call)(void * const);
     // Records the last instruction executed.
     // Can be used to debug upon emu_ext_call.
     emu_word_t last_instr_exec;

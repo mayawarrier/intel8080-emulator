@@ -10,7 +10,6 @@
 #ifndef EMU_H
 #define EMU_H
 
-#include <stdbool.h>
 #include <stdlib.h>
 #include "emu_types.h"
 #include "i8080/i8080.h"
@@ -34,7 +33,7 @@ static const emu_word_t CPM_CONSOLE_ADDR = 0x00;
 static const emu_addr_t DEFAULT_START_PA = 0x40;
 
 // Allocates the largest amount of memory addressable (in this case 64KB)
-bool memory_init(emu_word_t * const memory_buf);
+_Bool memory_init(emu_word_t * const memory_buf);
 // Loads a file into memory. Call only after memory_init(). Returns number of words read.
 size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
 
@@ -57,7 +56,7 @@ void emu_set_default_env(i8080 * const cpu);
 
 // Begin the emulator. Must have properly set up memory and streams first!
 // Returns an error code if the emulator was not initialized properly or failed the startup check.
-EMU_EXIT_CODE emu_runtime(i8080 * const cpu, bool perform_startup_check);
+EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check);
 
 // Send an interrupt (INTE) to the i8080. This can be sent on another thread
 void emu_i8080_interrupt(i8080 * const cpu);

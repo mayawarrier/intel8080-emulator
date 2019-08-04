@@ -12,18 +12,18 @@
 // The console port address duplicated across 16-bit address bus for use with port out
 static const emu_addr_t CONSOLE_ADDR_FULL = (emu_addr_t)((CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
 
-bool memory_init(emu_word_t * const memory_buf) {
+_Bool memory_init(emu_word_t * const memory_buf) {
     // Allocate memory
     memory_buf = (emu_word_t *)malloc(sizeof(emu_word_t) * (ADDR_T_MAX + 1));
     if (memory_buf == NULL) {
         printf("Error: Could not allocate enough memory to emulate.\n");
-        return false;
+        return 0;
     }
     // Blank the entire memory. 
     // EEPROMS usually had 0xff in all locations when blanked because it
     // conveniently caused a restart when non-program code was executed.
     memset((void *)memory_buf, 0xff, ADDR_T_MAX + 1);
-    return true;
+    return 1;
 }
 
 size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc) {
@@ -68,7 +68,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
 // Prints the string at str_addr to CPM console, terminated by '$'
 static void cpm_print_str(i8080 * const cpu, emu_addr_t str_addr) {
     // Print each character until we hit a '$'
-    while (true) {
+    while (1) {
         emu_word_t str_char = cpu->read_memory(str_addr);
         if (str_char == '$') {
             break;
@@ -82,7 +82,7 @@ static void cpm_print_str(i8080 * const cpu, emu_addr_t str_addr) {
 
 // Provides limited emulation of CP/M BDOS and zero page. At the moment, this only works with BDOS op 2 and 9, and WBOOT.
 // WBOOT launches into a simple command processor so programs can be run and the emulator can quit.
-static bool i8080_cpm_zero_page(void * const udata) {
+static _Bool i8080_cpm_zero_page(void * const udata) {
     
     i8080 * const cpu = (i8080 * const)udata;
 
@@ -110,7 +110,7 @@ static bool i8080_cpm_zero_page(void * const udata) {
             emu_addr_t run_addr;
             
             // Keep getting input from the console until a valid command is entered
-            while(true) {
+            while(1) {
                 // Prints a prompt "> "
                 cpm_print_str(cpu, CMD_PROMPT_PTR);
                 // reset buffer
@@ -155,10 +155,10 @@ static bool i8080_cpm_zero_page(void * const udata) {
                 cpu->write_memory(0xe401, JMP);
                 cpu->write_memory(0xe402, lo_addr);
                 cpu->write_memory(0xe403, hi_addr);
-                return true;
+                return 1;
             }
             
-            command_quit: return false;
+            command_quit: return 0;
         }
         
         case 0x06: 
@@ -185,10 +185,10 @@ static bool i8080_cpm_zero_page(void * const udata) {
                 }
             }
             
-            return true;
+            return 1;
         }
         
-        default: return true;
+        default: return 1;
     }
 }
 
@@ -277,12 +277,12 @@ void emu_init_i8080(i8080 * const cpu) {
     cpu->port_out = NULL;
     cpu->emu_ext_call = NULL;
     // interrupts disabled by default
-    cpu->ie = false;
+    cpu->ie = 0;
 }
 
 // Writes test_word to all locations, then reads test_word from all locations.
-// Returns false if a read failed to return test_word, and stores the failed location in cpu->pc.
-static bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
+// Returns 0 if a read failed to return test_word, and stores the failed location in cpu->pc.
+static _Bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
     // Write pass
     for (emu_addr_t i = 0; i <= ADDR_T_MAX; ++i) {
         cpu->write_memory(i, test_word);
@@ -292,13 +292,13 @@ static bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
         if (cpu->read_memory(i) != test_word) {
             // indicate to user which location failed
             cpu->pc = i;
-            return false;
+            return 0;
         }
     }
-    return true;
+    return 1;
 }
 
-EMU_EXIT_CODE emu_runtime(i8080 * const cpu, bool perform_startup_check) {
+EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check) {
     
     if (cpu->read_memory == NULL || cpu->write_memory == NULL) {
         return EMU_ERR_MEM_STREAMS;
@@ -313,7 +313,7 @@ EMU_EXIT_CODE emu_runtime(i8080 * const cpu, bool perform_startup_check) {
     }
     
     // Execute all instructions until failure/quit
-    while(true) {
+    while(1) {
         if (!i8080_next(cpu)) {
             break;
         }

@@ -30,15 +30,15 @@ static const int NUM_IVT_VECTORS = 8;
 void i8080_reset(i8080 * const cpu);
 
 // Executes the next instruction. If an interrupt is pending, services it.
-// Returns false if it isn't safe to continue execution.
-bool i8080_next(i8080 * const cpu);
+// Returns 0 if it isn't safe to continue execution.
+_Bool i8080_next(i8080 * const cpu);
 
 // i8080_next(), but also pretty prints the instr executed.
-bool i8080_debug_next(i8080 * const cpu);
+_Bool i8080_debug_next(i8080 * const cpu);
 
 // Executes the opcode on cpu, updating its cycle count, registers and flags.
-// Returns false if it isn't safe to continue execution.
-bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
+// Returns 0 if it isn't safe to continue execution.
+_Bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
 
 #endif /* I8080_INTERNAL_H */
 
