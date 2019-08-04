@@ -17,17 +17,24 @@ static void ww_to_memory(emu_addr_t addr, emu_word_t word) {
     MEMORY[addr] = word;
 }
 
-static void ww_to_stdout(emu_addr_t addr, emu_word_t word) {
-    // don't need the port address to write to stdout
-    (void) addr;
-    printf(WORD_T_FORMAT, word);
+static void cpm_ww_to_stdout(emu_addr_t addr, emu_word_t word) {
+    // Address is duplicated, pick lower 8 bits
+    emu_word_t port_addr = (emu_word_t)(addr & WORD_T_MAX);
+    if (port_addr == CPM_CONSOLE_ADDR) {
+        printf(WORD_T_PRT_FORMAT, word);
+        // Some OSs buffer stdout, flush this buffer so that future scanfs
+        // don't read from this buffer but from stdin instead
+        fflush(stdout);
+    } 
 }
 
-static emu_word_t rw_from_stdin(emu_addr_t addr) {
-    // don't need the port address to read from stdin
-    (void) addr;
-    emu_word_t rw;
-    scanf(WORD_T_FORMAT, &rw);
+static emu_word_t cpm_rw_from_stdin(emu_addr_t addr) {
+    emu_word_t rw = 0x00;
+     // Address is duplicated, pick lower 8 bits
+    emu_word_t port_addr = (emu_word_t)(addr & WORD_T_MAX);
+    if (port_addr == CPM_CONSOLE_ADDR) {
+        scanf(WORD_T_PRT_FORMAT, &rw);
+    }
     return rw;
 }
 
@@ -56,7 +63,7 @@ int main(int argc, char ** argv) {
         words_read = memory_load(test_file_location, memory_handle.mem, CPM_START_OF_TPA);
 
         // File read error
-        if (words_read == SIZE_MAX) {
+        if (words_read == 0) {
             goto boot_failure;
         }
 
@@ -65,7 +72,7 @@ int main(int argc, char ** argv) {
 
         // Initialize i8080 and setup default memory + IO streams
         emu_init_i8080(&cpu);
-        emu_setup_streams(&cpu, rw_from_memory, ww_to_memory, rw_from_stdin, ww_to_stdout);
+        emu_setup_streams(&cpu, rw_from_memory, ww_to_memory, cpm_rw_from_stdin, cpm_ww_to_stdout);
 
         // Set up BDOS and WBOOT emulation for CP/M
         emu_set_cpm_env(&cpu);
