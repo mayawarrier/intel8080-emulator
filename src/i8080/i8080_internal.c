@@ -192,9 +192,9 @@ static inline emu_word_t i8080_advance_read_word(i8080 * const cpu) {
 /* Address is read backwards, since the assembler inverts the words upon assembly:
 /* https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 84 */
 static inline emu_addr_t i8080_advance_read_addr(i8080 * const cpu) {
-    emu_word_t hi_addr = i8080_advance_read_word(cpu);
     emu_word_t lo_addr = i8080_advance_read_word(cpu);
-    return (emu_addr_t)concatenate(lo_addr, hi_addr);
+    emu_word_t hi_addr = i8080_advance_read_word(cpu);
+    return (emu_addr_t)concatenate(hi_addr, lo_addr);
 }
 
 // Returns pointers to the left and right registers for a mov operation.
@@ -530,7 +530,7 @@ static inline bool emu_ext_call(i8080 * const cpu) {
         should_continue = cpu->emu_ext_call(cpu);
         cpu->pc = (emu_addr_t)ADDR_BITS(i8080_pop(cpu));
         // Subtract cycles added by this opcode since this is an external call
-        cpu->cycles_taken -= 4;
+        cpu->cycles_taken -= OPCODES_CYCLES[EMU_EXT_CALL];
     }
     return should_continue;
 }

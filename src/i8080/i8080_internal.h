@@ -24,7 +24,7 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
     0x38 // RST 7
 };
 
-static const int NUM_IVT_LOCATIONS = 8;
+static const int NUM_IVT_VECTORS = 8;
 
 // Resets the cpu. PC is set to 0. No other working registers or flags are affected.
 void i8080_reset(i8080 * const cpu);
