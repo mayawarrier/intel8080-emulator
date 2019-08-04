@@ -43,8 +43,8 @@ typedef struct i8080 {
     /* This is called on opcode 0x38. 0x38
      * is actually an undocumented NOP, but is
      * re-purposed for this instead.
-     * It pushes the return address to the stack. 
-     * This fn is called with a ptr to the i8080.
+     * It pushes the return address to the stack,
+     * and provides a reference to the i8080.
      * It should return true if i8080 should
      * continue execution. */
     bool (* emu_ext_call)(void * const);

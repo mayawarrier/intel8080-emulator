@@ -15,11 +15,19 @@
 #include "emu_types.h"
 #include "i8080/i8080.h"
 
+enum EMU_EXIT_CODE {
+    EMU_ERR_MEM_STREAMS,        // A memory stream function (cpu->read_memory, cpu->write_memory) is not initialized.
+    EMU_ERR_IO_STREAMS,         // An I/O request was made at runtime but an I/O stream function (cpu->port_in, cpu->port_out) was not initialized.
+    EMU_ERR_MEMORY,             // A memory location is not read/writ-able. Location of failure stored in cpu->pc.
+                                // This error can only be triggered by the startup check.
+    EMU_SUCCESS                 // Successful run.
+};
+
 /* The starting location of the CP/M Transient Program Area i.e. 
  * the first valid location to load a program written for CP/M. 
  * Set this environment with emu_set_cpm_env(). */
 static const emu_addr_t CPM_START_OF_TPA = 0x100;
-// Port address that CP/M will treat as its console
+// Port address that CP/M will use to read/write characters from/to a console
 static const emu_word_t CPM_CONSOLE_ADDR = 0x00;
 /* The first valid location to load a program with the default 
  * environment. Set this environment with emu_set_default_env(). */
@@ -32,29 +40,29 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
 
 // Initialize an i8080
 void emu_init_i8080(i8080 * const cpu);
-// Setup i8080 memory and I/O streams. Returns true if memory stream functions are valid. 
-// I/O read/write are allowed to be NULL, but the emulator will crash if an I/O request is made.
-bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_fp write_memory, 
-        read_word_fp io_port_in, write_word_fp io_port_out);
 
 /* Sets up the environment for some basic CP/M 2.2 BIOS emulation.
  * Some programs written for the 8080 need this environment. At the moment, only 
- * supports CP/M BDOS ops 2 and 9, and WBOOT (which simply quits the emulator).
- * Call this only after the streams have been set. */
+ * supports CP/M BDOS ops 2 and 9, and WBOOT (which launches into a simple command processor).
+ * The command processor has 2 commands:
+ * RUN addr: Begins execution of a CP/M program starting at addr.
+ * QUIT: Quits the emulator.
+ * Call this after the emulator's memory streams have been initialized (cpu->read_memory & cpu->write_memory). */
 void emu_set_cpm_env(i8080 * const cpu);
-
 /* Sets up the default emulator environment.
  * Creates an interrupt vector table at the top 64 bytes of memory,
- * and writes a RST 0 sequence that jumps to after the IVT (0x40, DEFAULT_START_PA). */
+ * and writes a RST 0 sequence that jumps to after the IVT (0x40, DEFAULT_START_PA). 
+ * Call this after the emulator's memory streams have been initialized (cpu->read_memory & cpu->write_memory). */
 void emu_set_default_env(i8080 * const cpu);
 
 // Begin the emulator. Must have properly set up memory and streams first!
-bool emu_runtime(i8080 * const cpu);
+// Returns an error code if the emulator was not initialized properly or failed the startup check.
+EMU_EXIT_CODE emu_runtime(i8080 * const cpu, bool perform_startup_check);
 
+// Send an interrupt (INTE) to the i8080. This can be sent on another thread
 void emu_i8080_interrupt(i8080 * const cpu);
 
 // Cleans up memory
 void emu_cleanup(i8080 * cpu, emu_mem_t * memory_handle);
 
 #endif /* EMU_H */
-

@@ -9,15 +9,6 @@
 #include "i8080/i8080_internal.h"
 #include "i8080/i8080_opcodes.h"
 
-// Jumps to start of program memory
-static const emu_word_t DEFAULT_BOOTLOADER[] = {
-    JMP,
-    0x00,
-    DEFAULT_START_PA
-};
-
-static const int DEFAULT_BOOTLOADER_SIZE = 3;
-
 // The console port address duplicated across 16-bit address bus for use with port out
 static const emu_addr_t CONSOLE_ADDR_FULL = (emu_addr_t)((CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
 
@@ -28,8 +19,10 @@ bool memory_init(emu_word_t * const memory_buf) {
         printf("Error: Could not allocate enough memory to emulate.\n");
         return false;
     }
-    // Zero out the entire memory
-    memset((void *)memory_buf, 0, ADDR_T_MAX + 1);
+    // Blank the entire memory. 
+    // EEPROMS usually had 0xff in all locations when blanked because it
+    // conveniently caused a restart when non-program code was executed.
+    memset((void *)memory_buf, 0xff, ADDR_T_MAX + 1);
     return true;
 }
 
@@ -62,8 +55,6 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
         printf("Error: file read failure.\n");
         goto failure;
     }
-    
-    printf("Success: %zu words read.\n\n", words_read);
     
     fclose(f_ptr);
     return words_read;
@@ -138,6 +129,7 @@ static bool i8080_cpm_zero_page(void * const udata) {
                     // ADDR_T_FORMAT is %#06x, # formats for 0x in every case except 0x0000
                     if (strncmp(&input_buf[4], "0x0000", 6) == 0) {
                         run_addr = 0x0000;
+                        goto command_run;
                     } else if (sscanf(&input_buf[4], ADDR_T_FORMAT, &run_addr) == 1
                             && run_addr >= 0 && run_addr <= 0xffff) {
                         // address is in correct format and within bounds
@@ -157,6 +149,7 @@ static bool i8080_cpm_zero_page(void * const udata) {
             }
             
             command_run: {
+                // Write JMP addr to the bytes immediately after
                 emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
                 emu_word_t hi_addr = (emu_word_t)((run_addr >> HALF_WORD_SIZE) & WORD_T_MAX);
                 cpu->write_memory(0xe401, JMP);
@@ -199,6 +192,8 @@ static bool i8080_cpm_zero_page(void * const udata) {
     }
 }
 
+static const char INIT_MEM_STREAM_ERR_MSG[] = "Error: Cannot write to memory. Initialize emulator memory streams first.\n";
+
 void emu_set_cpm_env(i8080 * const cpu) {
     // 0x38 is a special instruction that calls
     // an external fn outside the i8080 runtime.
@@ -239,25 +234,38 @@ void emu_set_cpm_env(i8080 * const cpu) {
 
         cpu->emu_ext_call = i8080_cpm_zero_page;
     } else {
-        printf("i8080 streams have not been initialized yet!");
+        printf(INIT_MEM_STREAM_ERR_MSG);
     }
 }
 
+// Jumps to start of program memory
+static const emu_word_t DEFAULT_BOOTLOADER[] = {
+    JMP,
+    DEFAULT_START_PA,
+    0x00
+};
+
+static const int DEFAULT_BOOTLOADER_SIZE = 3;
+
 void emu_set_default_env(i8080 * const cpu) {
     
-    // Create the interrupt vector table
-    // Do not write to RST 1 sequence, we'll put our bootloader there instead
-    for (int i = 1; i < NUM_IVT_VECTORS; ++i) {
-        // HLT for all interrupts
-        cpu->write_memory(INTERRUPT_TABLE[i], HLT);
-    }
-    
-    // Write a default bootloader that jumps to start of program memory
-    emu_addr_t wr_addr = INTERRUPT_TABLE[0]; // start at 0x0
-    
-    for (int i = 0; i < DEFAULT_BOOTLOADER_SIZE; ++i) {
-        cpu->write_memory(wr_addr, DEFAULT_BOOTLOADER[i]);
-        wr_addr++;
+    if (cpu->write_memory != NULL) {
+        // Create the interrupt vector table
+        // Do not write to RST 1 sequence, we'll put our bootloader there instead
+        for (int i = 1; i < NUM_IVT_VECTORS; ++i) {
+            // HLT for all interrupts
+            cpu->write_memory(INTERRUPT_TABLE[i], HLT);
+        }
+
+        // Write a default bootloader that jumps to start of program memory
+        emu_addr_t wr_addr = INTERRUPT_TABLE[0]; // start at 0x0
+
+        for (int i = 0; i < DEFAULT_BOOTLOADER_SIZE; ++i) {
+            cpu->write_memory(wr_addr, DEFAULT_BOOTLOADER[i]);
+            wr_addr++;
+        }
+    } else {
+        printf(INIT_MEM_STREAM_ERR_MSG);
     }
 }
 
@@ -272,45 +280,50 @@ void emu_init_i8080(i8080 * const cpu) {
     cpu->ie = false;
 }
 
-bool emu_setup_streams(i8080 * const cpu, read_word_fp read_memory, write_word_fp write_memory, 
-        read_word_fp port_in, write_word_fp port_out) {
-    
-    if (read_memory == NULL || write_memory == NULL) {
-        printf("Error. Memory stream functions NULL.\n");
-        return false;
+// Writes test_word to all locations, then reads test_word from all locations.
+// Returns false if a read failed to return test_word, and stores the failed location in cpu->pc.
+static bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
+    // Write pass
+    for (emu_addr_t i = 0; i <= ADDR_T_MAX; ++i) {
+        cpu->write_memory(i, test_word);
     }
-    
-    if (port_in == NULL || port_out == NULL) {
-        printf("Warning: I/O stream functions NULL.\n");
+    // Read pass
+    for (emu_addr_t i = 0; i <= ADDR_T_MAX; ++i) {
+        if (cpu->read_memory(i) != test_word) {
+            // indicate to user which location failed
+            cpu->pc = i;
+            return false;
+        }
     }
-    
-    cpu->read_memory = read_memory;
-    cpu->write_memory = write_memory;
-    cpu->port_in = port_in;
-    cpu->port_out = port_out;
-    
     return true;
 }
 
-bool emu_runtime(i8080 * const cpu) {
+EMU_EXIT_CODE emu_runtime(i8080 * const cpu, bool perform_startup_check) {
     
-    cpu->cycles_taken = 0;
+    if (cpu->read_memory == NULL || cpu->write_memory == NULL) {
+        return EMU_ERR_MEM_STREAMS;
+    }
     
-    cpu->pc = 0x100;
+    // Check if all memory locations are read/write-able
+    if (perform_startup_check) {
+        // Pass 1
+        if (!memory_write_read_pass(cpu, 0x55)) return EMU_ERR_MEMORY;
+        // Pass 2, check alternate bits
+        if (!memory_write_read_pass(cpu, 0xAA)) return EMU_ERR_MEMORY;
+    }
     
-    // debug
-    //dump_memory(memory->mem, memory->highest_addr);
-    
-    // execute all the instructions until told to stop
+    // Execute all instructions until failure/quit
     while(true) {
         if (!i8080_next(cpu)) {
             break;
         }
     }
     
-    printf("\n\nEmulator quit successfully.\n");
+    if (cpu->last_instr_exec == IN || cpu->last_instr_exec == OUT) {
+        return EMU_ERR_IO_STREAMS;
+    }
     
-    dump_cpu_stats(cpu);
+    return EMU_SUCCESS;
 }
 
 void emu_cleanup(i8080 * cpu, emu_mem_t * memory_handle) {

@@ -539,6 +539,7 @@ void i8080_reset(i8080 * const cpu) {
     // start executing from beginning again
     cpu->pc = 0;
     cpu->is_halted = false;
+    cpu->cycles_taken = 0;
 }
 
 bool i8080_next(i8080 * const cpu) {
@@ -551,6 +552,8 @@ bool i8080_debug_next(i8080 * const cpu) {
     // Do not print the opcode for an external call
     if (opcode != EMU_EXT_CALL) {
         printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
+    } else {
+        printf("Emulator external call\n");
     }
     return i8080_exec(cpu, opcode);
 }
@@ -558,6 +561,8 @@ bool i8080_debug_next(i8080 * const cpu) {
 bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
     
     cpu->cycles_taken += OPCODES_CYCLES[opcode];
+    // If the emulator should continue after executing this instruction 
+    bool continue_runtime = true;
     
     switch(opcode) {
         
@@ -565,8 +570,8 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case NOP: case ALT_NOP0: case ALT_NOP1: case ALT_NOP2: case ALT_NOP3: case ALT_NOP4: case ALT_NOP5:
             break;
             
-        // Calls cpu->emu_ext_call() on 0x38. This is for debugging and further emulation purposes.
-        case EMU_EXT_CALL: if (!emu_ext_call(cpu)) { return false; } break;
+        // 0x38: External emulator call to inspect emulator state or provide out-of-i8080 functionality.
+        case EMU_EXT_CALL: continue_runtime = emu_ext_call(cpu); break;
             
         // Move between registers
         case MOV_B_B: case MOV_B_C: case MOV_B_D: case MOV_B_E: case MOV_B_H: case MOV_B_L: case MOV_B_A:
@@ -836,13 +841,21 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
          * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 97 */
         case IN: 
         {
-            emu_word_t port_addr = i8080_advance_read_word(cpu);
-            cpu->a = cpu->port_in((emu_addr_t)concatenate(port_addr, port_addr));
+            if (cpu->port_in != NULL) {
+                emu_word_t port_addr = i8080_advance_read_word(cpu);
+                cpu->a = cpu->port_in((emu_addr_t)concatenate(port_addr, port_addr));
+            } else {
+                continue_runtime = false;
+            }
         }
         case OUT: 
         {
-            emu_word_t port_addr = i8080_advance_read_word(cpu);
-            cpu->port_out((emu_addr_t)concatenate(port_addr, port_addr), cpu->a);
+            if (cpu->port_out != NULL) {
+               emu_word_t port_addr = i8080_advance_read_word(cpu);
+               cpu->port_out((emu_addr_t)concatenate(port_addr, port_addr), cpu->a); 
+            } else {
+                continue_runtime = false;
+            }
         }
         
         // Restart / software interrupts
@@ -863,11 +876,10 @@ bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         // Can only be brought out by interrupt or RESET.
         case HLT: cpu->is_halted = true; break;
         
-        default: return false;
+        default: continue_runtime = false; // instruction was not identifiable
     }
     
     cpu->last_instr_exec = opcode;
     
-    // successful execution
-    return true;
+    return continue_runtime;
 }
