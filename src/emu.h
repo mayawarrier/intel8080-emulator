@@ -10,17 +10,18 @@
 #ifndef EMU_H
 #define EMU_H
 
-#include <stdlib.h>
-#include "emu_types.h"
+/* Define the location of the machine types file relative to i8080.h.
+ * It is necessary to define EMU_TYPES_LOC before including i8080.h.*/
+#define EMU_TYPES_LOC "../emu_types.h"
 #include "i8080/i8080.h"
 
-enum EMU_EXIT_CODE {
+typedef enum EMU_EXIT_CODES {
     EMU_ERR_MEM_STREAMS,        // A memory stream function (cpu->read_memory, cpu->write_memory) is not initialized.
     EMU_ERR_IO_STREAMS,         // An I/O request was made at runtime but an I/O stream function (cpu->port_in, cpu->port_out) was not initialized.
     EMU_ERR_MEMORY,             // A memory location is not read/writ-able. Location of failure stored in cpu->pc.
                                 // This error can only be triggered by the startup check.
     EMU_SUCCESS                 // Successful run.
-};
+} EMU_EXIT_CODE;
 
 /* The starting location of the CP/M Transient Program Area i.e. 
  * the first valid location to load a program written for CP/M. 
@@ -57,11 +58,14 @@ void emu_set_default_env(i8080 * const cpu);
 // Begin the emulator. Must have properly set up memory and streams first!
 // Returns an error code if the emulator was not initialized properly or failed the startup check.
 EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check);
+/* Begins the emulator in debug mode. In this mode, the emulator prints the values of all flags and registers,
+ * and dumps the main memory after each instruction is executed. */
+EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, FILE * debug_out, const char dump_format[]);
 
 // Send an interrupt (INTE) to the i8080. This can be sent on another thread
 void emu_i8080_interrupt(i8080 * const cpu);
 
 // Cleans up memory
-void emu_cleanup(i8080 * cpu, emu_mem_t * memory_handle);
+void emu_cleanup(i8080 * cpu, emu_word_t * memory);
 
 #endif /* EMU_H */

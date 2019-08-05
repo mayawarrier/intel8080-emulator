@@ -6,7 +6,6 @@
 #include <string.h>
 #include "emu.h"
 #include "emu_debug.h"
-#include "i8080/i8080_internal.h"
 #include "i8080/i8080_opcodes.h"
 
 // The console port address duplicated across 16-bit address bus for use with port out
@@ -326,13 +325,12 @@ EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check) {
     return EMU_SUCCESS;
 }
 
-void emu_cleanup(i8080 * cpu, emu_mem_t * memory_handle) {
+void emu_cleanup(i8080 * cpu, emu_word_t * memory) {
     cpu->read_memory = NULL;
     cpu->write_memory = NULL;
     cpu->port_in = NULL;
     cpu->port_out = NULL;
-    free(memory_handle->mem);
-    memory_handle = NULL;
+    free(memory);
+    memory = NULL;
     cpu = NULL;
-    memory_handle = NULL;
 }
