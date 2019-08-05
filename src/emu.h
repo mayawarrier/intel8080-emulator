@@ -2,7 +2,12 @@
  * File:   emu.h
  * Author: dhruvwarrier
  *
- * Starts up the emulator and handles boot.
+ * This is the emulator layer over the base i8080 implementation.
+ * 
+ * It provides EMU_TYPES_LOC (required by i8080.h), debugging functionality, and 
+ * limited emulation of the CP/M 2.2 BIOS and memory environment.
+ * 
+ * See below for what is supported in the CP/M 2.2 environment.
  * 
  * Created on June 30, 2019, 5:28 PM
  */
@@ -33,8 +38,6 @@ static const emu_word_t CPM_CONSOLE_ADDR = 0x00;
  * environment. Set this environment with emu_set_default_env(). */
 static const emu_addr_t DEFAULT_START_PA = 0x40;
 
-/* Allocates 64KB of emulated i8080 memory. Use this only when no external memory exists. */
-_Bool memory_init(emu_word_t * const memory_buf);
 /* Loads a file into memory. Call only after memory_init(). Returns number of words read. */
 size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
 
@@ -55,8 +58,8 @@ void emu_set_cpm_env(i8080 * const cpu);
  * Call this after the emulator's memory streams have been initialized (cpu->read_memory & cpu->write_memory). */
 void emu_set_default_env(i8080 * const cpu);
 
-// Begin the emulator. Must have properly set up memory and streams first!
-// Returns an error code if the emulator was not initialized properly or failed the startup check.
+/* Begin the emulator. Must have properly set up memory and streams first!
+ * Returns an error code if the emulator was not initialized properly or failed the startup check. */
 EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check);
 /* Begins the emulator in debug mode. In this mode, the emulator prints the values of all flags and registers,
  * and dumps the main memory after each instruction is executed to debug_out. Each word is formatted as mem_dump_format,
@@ -67,7 +70,5 @@ EMU_EXIT_CODE emu_debug_runtime(i8080 * const cpu, _Bool perform_startup_check,
 // Send an interrupt (INTE) to the i8080. This can be sent on another thread
 void emu_i8080_interrupt(i8080 * const cpu);
 
-// Cleans up memory
-void emu_cleanup(i8080 * cpu, emu_word_t * memory);
 
 #endif /* EMU_H */

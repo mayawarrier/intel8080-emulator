@@ -11,20 +11,6 @@
 // The console port address duplicated across 16-bit address bus for use with port out
 static const emu_addr_t CONSOLE_ADDR_FULL = (emu_addr_t)((CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
 
-_Bool memory_init(emu_word_t * const memory_buf) {
-    // Allocate memory
-    memory_buf = (emu_word_t *)malloc(sizeof(emu_word_t) * (ADDR_T_MAX + 1));
-    if (memory_buf == NULL) {
-        printf("Error: Could not allocate enough memory to emulate.\n");
-        return 0;
-    }
-    // Blank the entire memory. 
-    // EEPROMS usually had 0xff in all locations when blanked because it
-    // conveniently caused a restart when non-program code was executed.
-    memset((void *)memory_buf, 0xff, ADDR_T_MAX + 1);
-    return 1;
-}
-
 size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc) {
     
     size_t file_size = 0;
@@ -341,14 +327,4 @@ EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check) {
 EMU_EXIT_CODE emu_debug_runtime(i8080 * const cpu, _Bool perform_startup_check, 
         FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after) {
     return emu_runtime(cpu, perform_startup_check, 1, debug_out, mem_dump_format, mem_dump_newline_after);
-}
-
-void emu_cleanup(i8080 * cpu, emu_word_t * memory) {
-    cpu->read_memory = NULL;
-    cpu->write_memory = NULL;
-    cpu->port_in = NULL;
-    cpu->port_out = NULL;
-    free(memory);
-    memory = NULL;
-    cpu = NULL;
 }
