@@ -43,7 +43,7 @@ void dump_cpu_stats(FILE * stream, i8080 * const cpu) {
 
 // Debug next options, set to default values
 static FILE * DEBUG_OUT = NULL;
-static const int DUMPF_BUF_SIZE = 128;
+#define DUMPF_BUF_SIZE 128
 static char MEM_DUMPF_BUF[DUMPF_BUF_SIZE] = WORD_T_FORMAT;
 static int MEM_NEWLINE_AFTER = 16;
 
@@ -51,7 +51,7 @@ static int MEM_NEWLINE_AFTER = 16;
  * so the options have to be passed in separately. */
 void set_debug_next_options(FILE * stream, const char mem_dump_format[], int mem_dump_newline_after) {
     // Get size of string along with trailing NULL
-    size_t format_size = sizeof(mem_dump_format);
+    size_t format_size = strlen(mem_dump_format) + 1;
     if (format_size > DUMPF_BUF_SIZE) {
         printf("Error: Debug next format too large.\n");
     } else {
@@ -69,6 +69,6 @@ _Bool i8080_debug_next(i8080 * const cpu) {
     _Bool exec = i8080_exec(cpu, opcode);
     // Dump stats and memory
     dump_cpu_stats(DEBUG_OUT, cpu);
-    dump_memory(DEBUG_OUT, MEM_DUMPF_BUF, MEM_NEWLINE_AFTER, cpu);
+    dump_memory(DEBUG_OUT, MEM_DUMPF_BUF, MEM_NEWLINE_AFTER, 0, ADDR_T_MAX, cpu);
     return exec;
 }
