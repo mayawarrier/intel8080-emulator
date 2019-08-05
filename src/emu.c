@@ -83,8 +83,8 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             
             // Addresses of command proc messages
             const emu_addr_t ERROR_ADDR_PTR = 0x40;                     // "\nInvalid address."
-            const emu_addr_t ERROR_CMD_PTR = ERROR_ADDR_PTR + 0x18;     // "\nInvalid command."
-            const emu_addr_t CMD_PROMPT_PTR = ERROR_CMD_PTR + 0x18;     // "> "
+            const emu_addr_t ERROR_CMD_PTR = ERROR_ADDR_PTR + 0x11;     // "\nInvalid command."
+            const emu_addr_t CMD_PROMPT_PTR = ERROR_CMD_PTR + 0x11;     // "> "
             
             // Max length, excluding trailing null
             int LEN_INPUT_BUF = 127;
@@ -200,7 +200,7 @@ void emu_set_cpm_env(i8080 * const cpu) {
         
         // Command processor messages, '$'-terminated
         // as is the convention in CP/M.
-        char * const CMD_MSGS[] = {"\nInvalid address.$", "\nInvalid command.$", "> $"};
+        char * const CMD_MSGS[] = {"Invalid address.$", "Invalid command.$", "> $"};
         
         // Store all messages after the standard IVT
         emu_addr_t msgs_loc = 0x40;
