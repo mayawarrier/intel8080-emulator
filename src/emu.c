@@ -77,14 +77,20 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
         
         case 0xe401:
         {
-            // This is a basic command processor, entered upon WBOOT. Commands are: RUN addr, and QUIT.
+            // This is a basic command processor, entered upon WBOOT. Commands are: RUN addr, HELP, and QUIT.
             // RUN addr starts executing instructions from addr. addr should be in 16-bit hex format eg. 0x0000 or 0x1234
+            // HELP shows the list of commands.
             // QUIT quits the emulator.
             
             // Addresses of command proc messages
-            const emu_addr_t ERROR_ADDR_PTR = 0x40;                     // "\nInvalid address."
+            const emu_addr_t ERROR_ADDR_PTR = 0xe410;                   // "\nInvalid address."
             const emu_addr_t ERROR_CMD_PTR = ERROR_ADDR_PTR + 0x11;     // "\nInvalid command."
-            const emu_addr_t CMD_PROMPT_PTR = ERROR_CMD_PTR + 0x11;     // "> "
+            const emu_addr_t STARTUP_MSG_PTR = ERROR_CMD_PTR + 0x11;    // Startup message
+            const emu_addr_t HELP_MSG_PTR = STARTUP_MSG_PTR + 0x49;     // Message shown on HELP
+            const emu_addr_t CMD_PROMPT_PTR = HELP_MSG_PTR + 0x78;      // "> "
+            
+            // Print startup message
+            cpm_print_str(cpu, STARTUP_MSG_PTR);
             
             // Max length, excluding trailing null
             int LEN_INPUT_BUF = 127;
@@ -110,11 +116,7 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
 
                 // Process commands
                 if (strncmp(input_buf, "RUN ", 4) == 0) {
-                    // ADDR_T_FORMAT is %#06x, # formats for 0x in every case except 0x0000
-                    if (strncmp(&input_buf[4], "0x0000", 6) == 0) {
-                        run_addr = 0x0000;
-                        goto command_run;
-                    } else if (sscanf(&input_buf[4], ADDR_T_FORMAT, &run_addr) == 1
+                    if (sscanf(&input_buf[4], ADDR_T_FORMAT, &run_addr) == 1
                             && run_addr >= 0 && run_addr <= 0xffff) {
                         // address is in correct format and within bounds
                         goto command_run;
@@ -124,6 +126,8 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
                     }
                 } else if (strncmp(input_buf, "QUIT", 4) == 0) {
                     goto command_quit;
+                } else if (strncmp(input_buf, "HELP", 4) == 0) {
+                    cpm_print_str(cpu, HELP_MSG_PTR);
                 } else {
                     // Invalid command error
                     cpm_print_str(cpu, ERROR_CMD_PTR);
@@ -200,11 +204,17 @@ void emu_set_cpm_env(i8080 * const cpu) {
         
         // Command processor messages, '$'-terminated
         // as is the convention in CP/M.
-        char * const CMD_MSGS[] = {"Invalid address.$", "Invalid command.$", "> $"};
+        char * const CMD_MSGS[] = {
+            "Invalid address.$", 
+            "Invalid command.$",
+            "\nintel8080-emulator, CP/M Warm Boot.\nType HELP for a list of commands.\n\n$",
+            "\nRUN addr: Start executing instructions from addr. For eg. RUN 0x0100\nHELP: Bring up this list of commands.\nQUIT: quit\n$",
+            "> $"
+        };
         
-        // Store all messages after the standard IVT
-        emu_addr_t msgs_loc = 0x40;
-        for (int i = 0; i < 3; ++i) {
+        // Store messages from 0xe410
+        emu_addr_t msgs_loc = 0xe410;
+        for (int i = 0; i < 5; ++i) {
             char * msg = CMD_MSGS[i];
             for (int j = 0; j < strlen(msg); ++j) {
                 cpu->write_memory(msgs_loc++, msg[j]);
