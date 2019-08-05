@@ -15,6 +15,8 @@
 #ifndef EMU_H
 #define EMU_H
 
+#include <stdio.h>
+
 /* Define the location of the machine types file relative to i8080.h.
  * It is necessary to define EMU_TYPES_LOC before including i8080.h.*/
 #define EMU_TYPES_LOC "../emu_types.h"
@@ -25,18 +27,18 @@ typedef enum EMU_EXIT_CODES {
     EMU_ERR_IO_STREAMS,         // An I/O request was made at runtime but an I/O stream function (cpu->port_in, cpu->port_out) was not initialized.
     EMU_ERR_MEMORY,             // A memory location is not read/writ-able. Location of failure stored in cpu->pc.
                                 // This error can only be triggered by the startup check.
-    EMU_SUCCESS                 // Successful run.
+    EMU_EXIT_SUCCESS            // Successful run.
 } EMU_EXIT_CODE;
 
 /* The starting location of the CP/M Transient Program Area i.e. 
  * the first valid location to load a program written for CP/M. 
  * Set this environment with emu_set_cpm_env(). */
-static const emu_addr_t CPM_START_OF_TPA = 0x100;
+#define CPM_START_OF_TPA 0x100
 // Port address that CP/M will use to read/write characters from/to a console
-static const emu_word_t CPM_CONSOLE_ADDR = 0x00;
+#define CPM_CONSOLE_ADDR 0x00
 /* The first valid location to load a program with the default 
  * environment. Set this environment with emu_set_default_env(). */
-static const emu_addr_t DEFAULT_START_PA = 0x40;
+#define DEFAULT_START_PA 0x40
 
 /* Loads a file into memory. Call only after memory_init(). Returns number of words read. */
 size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);

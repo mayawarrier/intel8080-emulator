@@ -2,7 +2,6 @@
  * Implement emu.h
  */
 
-#include <stdio.h>
 #include <string.h>
 #include "emu.h"
 #include "emu_debug.h"
@@ -317,7 +316,7 @@ static EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check,
         return EMU_ERR_IO_STREAMS;
     }
     
-    return EMU_SUCCESS;
+    return EMU_EXIT_SUCCESS;
 }
 
 EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check) {
