@@ -99,9 +99,6 @@ static const int NUM_IVT_VECTORS = 8;
 // No other working registers or flags are affected.
 void i8080_reset(i8080 * const cpu);
 
-// Reads a word and advances PC by 1.
-inline emu_word_t i8080_advance_read_word(i8080 * const cpu);
-
 // Executes the next instruction. If an interrupt is pending, services it.
 // Returns 0 if it isn't safe to continue execution.
 _Bool i8080_next(i8080 * const cpu);

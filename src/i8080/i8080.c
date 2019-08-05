@@ -182,7 +182,7 @@ static inline void i8080_write_memory(i8080 * const cpu, emu_word_t word) {
 }
 
 // Reads a word and advances PC by 1.
-inline emu_word_t i8080_advance_read_word(i8080 * const cpu) {
+static inline emu_word_t i8080_advance_read_word(i8080 * const cpu) {
     return cpu->read_memory(cpu->pc++);
 }
 

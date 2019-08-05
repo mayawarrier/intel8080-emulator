@@ -63,7 +63,7 @@ void set_debug_next_options(FILE * stream, const char mem_dump_format[], int mem
 
 _Bool i8080_debug_next(i8080 * const cpu) {
     // Print the instruction
-    emu_word_t opcode = i8080_advance_read_word(cpu);
+    emu_word_t opcode = cpu->read_memory(cpu->pc++);
     printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
     // execute the instruction
     _Bool exec = i8080_exec(cpu, opcode);
