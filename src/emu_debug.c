@@ -48,7 +48,7 @@ static char MEM_DUMPF_BUF[DUMPF_BUF_SIZE] = WORD_T_FORMAT;
 static int MEM_NEWLINE_AFTER = 16;
 
 /* i8080_debug_next() is expected to have the signature _Bool (*)(i8080 * const),
- * so the options must be set before calling it. */
+ * so the options have to be passed in separately. */
 void set_debug_next_options(FILE * stream, const char mem_dump_format[], int mem_dump_newline_after) {
     // Get size of string along with trailing NULL
     size_t format_size = sizeof(mem_dump_format);
@@ -64,11 +64,7 @@ void set_debug_next_options(FILE * stream, const char mem_dump_format[], int mem
 _Bool i8080_debug_next(i8080 * const cpu) {
     // Print the instruction
     emu_word_t opcode = i8080_advance_read_word(cpu);
-    if (opcode == EMU_EXT_CALL) {
-        printf("Emulator external call.\n");
-    } else {
-        printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
-    }
+    printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
     // execute the instruction
     _Bool exec = i8080_exec(cpu, opcode);
     // Dump stats and memory

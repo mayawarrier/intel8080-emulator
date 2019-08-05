@@ -1,3 +1,13 @@
+/* 
+ * File:   i8080.h
+ * Author: dhruvwarrier
+ *
+ * Defines the emulated i8080, and provides fns to execute instructions on it.
+ * EMU_TYPES_LOC must be defined before including this. See below for requirements.
+ * 
+ * Created on June 30, 2019, 5:28 PM
+ */
+
 #ifndef I_8080_H
 #define I_8080_H
 
