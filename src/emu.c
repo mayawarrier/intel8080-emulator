@@ -200,7 +200,7 @@ void emu_set_cpm_env(i8080 * const cpu) {
         
         // Command processor messages, '$'-terminated
         // as is the convention in CP/M.
-        char ** CMD_MSGS = {"\nInvalid address.$", "\nInvalid command.$", "> $"};
+        char * const CMD_MSGS[] = {"\nInvalid address.$", "\nInvalid command.$", "> $"};
         
         // Store all messages after the standard IVT
         emu_addr_t msgs_loc = 0x40;
