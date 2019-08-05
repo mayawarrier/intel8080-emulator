@@ -2,15 +2,13 @@
  * Implement emu_debug.h
  */
 
-#include <stdlib.h>
-#include <stdio.h>
 #include "emu_debug.h"
-#include "i8080/i8080.h"
+#include "i8080/i8080_opcodes.h"
 
 static const char * DUMP_LOCATION = "dumps/memory_dump.bin";
 static const char * CPU_STATS_DUMP_LOCATION = "dumps/cpu_stats_dump.bin";
 
-void dump_memory(const emu_word_t * memory, emu_addr_t highest_addr) {
+void dump_memory(FILE * stream, const emu_word_t * memory, emu_addr_t highest_addr, const char format[]) {
     
     FILE * dumpf_ptr = fopen(DUMP_LOCATION, "w");
     
@@ -46,4 +44,14 @@ void dump_cpu_stats(i8080 * const cpu) {
         fprintf(dumpf_ptr, "Carry: %d\n", cpu->cy);
         fprintf(dumpf_ptr, "Interrupt enable: %d\n", cpu->ie);
     }
+}
+
+_Bool i8080_debug_next(i8080 * const cpu, FILE * stream, const char mem_dump_format[]) {
+    emu_word_t opcode = i8080_advance_read_word(cpu);
+    if (opcode == EMU_EXT_CALL) {
+        printf("Emulator external call.\n");
+    } else {
+        printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
+    }
+    return i8080_exec(cpu, opcode);
 }
