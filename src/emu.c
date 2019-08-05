@@ -297,7 +297,8 @@ static _Bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
     return 1;
 }
 
-EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check) {
+static EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, 
+        _Bool debug_mode, FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after) {
     
     if (cpu->read_memory == NULL || cpu->write_memory == NULL) {
         return EMU_ERR_MEM_STREAMS;
@@ -311,9 +312,17 @@ EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check) {
         if (!memory_write_read_pass(cpu, 0xAA)) return EMU_ERR_MEMORY;
     }
     
+    // If in debug mode, this is overridden by i8080_debug_next
+    _Bool (* i8080_next_ovrd)(i8080 * const) = i8080_next;
+    
+    if(debug_mode) {
+        set_debug_next_options(debug_out, mem_dump_format, mem_dump_newline_after);
+        i8080_next_ovrd = i8080_debug_next;
+    }
+    
     // Execute all instructions until failure/quit
     while(1) {
-        if (!i8080_next(cpu)) {
+        if (!i8080_next_ovrd(cpu)) {
             break;
         }
     }
@@ -323,6 +332,15 @@ EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check) {
     }
     
     return EMU_SUCCESS;
+}
+
+EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check) {
+    return emu_runtime(cpu, perform_startup_check, 0, NULL, "", 0);
+}
+
+EMU_EXIT_CODE emu_debug_runtime(i8080 * const cpu, _Bool perform_startup_check, 
+        FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after) {
+    return emu_runtime(cpu, perform_startup_check, 1, debug_out, mem_dump_format, mem_dump_newline_after);
 }
 
 void emu_cleanup(i8080 * cpu, emu_word_t * memory) {
