@@ -28,8 +28,8 @@ typedef size_t emu_size_t;
 #define WORD_T_MAX UINT8_MAX
 #define ADDR_T_MAX UINT16_MAX
 
-#define WORD_T_FORMAT "%#04x"
-#define ADDR_T_FORMAT "%#06x"
+#define WORD_T_FORMAT "0x%02x"
+#define ADDR_T_FORMAT "0x%04x"
 
 #define WORD_T_PRT_FORMAT "%c"
 

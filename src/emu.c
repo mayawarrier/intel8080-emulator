@@ -135,7 +135,7 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             command_run: {
                 // Write JMP addr to the bytes immediately after
                 emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
-                emu_word_t hi_addr = (emu_word_t)((run_addr >> HALF_WORD_SIZE) & WORD_T_MAX);
+                emu_word_t hi_addr = (emu_word_t)((run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
                 cpu->write_memory(0xe401, JMP);
                 cpu->write_memory(0xe402, lo_addr);
                 cpu->write_memory(0xe403, hi_addr);
