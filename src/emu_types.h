@@ -1,26 +1,26 @@
 /* 
- * File:   types.h
+ * File:   emu_types.h
  * Author: dhruvwarrier
  * 
  * Provides word and address types, defines
  * max values, and provides formatting specifiers.
  * 
- * emu_buf_t should be a type that is larger than the 
- * widths of emu_word_t and emu_addr_t.
+ * See i8080.h for the requirements on these types and macros.
  * 
- * Modify to port to different architectures.
+ * Modify to port to different host/virtual machines.
  *
  * Created on June 30, 2019, 2:56 PM
  */
 
-#ifndef TYPES_H
-#define TYPES_H
+#ifndef EMU_TYPES_H
+#define EMU_TYPES_H
 
 #include <stdint.h>
 
 typedef uint8_t emu_word_t;
 typedef uint16_t emu_addr_t;
-typedef uint32_t emu_buf_t; 
+typedef uint32_t emu_buf_t;
+typedef size_t emu_size_t;
 
 #define HALF_WORD_SIZE (4)
 #define HALF_ADDR_SIZE (8)
@@ -33,4 +33,4 @@ typedef uint32_t emu_buf_t;
 
 #define WORD_T_PRT_FORMAT "%c"
 
-#endif /* TYPES_H */
+#endif /* EMU_TYPES_H */
