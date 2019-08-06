@@ -270,6 +270,8 @@ void emu_init_i8080(i8080 * const cpu) {
     cpu->port_in = NULL;
     cpu->port_out = NULL;
     cpu->emu_ext_call = NULL;
+    cpu->interrupt_acknowledge = NULL;
+    cpu->pending_interrupt_req = 0;
     // interrupts disabled by default
     cpu->ie = 0;
 }
@@ -336,4 +338,11 @@ EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check) {
 EMU_EXIT_CODE emu_debug_runtime(i8080 * const cpu, _Bool perform_startup_check, 
         FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after) {
     return emu_runtime(cpu, perform_startup_check, 1, debug_out, mem_dump_format, mem_dump_newline_after);
+}
+
+void emu_i8080_interrupt(i8080 * const cpu) {
+    // When serviced by the i8080, this will be toggled back
+    if (cpu->ie) {
+        cpu->pending_interrupt_req = 1;
+    }
 }

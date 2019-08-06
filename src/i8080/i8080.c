@@ -541,7 +541,17 @@ void i8080_reset(i8080 * const cpu) {
 }
 
 _Bool i8080_next(i8080 * const cpu) {
-    return i8080_exec(cpu, i8080_advance_read_word(cpu));
+    if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
+        // If an interrupt needs to be serviced execute it first
+        emu_word_t int_vector = cpu->interrupt_acknowledge();
+        // disable interrupts
+        cpu->ie = 0;
+        cpu->pending_interrupt_req = 0;
+        return i8080_exec(cpu, int_vector);
+    } else {
+        // regular execution
+        return i8080_exec(cpu, i8080_advance_read_word(cpu));
+    }
 }
 
 _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {

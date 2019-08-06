@@ -69,8 +69,11 @@ EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check);
 EMU_EXIT_CODE emu_debug_runtime(i8080 * const cpu, _Bool perform_startup_check, 
         FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after);
 
-// Send an interrupt (INTE) to the i8080. This can be sent on another thread
+/* Send an interrupt to the i8080. This can be sent on another thread i.e. concurrently,
+ * and it will be serviced when the i8080 is ready. When ready, the i8080 will call 
+ * i8080.interrupt_acknowledge() which should return the vector to be executed. 
+ * Interrupts are disabled every time an interrupt is serviced, so they must be enabled
+ * again before the next interrupt. */
 void emu_i8080_interrupt(i8080 * const cpu);
-
 
 #endif /* EMU_H */

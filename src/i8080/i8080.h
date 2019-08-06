@@ -76,6 +76,16 @@ typedef struct i8080 {
     // Can be used to debug upon emu_ext_call.
     emu_word_t last_instr_exec;
     
+    /* When an interrupt is issued, this
+     * is called back when the i8080 is ready
+     * to receive the interrupt vector. After
+     * the vector has been executed, interrupts 
+     * are disabled again. */
+    emu_word_t (* interrupt_acknowledge)(void);
+    
+    // Whether there is a pending interrupt request to service
+    _Bool pending_interrupt_req;
+    
     // Cycles taken for last emu_runtime
     emu_size_t cycles_taken;
     
