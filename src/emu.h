@@ -17,9 +17,6 @@
 
 #include <stdio.h>
 
-/* Define the location of the machine types file relative to i8080.h.
- * It is necessary to define EMU_TYPES_LOC before including i8080.h.*/
-#define EMU_TYPES_LOC "../emu_types.h"
 #include "i8080/i8080.h"
 
 typedef enum EMU_EXIT_CODES {
@@ -68,12 +65,5 @@ EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check);
  * and a newline is inserted every mem_dump_newline_after words. */
 EMU_EXIT_CODE emu_debug_runtime(i8080 * const cpu, _Bool perform_startup_check, 
         FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after);
-
-/* Send an interrupt to the i8080. This can be sent on another thread i.e. concurrently,
- * and it will be serviced when the i8080 is ready. When ready, the i8080 will call 
- * i8080.interrupt_acknowledge() which should return the vector to be executed. 
- * Interrupts are disabled every time an interrupt is serviced, so they must be enabled
- * again before the next interrupt. */
-void emu_i8080_interrupt(i8080 * const cpu);
 
 #endif /* EMU_H */

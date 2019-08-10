@@ -1,5 +1,5 @@
 /* 
- * File:   emu_types.h
+ * File:   i8080_types.h
  * Author: dhruvwarrier
  * 
  * Provides word and address types, defines

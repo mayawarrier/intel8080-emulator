@@ -10,8 +10,7 @@
 #ifndef EMU_DEBUG_H
 #define EMU_DEBUG_H
 
-// Forces definition of EMU_TYPES_LOC before including i8080.h
-#include "emu.h"
+#include "i8080/i8080.h"
 #include <stdio.h>
 
 /* Dumps the contents of memory from start_addr to end_addr to a stream, formatting each word as format.

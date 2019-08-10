@@ -2,8 +2,7 @@
  * File:   i8080.h
  * Author: dhruvwarrier
  *
- * Defines the emulated i8080, and provides fns to execute instructions on it.
- * EMU_TYPES_LOC must be defined before including this. See below for requirements.
+ * Defines the i8080, and provides fns to emulate instructions on it.
  * 
  * Created on June 30, 2019, 5:28 PM
  */
@@ -11,14 +10,14 @@
 #ifndef I_8080_H
 #define I_8080_H
 
-/* Location of user-configurable file that contains emulator base types, format specifiers, sizes etc.
+/* User-configurable file that contains emulator base types, format specifiers, sizes etc.
  * 
  * In this file, the following types must be defined:
  * emu_word_t: An unsigned type with a bit width equal to the virtual machine's word size.
  * emu_addr_t: An unsigned type with a bit width equal to the virtual machine's address size.
  * emu_buf_t: An unsigned type that is at least 1 bit larger than emu_word_t and emu_addr_t.
  * emu_size_t: An unsigned large type. Used to count processor cycles taken. If this is not large enough,
- *             the emulator will still run properly, but the cycles_taken might overflow.
+ *             the emulator will still run properly, but cycles_taken might overflow.
  * 
  * In this file, the following macros must be defined:
  * HALF_WORD_SIZE: uint, half the bit width of emu_word_t for eg. (4)
@@ -29,12 +28,7 @@
  * ADDR_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_addr_t.
  * WORD_T_PRT_FORMAT: quote-enclosed string, format specifier to print word as ASCII eg. "%c"
  */
-#ifdef EMU_TYPES_LOC
-#include EMU_TYPES_LOC
-#else
-// If EMU_TYPES_LOC doesn't exist, attempt to find it in its default location
-#include "../emu_types.h"
-#endif
+#include "i8080_types.h"
 
 // Define types of read/write streams
 typedef emu_word_t (* read_word_fp)(emu_addr_t);
@@ -82,9 +76,17 @@ typedef struct i8080 {
      * the vector has been executed, interrupts 
      * are disabled again. */
     emu_word_t (* interrupt_acknowledge)(void);
-    
-    // Whether there is a pending interrupt request to service
+    // Whether there is a pending interrupt request to service.
     _Bool pending_interrupt_req;
+    
+    /* When an interrupt comes on another thread,
+     * this signal is used to sync i8080 status
+     * with the interrupt generator, so the
+     * interrupt is not accidentally double-serviced
+     * or missed by the i8080.
+     * A char type ensures atomic access on byte-aligned
+     * systems, which should reduce the sync time. */
+    char interrupts_sync;
     
     // Cycles taken for last emu_runtime
     emu_size_t cycles_taken;
@@ -105,16 +107,26 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
 
 static const int NUM_IVT_VECTORS = 8;
 
-// Resets the i8080. PC is set to 0, i8080 exits halt state, and cycles taken is reset to 0. 
-// No other working registers or flags are affected.
+/* Resets the i8080. PC is set to 0, i8080 exits halt state, and cycles taken is reset to 0. 
+ * No other working registers or flags are affected. Equivalent to pulling RESET low. */
 void i8080_reset(i8080 * const cpu);
 
-// Executes the next instruction. If an interrupt is pending, services it.
-// Returns 0 if it isn't safe to continue execution.
+/* Executes the next instruction. If an interrupt is pending, services it.
+ * Returns 0 if it isn't safe to continue execution. */
 _Bool i8080_next(i8080 * const cpu);
 
-// Executes the opcode on cpu, updating its cycle count, registers and flags.
-// Returns 0 if it isn't safe to continue execution.
+/* Executes the opcode on cpu, updating its cycle count, registers and flags.
+ * Returns 0 if it isn't safe to continue execution. */
 _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
+
+/* Sends an interrupt to the i8080. This can be an interrupt passed through from
+ * the host processor, or sent on another thread, and it will be serviced when the i8080 is ready. 
+ * If the compiler does not support atomics, the interrupt sync signal may not work correctly,
+ * and interrupts may be serviced more than once or not at all. See i8080_atomic.h.
+ * 
+ * When ready, the i8080 will call i8080.interrupt_acknowledge() which should return the vector to be executed. 
+ * Interrupts are disabled every time an interrupt is serviced, so they must be enabled
+ * again before the next interrupt. */
+void i8080_interrupt(i8080 * const cpu);
 
 #endif // I_8080_H
