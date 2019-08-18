@@ -12,19 +12,32 @@
 
 // Define the mutex handle type.
 #if defined __GNUC__
-    #if PTHREADS_AVAILABLE
+    #if EMU_PTHREADS_AVAILABLE
         // Use pthreads, if available
         #include <pthread.h>
         typedef pthread_mutex_t emu_mutex_t;
     #else
-        /* Use char, implementation relies on __atomic_load_n
+        /* Use char. Implementation relies on __atomic_load_n
          * and __atomic_store_n */
         typedef char emu_mutex_t;
     #endif
 #elif defined _MSC_VER
-    // Rely on Windows to provide a mutex
-    #include <windows.h>
-    typedef HANDLE emu_mutex_t;
+    // Define minimum supported windows version
+    #ifndef WINVER
+        #define WINVER 0x0403
+    #endif
+    #ifndef _WIN32_WINNT
+        #define _WIN32_WINNT 0x0403
+    #endif
+    // Reduce the size of windows header files
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    /* Critical sections have better performance than
+     * standard windows mutexes and appear to be compatible
+     * with std::thread. */
+    #include <Windows.h>
+    typedef CRITICAL_SECTION emu_mutex_t;
 #else
     /* A volatile char ~should~ provide the best chance
      * at proper sync, if nothing else is available. */
@@ -45,7 +58,7 @@ static inline void emu_mutex_destroy(emu_mutex_t * handle);
 #if defined __GNUC__
 
 // If pthreads are available, use them instead
-#if PTHREADS_AVAILABLE
+#if EMU_PTHREADS_AVAILABLE
 
 static inline void emu_mutex_init(emu_mutex_t * handle) {
     pthread_mutex_init(handle, NULL);
@@ -91,24 +104,24 @@ static inline void emu_mutex_destroy(emu_mutex_t * handle) {
 
 #elif defined _MSC_VER
 
-// These rely on Windows to provide a mutex handle.
+// These use Windows critical sections for faster mutexes.
 
 static inline void emu_mutex_init(emu_mutex_t * handle) {
-    *handle = CreateMutex(NULL, FALSE, NULL);
+    /* Initializing with a spin count can hugely improve performance:
+     */
+    InitializeCriticalSectionAndSpinCount(handle, 4000);
 }
 
 static inline void emu_mutex_lock(emu_mutex_t * handle) {
-    // Request mutex ownership and wait until control is transferred to this thread
-    WaitForSingleObject(*handle, INFINITE);
+    EnterCriticalSection(handle);
 }
 
 static inline void emu_mutex_unlock(emu_mutex_t * handle) {
-    // Release mutex from this thread
-    ReleaseMutex(*handle);
+    LeaveCriticalSection(handle);
 }
 
 static inline void emu_mutex_destroy(emu_mutex_t * handle) {
-    CloseHandle(*handle);
+    DeleteCriticalSection(handle);
 }
 
 #else
