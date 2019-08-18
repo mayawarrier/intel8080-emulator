@@ -11,7 +11,7 @@
 #define I_8080_H
 
 /* User-configurable file that contains emulator base types, format specifiers, 
- * sizes, options for building, and synchronization primitives.
+ * sizes, and pre-definitions for different compilers.
  * 
  * In this file, the following types must be defined:
  * emu_word_t: An unsigned type with a bit width equal to the virtual machine's word size.
@@ -28,13 +28,32 @@
  * WORD_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_word_t. for eg. "%#04x"
  * ADDR_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_addr_t.
  * WORD_T_PRT_FORMAT: quote-enclosed string, format specifier to print word as ASCII eg. "%c"
- * PTHREADS_AVAILABLE: 1 if pthreads are available in your environment, 0 if not.
+ * 
+ * Predefs:
+ * - Suppress MSVC errors on using unsafe/deprecated stream format functions.
  */
-#include "i8080_port.h"
+#include "i8080_predef.h"
+
+/* If the environment is GNUC, and pthreads are available,
+ * define this as 1. This must be defined before including 
+ * i8080_sync.h. */
+#define EMU_PTHREADS_AVAILABLE (1)
+
+/* Provides access to portable synchronization functions. 
+ * 
+ * For GNUC, this is implemented with pthread_mutex_t, which is not
+ * compatible with std::thread as defined by the standard, though it
+ * usually always is: https://stackoverflow.com/questions/37110571/when-to-use-pthread-mutex-t
+ * 
+ * For Windows, this is implemented with CRITICAL_SECTION. I can't find
+ * information about compatibility with std::thread, but it seems to be
+ * implemented in the same way in threading libraries: https://github.com/aseprite/tinythreadpp 
+ */
+#include "i8080_sync.h"
 
 // Define types of read/write streams
-typedef emu_word_t (* read_word_fp)(emu_addr_t);
-typedef void (* write_word_fp)(emu_addr_t, emu_word_t);
+typedef emu_word_t (* emu_read_word_fp)(emu_addr_t);
+typedef void (* emu_write_word_fp)(emu_addr_t, emu_word_t);
 
 typedef struct i8080 {
     // registers
@@ -53,12 +72,12 @@ typedef struct i8080 {
     // provide your own read/write streams
     
     // Read and write to a memory stream
-    read_word_fp read_memory;
-    write_word_fp write_memory;
+    emu_read_word_fp read_memory;
+    emu_write_word_fp write_memory;
     
     // I/O stream in and out
-    read_word_fp port_in;
-    write_word_fp port_out;
+    emu_read_word_fp port_in;
+    emu_write_word_fp port_out;
     
     /* This is called on opcode 0x38. 0x38
      * is actually an undocumented NOP, but is
