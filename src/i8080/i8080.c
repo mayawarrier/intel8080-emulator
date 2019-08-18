@@ -533,16 +533,6 @@ static inline _Bool emu_ext_call(i8080 * const cpu) {
     return should_continue;
 }
 
-
-void i8080_interrupt(i8080 * const cpu) {
-    // When serviced by the i8080, this will be toggled back
-    // wait and acquire
-    if (cpu->ie && !cpu->pending_interrupt_req) {
-        cpu->pending_interrupt_req = 1;
-    }
-    // release 
-}
-
 void i8080_init(i8080 * const cpu) {
     i8080_reset(cpu);
     cpu->cycles_taken = 0;
@@ -562,10 +552,24 @@ void i8080_reset(i8080 * const cpu) {
     cpu->pending_interrupt_req = 0;
 }
 
+/* i8080_interrupt() and i8080_next() can be on different threads, so lock
+ * access to critical variables so that reads/writes are atomic and
+ * completely synchronized. */
+
+void i8080_interrupt(i8080 * const cpu) {
+    emu_mutex_lock(&cpu->i_mutex);
+    // When serviced by the i8080, this will be toggled back
+    if (cpu->ie && !cpu->pending_interrupt_req) {
+        cpu->pending_interrupt_req = 1;
+    }
+    emu_mutex_unlock(&cpu->i_mutex);
+}
+
 _Bool i8080_next(i8080 * const cpu) {
-    // wait and acquire 
+    emu_mutex_lock(&cpu->i_mutex);
+    // The next opcode to be executed
     emu_word_t opcode;
-    if (cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
+    if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
         // If an interrupt needs to be serviced execute it first
         opcode = cpu->interrupt_acknowledge();
         // disable interrupts
@@ -577,7 +581,7 @@ _Bool i8080_next(i8080 * const cpu) {
         // regular execution
         opcode = i8080_advance_read_word(cpu);
     }
-    // release
+    emu_mutex_unlock(&cpu->i_mutex);
     
     return i8080_exec(cpu, opcode);
 }
