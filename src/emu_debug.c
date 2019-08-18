@@ -2,10 +2,10 @@
  * Implement emu_debug.h
  */
 
-#include <stddef.h>
-#include <string.h>
 #include "emu_debug.h"
 #include "i8080/i8080_opcodes.h"
+#include <stddef.h>
+#include <string.h>
 
 void dump_memory(FILE * stream, const char format[], int newline_after, emu_addr_t start_addr, emu_addr_t end_addr, i8080 * const cpu) {
     if (stream != NULL) {

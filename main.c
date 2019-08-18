@@ -1,7 +1,8 @@
 
+#include "src/i8080/i8080_predef.h"
+#include "src/emu.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "src/emu.h"
 
 // Emulator main memory, 64KB
 static emu_word_t MEMORY[ADDR_T_MAX + 1];

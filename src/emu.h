@@ -15,9 +15,8 @@
 #ifndef EMU_H
 #define EMU_H
 
-#include <stdio.h>
-
 #include "i8080/i8080.h"
+#include <stdio.h>
 
 typedef enum EMU_EXIT_CODES {
     EMU_ERR_MEM_STREAMS,        // A memory stream function (cpu->read_memory, cpu->write_memory) is not initialized.

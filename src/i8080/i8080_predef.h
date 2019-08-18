@@ -1,17 +1,18 @@
 /* 
- * File:   i8080_port.h
+ * File:   i8080_predef.h
  * Author: dhruvwarrier
  * 
- * Modify this file to port to different host/virtual machines.
+ * Modify this file to port emulator.
  * See i8080.h for the requirements on these types and macros.
  *
  * Created on June 30, 2019, 2:56 PM
  */
 
-#ifndef I8080_PORT_H
-#define I8080_PORT_H
+#ifndef I8080_PREDEF_H
+#define I8080_PREDEF_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef uint8_t emu_word_t;
 typedef uint16_t emu_addr_t;
@@ -28,10 +29,10 @@ typedef size_t emu_size_t;
 #define ADDR_T_FORMAT "0x%04x"
 #define WORD_T_PRT_FORMAT "%c"
 
-// This must be defined before including i8080_sync.h.
-#define PTHREADS_AVAILABLE (1)
+// Suppress deprecation errors with scanf, printf, etc
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_DEPRECATE
+#endif
 
-// Provides access to synchronization functions.
-#include "i8080_sync.h"
-
-#endif /* I8080_PORT_H */
+#endif /* I8080_PREDEF_H */
