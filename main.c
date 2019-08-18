@@ -65,6 +65,8 @@ int main(int argc, char ** argv) {
 
     // Begin the emulator.
     EMU_EXIT_CODE emu_exit_code = emu_main_runtime(&cpu, 0);
+    // Destroy i8080 when emulator quits.
+    i8080_destroy(&cpu);
     
     if (emu_exit_code == EMU_EXIT_SUCCESS) return EXIT_SUCCESS;
     else return EXIT_FAILURE;

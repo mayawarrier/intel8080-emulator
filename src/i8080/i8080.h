@@ -86,7 +86,7 @@ typedef struct i8080 {
      * with the interrupt generator, so the
      * interrupt is not accidentally double-serviced
      * or missed by the i8080. */
-    EMU_MUTEX_HANDLE i_mutex;
+    emu_mutex_t i_mutex;
     
     // Cycles taken for last emu_runtime
     emu_size_t cycles_taken;
@@ -107,6 +107,9 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
 
 static const int NUM_IVT_VECTORS = 8;
 
+/* Resets the i8080, and performs first time initialization. */
+void i8080_init(i8080 * const cpu);
+
 /* Resets the i8080. PC is set to 0, i8080 exits halt state, and cycles taken is reset to 0. 
  * No other working registers or flags are affected. Equivalent to pulling RESET low. */
 void i8080_reset(i8080 * const cpu);
@@ -123,8 +126,10 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
  * If the compiler/environment does not support mutexes, this may not work correctly. See i8080_sync.h.
  * 
  * When ready, the i8080 will call i8080.interrupt_acknowledge() which should return the vector to be executed. 
- * Interrupts are disabled every time an interrupt is serviced, so they must be enabled
- * again before the next interrupt. */
+ * Interrupts are disabled every time an interrupt is serviced, so they must be enabled again before the next interrupt. */
 void i8080_interrupt(i8080 * const cpu);
+
+/* Destroys i_mutex. */
+void i8080_destroy(i8080 * const cpu);
 
 #endif // I_8080_H

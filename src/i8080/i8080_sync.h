@@ -15,30 +15,30 @@
     #if PTHREADS_AVAILABLE
         // Use pthreads, if available
         #include <pthread.h>
-        #define EMU_MUTEX_HANDLE pthread_mutex_t
+        typedef pthread_mutex_t emu_mutex_t;
     #else
         /* Use char, implementation relies on __atomic_load_n
          * and __atomic_store_n */
-        #define EMU_MUTEX_HANDLE char
+        typedef char emu_mutex_t;
     #endif
 #elif defined _MSC_VER
     // Rely on Windows to provide a mutex
     #include <windows.h>
-    #define EMU_MUTEX_HANDLE HANDLE*
+    typedef HANDLE emu_mutex_t;
 #else
-    /* A volatile char * ~should~ provide the best chance
+    /* A volatile char ~should~ provide the best chance
      * at proper sync, if nothing else is available. */
-    #define EMU_MUTEX_HANDLE volatile char *
+    typedef volatile char emu_mutex_t;
 #endif
 
 // Initialize a mutex.
-void inline emu_mutex_init(EMU_MUTEX_HANDLE handle);
+static inline void emu_mutex_init(emu_mutex_t * handle);
 // Waits until the mutex is released, then locks it and takes over control.
-void inline emu_mutex_lock(EMU_MUTEX_HANDLE handle);
+static inline void emu_mutex_lock(emu_mutex_t * handle);
 // Unlocks/releases a mutex.
-void inline emu_mutex_unlock(EMU_MUTEX_HANDLE handle);
+static inline void emu_mutex_unlock(emu_mutex_t * handle);
 // Destroys a mutex.
-void inline emu_mutex_destroy(EMU_MUTEX_HANDLE handle);
+static inline void emu_mutex_destroy(emu_mutex_t * handle);
 
 // -------------- Implementation for different compilers/machines -------------------
 
@@ -47,44 +47,44 @@ void inline emu_mutex_destroy(EMU_MUTEX_HANDLE handle);
 // If pthreads are available, use them instead
 #if PTHREADS_AVAILABLE
 
-void inline emu_mutex_init(EMU_MUTEX_HANDLE handle) {
-    handle = (EMU_MUTEX_HANDLE)PTHREAD_MUTEX_INITIALIZER;
+static inline void emu_mutex_init(emu_mutex_t * handle) {
+    pthread_mutex_init(handle, NULL);
 }
 
-void inline emu_mutex_lock(EMU_MUTEX_HANDLE handle) {
-    pthread_mutex_lock(&handle);
+static inline void emu_mutex_lock(emu_mutex_t * handle) {
+    pthread_mutex_lock(handle);
 }
 
-void inline emu_mutex_unlock(EMU_MUTEX_HANDLE handle) {
-    pthread_mutex_unlock(&handle);
+static inline void emu_mutex_unlock(emu_mutex_t * handle) {
+    pthread_mutex_unlock(handle);
 }
 
-void inline emu_mutex_destroy(EMU_MUTEX_HANDLE handle) {
-    pthread_mutex_destroy(&handle);
+static inline void emu_mutex_destroy(emu_mutex_t * handle) {
+    pthread_mutex_destroy(handle);
 }
 
 #else
 
 // These should work where pthreads are not available on any POSIX-compliant system.
 
-void inline emu_mutex_init(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_init(emu_mutex_t * handle) {
     // Puts the mutex in unlocked state
-    handle = (EMU_MUTEX_HANDLE)0;
+    *handle = (emu_mutex_t)0;
 }
 
-void inline emu_mutex_lock(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_lock(emu_mutex_t * handle) {
     // Stay here until the mutex is unlocked
-    while(__atomic_load_n(handle, __ATOMIC_ACQUIRE) != (EMU_MUTEX_HANDLE)0);
+    while(__atomic_load_n(handle, __ATOMIC_ACQUIRE) != (emu_mutex_t)0);
     // Lock the mutex
-    __atomic_store_n(handle, (EMU_MUTEX_HANDLE)1, __ATOMIC_RELEASE);
+    __atomic_store_n(handle, (emu_mutex_t)1, __ATOMIC_RELEASE);
 }
 
-void inline emu_mutex_unlock(EMU_MUTEX_HANDLE handle) {
-    __atomic_store_n(handle, (EMU_MUTEX_HANDLE)0, __ATOMIC_RELEASE);
+static inline void emu_mutex_unlock(emu_mutex_t * handle) {
+    __atomic_store_n(handle, (emu_mutex_t)0, __ATOMIC_RELEASE);
 }
 
-void inline emu_mutex_destroy(EMU_MUTEX_HANDLE handle) {
-    // do nothing, handle is just a char
+static inline void emu_mutex_destroy(emu_mutex_t * handle) {
+    // do nothing, handle is just a char *
     (void)handle;
 }
 #endif
@@ -93,21 +93,21 @@ void inline emu_mutex_destroy(EMU_MUTEX_HANDLE handle) {
 
 // These rely on Windows to provide a mutex handle.
 
-void inline emu_mutex_init(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_init(emu_mutex_t * handle) {
     *handle = CreateMutex(NULL, FALSE, NULL);
 }
 
-void inline emu_mutex_lock(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_lock(emu_mutex_t * handle) {
     // Request mutex ownership and wait until control is transferred to this thread
     WaitForSingleObject(*handle, INFINITE);
 }
 
-void inline emu_mutex_unlock(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_unlock(emu_mutex_t * handle) {
     // Release mutex from this thread
     ReleaseMutex(*handle);
 }
 
-void inline emu_mutex_destroy(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_destroy(emu_mutex_t * handle) {
     CloseHandle(*handle);
 }
 
@@ -115,23 +115,23 @@ void inline emu_mutex_destroy(EMU_MUTEX_HANDLE handle) {
 
 // Use a volatile char *. This may or may not work.
 
-void inline emu_mutex_init(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_init(emu_mutex_t * handle) {
     // init as unlocked
     *handle = 0;
 }
 
-void inline emu_mutex_lock(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_lock(emu_mutex_t * handle) {
     // wait until unlocked
     while (*handle != 0);
     // lock
     *handle = 1;
 }
 
-void inline emu_mutex_unlock(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_unlock(emu_mutex_t * handle) {
     *handle = 0;
 }
 
-void inline emu_mutex_destroy(EMU_MUTEX_HANDLE handle) {
+static inline void emu_mutex_destroy(emu_mutex_t * handle) {
     // nothing to do
     (void)handle;
 }

@@ -264,13 +264,13 @@ void emu_set_default_env(i8080 * const cpu) {
 }
 
 void emu_init_i8080(i8080 * const cpu) {
-    i8080_reset(cpu);
+    i8080_init(cpu);
     cpu->read_memory = NULL;
     cpu->write_memory = NULL;
     cpu->port_in = NULL;
     cpu->port_out = NULL;
     cpu->emu_ext_call = NULL;
-    cpu->interrupt_acknowledge = NULL;    
+    cpu->interrupt_acknowledge = NULL;
 }
 
 // Writes test_word to all locations, then reads test_word from all locations.

@@ -543,11 +543,21 @@ void i8080_interrupt(i8080 * const cpu) {
     // release 
 }
 
+void i8080_init(i8080 * const cpu) {
+    i8080_reset(cpu);
+    cpu->cycles_taken = 0;
+    // Initialize interrupts synchronization mutex
+    emu_mutex_init(&cpu->i_mutex);
+}
+
+void i8080_destroy(i8080 * const cpu) {
+    emu_mutex_destroy(&cpu->i_mutex);
+}
+
 void i8080_reset(i8080 * const cpu) {
     // start executing from beginning again
     cpu->pc = 0;
     cpu->is_halted = 0;
-    cpu->cycles_taken = 0;
     cpu->ie = 0;
     cpu->pending_interrupt_req = 0;
 }
