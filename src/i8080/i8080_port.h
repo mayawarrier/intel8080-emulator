@@ -1,19 +1,15 @@
 /* 
- * File:   i8080_types.h
+ * File:   i8080_port.h
  * Author: dhruvwarrier
  * 
- * Provides word and address types, defines
- * max values, and provides formatting specifiers.
- * 
+ * Modify this file to port to different host/virtual machines.
  * See i8080.h for the requirements on these types and macros.
- * 
- * Modify to port to different host/virtual machines.
  *
  * Created on June 30, 2019, 2:56 PM
  */
 
-#ifndef EMU_TYPES_H
-#define EMU_TYPES_H
+#ifndef I8080_PORT_H
+#define I8080_PORT_H
 
 #include <stdint.h>
 
@@ -30,7 +26,12 @@ typedef size_t emu_size_t;
 
 #define WORD_T_FORMAT "0x%02x"
 #define ADDR_T_FORMAT "0x%04x"
-
 #define WORD_T_PRT_FORMAT "%c"
 
-#endif /* EMU_TYPES_H */
+// This must be defined before including i8080_sync.h.
+#define PTHREADS_AVAILABLE (1)
+
+// Provides access to synchronization functions.
+#include "i8080_sync.h"
+
+#endif /* I8080_PORT_H */

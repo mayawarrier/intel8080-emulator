@@ -10,7 +10,8 @@
 #ifndef I_8080_H
 #define I_8080_H
 
-/* User-configurable file that contains emulator base types, format specifiers, sizes etc.
+/* User-configurable file that contains emulator base types, format specifiers, 
+ * sizes, options for building, and synchronization primitives.
  * 
  * In this file, the following types must be defined:
  * emu_word_t: An unsigned type with a bit width equal to the virtual machine's word size.
@@ -27,8 +28,9 @@
  * WORD_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_word_t. for eg. "%#04x"
  * ADDR_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_addr_t.
  * WORD_T_PRT_FORMAT: quote-enclosed string, format specifier to print word as ASCII eg. "%c"
+ * PTHREADS_AVAILABLE: 1 if pthreads are available in your environment, 0 if not.
  */
-#include "i8080_types.h"
+#include "i8080_port.h"
 
 // Define types of read/write streams
 typedef emu_word_t (* read_word_fp)(emu_addr_t);
@@ -80,13 +82,11 @@ typedef struct i8080 {
     _Bool pending_interrupt_req;
     
     /* When an interrupt comes on another thread,
-     * this signal is used to sync i8080 status
+     * this mutex is used to sync i8080 status
      * with the interrupt generator, so the
      * interrupt is not accidentally double-serviced
-     * or missed by the i8080.
-     * A char type ensures atomic access on byte-aligned
-     * systems, which should reduce the sync time. */
-    char interrupts_sync;
+     * or missed by the i8080. */
+    EMU_MUTEX_HANDLE i_mutex;
     
     // Cycles taken for last emu_runtime
     emu_size_t cycles_taken;
@@ -119,10 +119,8 @@ _Bool i8080_next(i8080 * const cpu);
  * Returns 0 if it isn't safe to continue execution. */
 _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
 
-/* Sends an interrupt to the i8080. This can be an interrupt passed through from
- * the host processor, or sent on another thread, and it will be serviced when the i8080 is ready. 
- * If the compiler does not support atomics, the interrupt sync signal may not work correctly,
- * and interrupts may be serviced more than once or not at all. See i8080_atomic.h.
+/* Sends an interrupt to the i8080. This is thread-safe, and it will be serviced when the i8080 is ready. 
+ * If the compiler/environment does not support mutexes, this may not work correctly. See i8080_sync.h.
  * 
  * When ready, the i8080 will call i8080.interrupt_acknowledge() which should return the vector to be executed. 
  * Interrupts are disabled every time an interrupt is serviced, so they must be enabled
