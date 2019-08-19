@@ -579,11 +579,18 @@ _Bool i8080_next(i8080 * const cpu) {
         cpu->is_halted = 0;
     } else {
         // regular execution
-        opcode = i8080_advance_read_word(cpu);
+        if (!cpu->is_halted) {
+            opcode = i8080_advance_read_word(cpu);
+        }
     }
     emu_mutex_unlock(&cpu->i_mutex);
     
-    return i8080_exec(cpu, opcode);
+    if (!cpu->is_halted) {
+        return i8080_exec(cpu, opcode);
+    } else {
+        // indicate success but remain halted
+        return 1;
+    }
 }
 
 _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
@@ -856,7 +863,7 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         // Special instructions
         case DAA: i8080_daa(cpu); break;      // Decimal adjust acc (convert acc to BCD)
         case CMA: cpu->a = ~cpu->a; break;    // Complement accumulator
-        case STC: cpu->cy = 1; break;      // Set carry
+        case STC: cpu->cy = 1; break;         // Set carry
         case CMC: cpu->cy = !cpu->cy; break;  // Complement carry
         case PCHL: cpu->pc = i8080_get_hl(cpu); break; // Move HL into PC
         case SPHL: cpu->sp = i8080_get_hl(cpu); break; // Move HL into SP
@@ -875,6 +882,7 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
             } else {
                 continue_runtime = 0;
             }
+            break;
         }
         case OUT: 
         {
@@ -884,6 +892,7 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
             } else {
                 continue_runtime = 0;
             }
+            break;
         }
         
         // Restart / software interrupts
