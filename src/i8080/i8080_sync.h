@@ -107,8 +107,9 @@ static inline void emu_mutex_destroy(emu_mutex_t * handle) {
 // These use Windows critical sections for faster mutexes.
 
 static inline void emu_mutex_init(emu_mutex_t * handle) {
-    /* Initializing with a spin count can hugely improve performance:
-     */
+    /* Initializing with a spin count can hugely improve performance, 
+     * by avoiding a kernel call for short critical sections:
+     * https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-initializecriticalsectionandspincount */
     InitializeCriticalSectionAndSpinCount(handle, 4000);
 }
 

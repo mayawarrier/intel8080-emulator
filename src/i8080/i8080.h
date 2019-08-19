@@ -56,12 +56,12 @@ typedef emu_word_t (* emu_read_word_fp)(emu_addr_t);
 typedef void (* emu_write_word_fp)(emu_addr_t, emu_word_t);
 
 typedef struct i8080 {
-    // registers
+    // Registers
     emu_word_t a, b, c, d, e, h, l;
-    // stack pointer, program counter
+    // Stack pointer, program counter
     emu_addr_t sp, pc;
     
-    // flags: sign, zero, auxiliary carry,
+    // Flags: sign, zero, auxiliary carry,
     // carry, parity, interrupt enable
     _Bool s, z, acy, cy, p, ie;
     
@@ -71,12 +71,14 @@ typedef struct i8080 {
     
     // provide your own read/write streams
     
-    // Read and write to a memory stream
+    // Read from a memory stream
     emu_read_word_fp read_memory;
+    // Write to a memory stream
     emu_write_word_fp write_memory;
     
-    // I/O stream in and out
+    // I/O stream in
     emu_read_word_fp port_in;
+    // I/O stream out
     emu_write_word_fp port_out;
     
     /* This is called on opcode 0x38. 0x38
@@ -121,7 +123,7 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
     0x20, // RST 4
     0x28, // RST 5
     0x30, // RST 6
-    0x38 // RST 7
+    0x38  // RST 7
 };
 
 static const int NUM_IVT_VECTORS = 8;
@@ -144,7 +146,7 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
 /* Sends an interrupt to the i8080. This is thread-safe, and it will be serviced when the i8080 is ready. 
  * If the compiler/environment does not support mutexes, this may not work correctly. See i8080_sync.h.
  * 
- * When ready, the i8080 will call i8080.interrupt_acknowledge() which should return the vector to be executed. 
+ * When ready, the i8080 will call interrupt_acknowledge() which should return the vector to be executed. 
  * Interrupts are disabled every time an interrupt is serviced, so they must be enabled again before the next interrupt. */
 void i8080_interrupt(i8080 * const cpu);
 
