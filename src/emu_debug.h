@@ -10,7 +10,7 @@
 #ifndef EMU_DEBUG_H
 #define EMU_DEBUG_H
 
-#include "i8080/i8080.h"
+#include "emu.h"
 #include <stdio.h>
 
 /* Dumps the contents of memory from start_addr to end_addr to a stream, formatting each word as format.
@@ -20,7 +20,7 @@ void dump_memory(FILE * stream, const char format[], int newline_after, emu_addr
 void dump_cpu_stats(FILE * stream, i8080 * const cpu);
 
 // Set the options to be used with the next call to i8080_debug_next().
-void set_debug_next_options(FILE * stream, const char mem_dump_format[], int mem_dump_newline_after);
+void set_debug_next_options(emu_debug_args * args);
 /* Performs an i8080_next(), and prints debug information to the given stream:
  * - The instruction executed
  * - State of all registers and flags in the i8080

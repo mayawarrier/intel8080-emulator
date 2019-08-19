@@ -41,34 +41,64 @@ void dump_cpu_stats(FILE * stream, i8080 * const cpu) {
     }
 }
 
-// Debug next options, set to default values
-static FILE * DEBUG_OUT = NULL;
-#define DUMPF_BUF_SIZE 128
-static char MEM_DUMPF_BUF[DUMPF_BUF_SIZE] = WORD_T_FORMAT;
-static int MEM_NEWLINE_AFTER = 16;
+// Debug args to be used with debug next
+static emu_debug_args * DEBUG_ARGS;
 
 /* i8080_debug_next() is expected to have the signature _Bool (*)(i8080 * const),
  * so the options have to be passed in separately. */
-void set_debug_next_options(FILE * stream, const char mem_dump_format[], int mem_dump_newline_after) {
-    // Get size of string along with trailing NULL
-    size_t format_size = strlen(mem_dump_format) + 1;
-    if (format_size > DUMPF_BUF_SIZE) {
-        printf("Error: Debug next format too large.\n");
+void set_debug_next_options(emu_debug_args * args) {
+    // Check if mem_dump_format is a valid string and format specifier
+    _Bool is_valid_str = 0;
+    for (int i = 0; i < EMU_DEBUG_FMAX; ++i) {
+        if (args->mem_dump_format[i] == '\0') {
+            is_valid_str = 1;
+        }
+    }
+    emu_word_t out_word;
+    _Bool is_valid_format = (sscanf("0x38", args->mem_dump_format, &out_word) == 1);
+    
+    if (is_valid_str && is_valid_format) {
+        DEBUG_ARGS = args;
     } else {
-        DEBUG_OUT = stream;
-        strncpy(MEM_DUMPF_BUF, mem_dump_format, format_size);
-        MEM_NEWLINE_AFTER = mem_dump_newline_after;
+        printf("Error: Bad mem_dump_format.\n");
     }
 }
 
 _Bool i8080_debug_next(i8080 * const cpu) {
-    // Print the instruction
-    emu_word_t opcode = cpu->read_memory(cpu->pc++);
-    printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
-    // execute the instruction
-    _Bool exec = i8080_exec(cpu, opcode);
-    // Dump stats and memory
-    dump_cpu_stats(DEBUG_OUT, cpu);
-    dump_memory(DEBUG_OUT, MEM_DUMPF_BUF, MEM_NEWLINE_AFTER, 0, ADDR_T_MAX, cpu);
-    return exec;
+    // Get the opcode
+    emu_mutex_lock(&cpu->i_mutex);
+    emu_word_t opcode;
+    if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
+        opcode = cpu->interrupt_acknowledge();
+        cpu->ie = 0;
+        cpu->pending_interrupt_req = 0;
+        cpu->is_halted = 0;
+    } else {
+        if (!cpu->is_halted) {
+            opcode = cpu->read_memory(cpu->pc++);
+        }
+    }
+    emu_mutex_unlock(&cpu->i_mutex);
+    
+    _Bool success = 0;
+    
+    // Execute the instruction
+    if (!cpu->is_halted) {
+        success = i8080_exec(cpu, opcode);
+
+        // Print disassembly
+        printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
+        // Dump cpu stats and main memory
+        if (DEBUG_ARGS->should_dump_stats) {
+            dump_cpu_stats(DEBUG_ARGS->debug_out, cpu);
+        }
+        if (DEBUG_ARGS->should_dump_memory) {
+            dump_memory(DEBUG_ARGS->debug_out, DEBUG_ARGS->mem_dump_format, DEBUG_ARGS->mem_dump_newline_after, 0, ADDR_T_MAX, cpu);
+        }
+    } else {
+        // indicate success but stay halted
+        success = 1;
+    }
+    
+    return success;
 }

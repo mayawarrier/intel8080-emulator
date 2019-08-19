@@ -4,8 +4,9 @@
  *
  * This is the emulator layer over the base i8080 implementation.
  * 
- * It provides EMU_TYPES_LOC (required by i8080.h), debugging functionality, and 
- * limited emulation of the CP/M 2.2 BIOS and memory environment.
+ * It provides debugging functionality, and limited emulation of the 
+ * CP/M 2.2 BIOS and memory environment, which is required by some 8080
+ * programs.
  * 
  * See below for what is supported in the CP/M 2.2 environment.
  * 
@@ -25,6 +26,18 @@ typedef enum EMU_EXIT_CODES {
                                 // This error can only be triggered by the startup check.
     EMU_EXIT_SUCCESS            // Successful run.
 } EMU_EXIT_CODE;
+
+// Args for emu debug mode.
+#define EMU_DEBUG_FMAX 128 // maximum size of mem_dump_format, including NULL
+typedef struct emu_debug_args {
+    FILE * debug_out;                       // Stream that debug output should go to.
+    _Bool should_dump_stats;                // Whether or not to dump status of all registers and flags after each instruction.
+    _Bool should_dump_memory;               // Whether or not to dump contents of the memory after each instruction.
+    const char * mem_dump_format;           // The format specifier applied to each word in the memory dump.
+    int mem_dump_newline_after;             // The number of words after which a newline is inserted in the memory dump.
+    emu_addr_t mem_dump_start_addr;         // The start address from which to dump memory.
+    emu_addr_t mem_dump_end_addr;           // The end address until which to dump memory.
+} emu_debug_args;
 
 /* The starting location of the CP/M Transient Program Area i.e. 
  * the first valid location to load a program written for CP/M. 
@@ -57,12 +70,11 @@ void emu_set_cpm_env(i8080 * const cpu);
 void emu_set_default_env(i8080 * const cpu);
 
 /* Begin the emulator. Must have properly set up memory and streams first!
- * Returns an error code if the emulator was not initialized properly or failed the startup check. */
-EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check);
-/* Begins the emulator in debug mode. In this mode, the emulator prints the values of all flags and registers,
- * and dumps the main memory after each instruction is executed to debug_out. Each word is formatted as mem_dump_format,
- * and a newline is inserted every mem_dump_newline_after words. */
-EMU_EXIT_CODE emu_debug_runtime(i8080 * const cpu, _Bool perform_startup_check, 
-        FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after);
+ * Returns an error code if the emulator was not initialized properly or failed the startup check. 
+ * 
+ * If debug_args is not NULL, emulator will start in debug mode. In this mode, the emulator can print
+ * the values of all flags and registers, and can dump the main memory after each instruction is executed to debug_out. 
+ * See emu_debug_args to set options on how the output is presented. */
+EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args * debug_args);
 
 #endif /* EMU_H */

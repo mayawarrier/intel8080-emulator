@@ -2,10 +2,10 @@
  * Implement emu.h
  */
 
-#include <string.h>
 #include "emu.h"
 #include "emu_debug.h"
 #include "i8080/i8080_opcodes.h"
+#include <string.h>
 
 // The console port address duplicated across 16-bit address bus for use with port out
 static const emu_addr_t CONSOLE_ADDR_FULL = (emu_addr_t)((CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
@@ -291,8 +291,7 @@ static _Bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
     return 1;
 }
 
-static EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, 
-        _Bool debug_mode, FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after) {
+EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args * d_args) {
     
     if (cpu->read_memory == NULL || cpu->write_memory == NULL) {
         return EMU_ERR_MEM_STREAMS;
@@ -309,8 +308,9 @@ static EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check,
     // If in debug mode, this is overridden by i8080_debug_next
     _Bool (* i8080_next_ovrd)(i8080 * const) = i8080_next;
     
-    if(debug_mode) {
-        set_debug_next_options(debug_out, mem_dump_format, mem_dump_newline_after);
+    if(d_args != NULL) {
+        // In debug mode, override i8080_next()
+        set_debug_next_options(d_args);
         i8080_next_ovrd = i8080_debug_next;
     }
     
@@ -326,13 +326,4 @@ static EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check,
     }
     
     return EMU_EXIT_SUCCESS;
-}
-
-EMU_EXIT_CODE emu_main_runtime(i8080 * const cpu, _Bool perform_startup_check) {
-    return emu_runtime(cpu, perform_startup_check, 0, NULL, "", 0);
-}
-
-EMU_EXIT_CODE emu_debug_runtime(i8080 * const cpu, _Bool perform_startup_check, 
-        FILE * debug_out, const char mem_dump_format[], int mem_dump_newline_after) {
-    return emu_runtime(cpu, perform_startup_check, 1, debug_out, mem_dump_format, mem_dump_newline_after);
 }
