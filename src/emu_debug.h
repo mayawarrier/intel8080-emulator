@@ -14,10 +14,10 @@
 #include <stdio.h>
 
 /* Dumps the contents of memory from start_addr to end_addr to a stream, formatting each word as format.
- * newline_after is the number of words after which an newline should be inserted each time. */
-void dump_memory(FILE * stream, const char format[], int newline_after, emu_addr_t start_addr, emu_addr_t end_addr, i8080 * const cpu);
+ * mem_dump_newline_after is the number of words after which an newline should be inserted each time. */
+void dump_memory(i8080 * const cpu, const emu_debug_args * args);
 // Writes the values of all flags and registers to the given stream.
-void dump_cpu_stats(FILE * stream, i8080 * const cpu);
+void dump_cpu_stats(i8080 * const cpu, FILE * const stream);
 
 // Set the options to be used with the next call to i8080_debug_next().
 void set_debug_next_options(emu_debug_args * args);

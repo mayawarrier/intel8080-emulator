@@ -7,20 +7,20 @@
 #include <stddef.h>
 #include <string.h>
 
-void dump_memory(FILE * stream, const char format[], int newline_after, emu_addr_t start_addr, emu_addr_t end_addr, i8080 * const cpu) {
-    if (stream != NULL) {
-        fprintf(stream, "**** Memory dump: ****\n");
-        for (emu_addr_t i = start_addr; i <= end_addr; ++i) {
-            fprintf(stream, format, cpu->read_memory(i));
+void dump_memory(i8080 * const cpu, const emu_debug_args * args) {
+    if (args->debug_out != NULL) {
+        fprintf(args->debug_out, "**** Memory dump: ****\n");
+        for (emu_addr_t i = args->mem_dump_start_addr; i <= args->mem_dump_end_addr; ++i) {
+            fprintf(args->debug_out, args->mem_dump_format, cpu->read_memory(i));
             // End-line every newline_after words
-            if ((i + 1) % newline_after == 0) {
-                fprintf(stream, "\n");
+            if ((i + 1) % args->mem_dump_newline_after == 0) {
+                fprintf(args->debug_out, "\n");
             }
         }
     }
 }
 
-void dump_cpu_stats(FILE * stream, i8080 * const cpu) {
+void dump_cpu_stats(i8080 * const cpu, FILE * const stream) {
     if (stream != NULL) {
         fprintf(stream, "**** CPU status: ****\n");
         fprintf(stream, "A: " WORD_T_FORMAT ", ", cpu->a);
@@ -90,10 +90,10 @@ _Bool i8080_debug_next(i8080 * const cpu) {
         printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
         // Dump cpu stats and main memory
         if (DEBUG_ARGS->should_dump_stats) {
-            dump_cpu_stats(DEBUG_ARGS->debug_out, cpu);
+            dump_cpu_stats(cpu, DEBUG_ARGS->debug_out);
         }
         if (DEBUG_ARGS->should_dump_memory) {
-            dump_memory(DEBUG_ARGS->debug_out, DEBUG_ARGS->mem_dump_format, DEBUG_ARGS->mem_dump_newline_after, 0, ADDR_T_MAX, cpu);
+            dump_memory(cpu, DEBUG_ARGS);
         }
     } else {
         // indicate success but stay halted
