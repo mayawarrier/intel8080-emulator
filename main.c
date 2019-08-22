@@ -1,5 +1,5 @@
 
-#include "src/i8080/i8080_predef.h"
+#include "src/i8080/i8080_build.h"
 #include "src/emu.h"
 #include <stdio.h>
 #include <stdlib.h>

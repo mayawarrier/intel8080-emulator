@@ -10,6 +10,7 @@
 #ifndef EMU_DEBUG_H
 #define EMU_DEBUG_H
 
+#include "i8080/i8080_build.h"
 #include "emu.h"
 #include <stdio.h>
 

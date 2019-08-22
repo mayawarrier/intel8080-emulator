@@ -16,6 +16,7 @@
 #ifndef EMU_H
 #define EMU_H
 
+#include "i8080/i8080_build.h"
 #include "i8080/i8080.h"
 #include <stdio.h>
 
