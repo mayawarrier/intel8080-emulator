@@ -920,3 +920,13 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
     
     return continue_runtime;
 }
+
+// Undef the macros used in this file.
+#undef WORD_LO_BITS
+#undef WORD_HI_BITS
+#undef WORD_BITS
+#undef WORD_DBL_BITS
+#undef ADDR_BITS
+#undef TWOS_COMP_LO_WORD
+#undef TWOS_COMP_WORD
+#undef AUX_CARRY
