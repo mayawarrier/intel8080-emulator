@@ -16,7 +16,6 @@
 #ifndef EMU_H
 #define EMU_H
 
-#include "i8080/i8080_build.h"
 #include "i8080/i8080.h"
 #include <stdio.h>
 
@@ -29,13 +28,12 @@ typedef enum EMU_EXIT_CODES {
 } EMU_EXIT_CODE;
 
 // Args for emu debug mode.
-#define EMU_DEBUG_FMAX 128 // maximum size of mem_dump_format, including NULL
 typedef struct emu_debug_args {
     FILE * debug_out;                       // Stream that debug output should go to.
     _Bool should_dump_stats;                // Whether or not to dump status of all registers and flags after each instruction.
     _Bool should_dump_memory;               // Whether or not to dump contents of the memory after each instruction.
     const char * mem_dump_format;           // The format specifier applied to each word in the memory dump.
-    int mem_dump_newline_after;             // The number of words after which a newline is inserted in the memory dump.
+    int mem_dump_newline_after;             // The number of words after which a newline is inserted in the memory dump. Max length is 127 chars.
     emu_addr_t mem_dump_start_addr;         // The start address from which to dump memory.
     emu_addr_t mem_dump_end_addr;           // The end address until which to dump memory.
 } emu_debug_args;

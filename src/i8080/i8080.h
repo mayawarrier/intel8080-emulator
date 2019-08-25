@@ -10,6 +10,9 @@
 #ifndef I_8080_H
 #define I_8080_H
 
+ // Build for non-POSIX-compliant compilers (MSVC).
+#include "i8080_build.h"
+
 /* Below are the i8080 emulator base types, format specifiers and sizes.
  * These can be modified to emulate architectures close to the i8080.
  * 
