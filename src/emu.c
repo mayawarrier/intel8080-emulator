@@ -182,6 +182,20 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
 
 static const char INIT_MEM_STREAM_ERR_MSG[] = "Error: Cannot write to memory. Initialize emulator memory streams first.\n";
 
+// Reserved locations for interrupt vector table
+static const emu_addr_t INTERRUPT_TABLE[] = {
+	0x00, // RESET, RST 0
+	0x08, // RST 1
+	0x10, // RST 2
+	0x18, // RST 3
+	0x20, // RST 4
+	0x28, // RST 5
+	0x30, // RST 6
+	0x38  // RST 7
+};
+
+static const int NUM_IVT_VECTORS = 8;
+
 void emu_set_cpm_env(i8080 * const cpu) {
     // 0x38 is a special instruction that calls
     // an external fn outside the i8080 runtime.

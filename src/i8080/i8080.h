@@ -129,20 +129,6 @@ typedef struct i8080 {
     
 } i8080;
 
-// Reserved locations for interrupt vector table
-static const emu_addr_t INTERRUPT_TABLE[] = {
-    0x00, // RESET, RST 0
-    0x08, // RST 1
-    0x10, // RST 2
-    0x18, // RST 3
-    0x20, // RST 4
-    0x28, // RST 5
-    0x30, // RST 6
-    0x38  // RST 7
-};
-
-static const int NUM_IVT_VECTORS = 8;
-
 /* Resets the i8080, and performs first time initialization. */
 void i8080_init(i8080 * const cpu);
 

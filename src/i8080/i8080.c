@@ -896,14 +896,14 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         }
         
         // Restart / software interrupts
-        case RST_0: i8080_call_addr(cpu, INTERRUPT_TABLE[0]); break;
-        case RST_1: i8080_call_addr(cpu, INTERRUPT_TABLE[1]); break;
-        case RST_2: i8080_call_addr(cpu, INTERRUPT_TABLE[2]); break;
-        case RST_3: i8080_call_addr(cpu, INTERRUPT_TABLE[3]); break;
-        case RST_4: i8080_call_addr(cpu, INTERRUPT_TABLE[4]); break;
-        case RST_5: i8080_call_addr(cpu, INTERRUPT_TABLE[5]); break;
-        case RST_6: i8080_call_addr(cpu, INTERRUPT_TABLE[6]); break;
-        case RST_7: i8080_call_addr(cpu, INTERRUPT_TABLE[7]); break;
+        case RST_0: i8080_call_addr(cpu, 0x0000); break;
+        case RST_1: i8080_call_addr(cpu, 0x0008); break;
+        case RST_2: i8080_call_addr(cpu, 0x0010); break;
+        case RST_3: i8080_call_addr(cpu, 0x0018); break;
+        case RST_4: i8080_call_addr(cpu, 0x0020); break;
+        case RST_5: i8080_call_addr(cpu, 0x0028); break;
+        case RST_6: i8080_call_addr(cpu, 0x0030); break;
+        case RST_7: i8080_call_addr(cpu, 0x0038); break;
         
         // Enable / disable interrupts
         case EI: cpu->ie = 1; break;
