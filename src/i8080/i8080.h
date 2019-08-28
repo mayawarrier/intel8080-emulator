@@ -29,7 +29,6 @@
  * WORD_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_word_t
  * ADDR_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_addr_t
  * WORD_T_PRT_FORMAT: quote-enclosed string, format specifier to print word as ASCII
- * 
  */
 
 #include <stdint.h>
@@ -40,15 +39,15 @@ typedef uint16_t emu_addr_t;
 typedef uint32_t emu_buf_t;
 typedef size_t emu_size_t;
 
-#define HALF_WORD_SIZE (4)
-#define HALF_ADDR_SIZE (8)
+extern const int HALF_WORD_SIZE;
+extern const int HALF_ADDR_SIZE;
 
-#define WORD_T_MAX UINT8_MAX
-#define ADDR_T_MAX UINT16_MAX
+extern const emu_word_t WORD_T_MAX;
+extern const emu_addr_t ADDR_T_MAX;
 
-#define WORD_T_FORMAT "0x%02x"
-#define ADDR_T_FORMAT "0x%04x"
-#define WORD_T_PRT_FORMAT "%c"
+extern const char WORD_T_FORMAT[];
+extern const char ADDR_T_FORMAT[];
+extern const char WORD_T_PRT_FORMAT[];
 
 /* If the environment is GNUC, and pthreads are available,
  * this must be defined as 1 before including i8080_sync.h. */
