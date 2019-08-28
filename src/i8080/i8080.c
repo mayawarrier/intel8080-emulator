@@ -7,32 +7,39 @@
 #include "i8080.h"
 #include "i8080_opcodes.h"
 
-const int HALF_WORD_SIZE = 4;
-const int HALF_ADDR_SIZE = 8;
-const emu_word_t WORD_T_MAX = UINT8_MAX;
-const emu_addr_t ADDR_T_MAX = UINT16_MAX;
+// Defines to initialize const variables
+#define HALF_WORD_SIZE_def (4)
+#define HALF_ADDR_SIZE_def (8)
+#define WORD_T_MAX_def UINT8_MAX
+#define ADDR_T_MAX_def UINT16_MAX
+
+// Format specs and sizes for emu_word_t and emu_addr_t, externed in i8080.h.
+const unsigned int HALF_WORD_SIZE = HALF_WORD_SIZE_def;
+const unsigned int HALF_ADDR_SIZE = HALF_ADDR_SIZE_def;
+const emu_word_t WORD_T_MAX = WORD_T_MAX_def;
+const emu_addr_t ADDR_T_MAX = ADDR_T_MAX_def;
 const char WORD_T_FORMAT[] = "0x%02x";
 const char ADDR_T_FORMAT[] = "0x%04x";
-const char WORD_T_PRT_FORMAT = "%c";
+const char WORD_T_PRT_FORMAT[] = "%c";
 
-static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1;
-static const emu_word_t WORD_HI_F = (((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1) << HALF_WORD_SIZE;
-static const emu_buf_t BUF_HI_WORD_MAX = (emu_buf_t)WORD_T_MAX << (HALF_WORD_SIZE * 2);
+// For internal use
+static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE_def) - (emu_word_t)1;
+static const emu_word_t WORD_HI_F = (((emu_word_t)1 << HALF_WORD_SIZE_def) - (emu_word_t)1) << HALF_WORD_SIZE_def;
+static const emu_buf_t BUF_HI_WORD_MAX = (emu_buf_t)WORD_T_MAX_def << (HALF_WORD_SIZE_def * 2);
 // Conditional RETs and CALLs (subroutine ops) take 6 cycles longer if the condition is true.
-static const emu_size_t CYCLES_OFFSET_COND_SUB_OPS = (emu_size_t)6;
+static const emu_large_t CYCLES_OFFSET_COND_SUB_OPS = 6;
 
-enum flag_bit {
-	CARRY_BIT = 0,
-	PARITY_BIT = 2,
-	AUX_CARRY_BIT = 4,
-	ZERO_BIT = 6,
-	SIGN_BIT = 7
-};
+// Undef these, not required anymore
+#undef HALF_WORD_SIZE_def
+#undef HALF_ADDR_SIZE_def
+#undef WORD_T_MAX_def
+#undef ADDR_T_MAX_def
 
-static inline _Bool get_word_bit(emu_word_t word, int bit) {
-	return ((word & ((emu_word_t)1 << bit)) != 0);
-}
-
+// Get value of a particular bit position in an emu_word_t.
+static inline _Bool get_word_bit(emu_word_t word, int bit) { return ((word >> bit) & 1); }
+// Get value of a particular bit position in an emu_buf_t.
+static inline _Bool get_buf_bit(emu_buf_t buf, int bit) { return ((buf >> bit) & 1); }
+// Set value of a particular bit position in an emu_word_t.
 static inline void set_word_bit(emu_word_t * word, int bit, _Bool val) {
 	if (val) {
 		*word |= ((emu_word_t)1 << bit);
@@ -41,92 +48,54 @@ static inline void set_word_bit(emu_word_t * word, int bit, _Bool val) {
 	}
 }
 
-static inline _Bool get_addr_bit(emu_addr_t addr, int bit) {
-	return ((addr & ((emu_addr_t)1 << bit)) != 0);
+// Picks the lower half of the word.
+static inline emu_word_t word_lo_bits(emu_word_t word) { 
+	return (word & WORD_LO_F); 
 }
-
-static inline void set_addr_bit(emu_addr_t * addr, int bit, _Bool val) {
-	if (val) {
-		*addr |= ((emu_addr_t)1 << bit);
-	} else {
-		*addr &= ~((emu_addr_t)1 << bit);
-	}
-}
-
-static inline _Bool get_buf_bit(emu_buf_t buf, int bit) {
-	return ((buf & ((emu_buf_t)1 << bit)) != 0);
-}
-
-static inline void set_buf_bit(emu_buf_t * buf, int bit, _Bool val) {
-	if (val) {
-		*buf |= ((emu_buf_t)1 << bit);
-	} else {
-		*buf &= ~((emu_buf_t)1 << bit);
-	}
-}
-
-// Picks the lower half of the word
-static inline emu_word_t word_lo_bits(emu_word_t word) {
-	return (word & WORD_LO_F);
-}
-// Picks the upper half of the word
-static inline emu_word_t word_hi_bits(emu_word_t word) {
-	return (word & WORD_HI_F);
-}
-// Picks the lower word bits only from a buf_t
-static inline emu_word_t word_bits(emu_buf_t buf) {
-	return (emu_word_t)(buf);
-}
-// Picks the address bits only from a buf_t
-static inline emu_addr_t addr_bits(emu_buf_t buf) {
-	return (emu_addr_t)(buf);
+// Picks the upper half of the word.
+static inline emu_word_t word_hi_bits(emu_word_t word) { 
+	return (word & WORD_HI_F); 
 }
 // Picks the word bits from the hi part of buf_t.
-static inline emu_word_t buf_hi_word(emu_buf_t buf) {
-	return (word_bits(buf & BUF_HI_WORD_MAX) >> (2 * HALF_WORD_SIZE));
+static inline emu_word_t buf_hi_word(emu_buf_t buf) { 
+	return ((buf & BUF_HI_WORD_MAX) >> (2 * HALF_WORD_SIZE)); 
 }
-
-// Perform 2's complement on the lower half of the word
-static inline emu_word_t twos_comp_lo_word(emu_word_t word) {
-	return (((word) ^ WORD_LO_F) + (emu_word_t)1);
+// Performs 2's complement on the lower half of the word.
+static inline emu_word_t twos_comp_lo_word(emu_word_t word) { 
+	return (((word) ^ WORD_LO_F) + (emu_word_t)1); 
 }
-
-// Perform 2's complement on the entire word, up-scaling to a buf_t
-static inline emu_buf_t twos_comp_word(emu_buf_t buf) {
-	return (((buf) ^ WORD_T_MAX) + (emu_buf_t)1);
+// Perform 2's complement on the entire word, up-scaling to a buf_t.
+static inline emu_buf_t twos_comp_word(emu_word_t word) { 
+	return (((word) ^ WORD_T_MAX) + (emu_buf_t)1); 
 }
-
 // Finds the auxiliary carry generated by adding two words.
-static inline _Bool aux_carry(emu_word_t word1, emu_word_t word2) {
-	return (get_word_bit(word_lo_bits(word1) + word_lo_bits(word2), HALF_WORD_SIZE));
+static inline _Bool aux_carry(emu_word_t word1, emu_word_t word2) { 
+	return (get_word_bit(word_lo_bits(word1) + word_lo_bits(word2), HALF_WORD_SIZE)); 
+}
+// Calculate parity of a word.
+static inline _Bool parity(emu_word_t word) {
+	_Bool p = 0;
+	// XOR each bit together
+	int word_size = HALF_WORD_SIZE * 2;
+	for (int i = 0; i < word_size; ++i) {
+		p ^= get_word_bit(word, i);
+	}
+	// invert for even number of ones
+	return !p;
 }
 
 // Updates the Z, S, P flags based on the word provided.
-// This must be buffered to preserve the bits produced after word's MSB.
 static inline void update_ZSP(i8080 * const cpu, emu_word_t word) {
-    emu_buf_t word_buf = (emu_buf_t)word;
     cpu->z = (word == 0);
     /* Bit 7 of the accumulator is used for signing, so the 8080
      * can only deal with -127 to 127 if using signed numbers */
     cpu->s = get_word_bit(word, 2 * HALF_WORD_SIZE - 1);
-    /* Until all 8 bits have been shifted out,
-     * shift each bit to the left and XOR it with cpu->p.
-     * This indicates odd number of ones if high.
-     * while(buf & (word_t)WORD_T_MAX != 0): check if word bits are zero yet
-     * (buff<<=1): shift the buffer to the left
-     * get_word_bit(,): select the bit we just shifted out */
-    cpu->p = 0; // reset before starting calculation again
-    while((word_buf & (emu_buf_t)WORD_T_MAX) != (emu_buf_t)0x0) {
-        word_buf <<= 1;
-        cpu->p ^= get_buf_bit(word_buf, HALF_WORD_SIZE * 2);
-    }
-    // invert since we want even number of ones
-    cpu->p = !cpu->p;
+	cpu->p = parity(word);
 }
 
 // Concatenates two words and returns a double word.
 static inline emu_buf_t concatenate(emu_word_t word1, emu_word_t word2) {
-    return ((emu_buf_t)word1 << HALF_ADDR_SIZE | (emu_buf_t)word2);
+    return ((emu_buf_t)word1 << HALF_ADDR_SIZE | word2);
 }
 
 // Gets the flags register from the internal emulator bool values.
@@ -156,46 +125,46 @@ static void i8080_set_flags_reg(i8080 * const cpu, emu_word_t flags_reg) {
 
 // Get address represented by {BC}
 static inline emu_addr_t i8080_get_bc(i8080 * const cpu) {
-    return (emu_addr_t)addr_bits(concatenate(cpu->b, cpu->c));
+    return (emu_addr_t)concatenate(cpu->b, cpu->c);
 }
 
 // Get address represented by {DE}
 static inline emu_addr_t i8080_get_de(i8080 * const cpu) {
-    return (emu_addr_t)addr_bits(concatenate(cpu->d, cpu->e));
+    return (emu_addr_t)concatenate(cpu->d, cpu->e);
 }
 
 // Get address represented by {HL}
 static inline emu_addr_t i8080_get_hl(i8080 * const cpu) {
-    return (emu_addr_t)addr_bits(concatenate(cpu->h, cpu->l));
+    return (emu_addr_t)concatenate(cpu->h, cpu->l);
 }
 
 // Gets the program status word {A, flags}
 static inline emu_addr_t i8080_get_psw(i8080 * const cpu) {
-    return (emu_addr_t)addr_bits(concatenate(cpu->a, i8080_get_flags_reg(cpu)));
+    return (emu_addr_t)concatenate(cpu->a, i8080_get_flags_reg(cpu));
 }
 
 // Sets B to hi dbl_word, and C to lo dbl_word
 static inline void i8080_set_bc(i8080 * const cpu, emu_buf_t dbl_word) {
     cpu->b = (emu_word_t)buf_hi_word(dbl_word);
-    cpu->c = (emu_word_t)word_bits(dbl_word);
+    cpu->c = (emu_word_t)dbl_word;
 }
 
 // Sets D to hi dbl_word, and E to lo dbl_word
 static inline void i8080_set_de(i8080 * const cpu, emu_buf_t dbl_word) {
     cpu->d = (emu_word_t)buf_hi_word(dbl_word);
-    cpu->e = (emu_word_t)word_bits(dbl_word);
+	cpu->e = (emu_word_t)dbl_word;
 }
 
 // Sets H to hi dbl_word, and L to lo dbl_word
 static inline void i8080_set_hl(i8080 * const cpu, emu_buf_t dbl_word) {
     cpu->h = (emu_word_t)buf_hi_word(dbl_word);
-    cpu->l = (emu_word_t)word_bits(dbl_word);
+	cpu->l = (emu_word_t)dbl_word;
 }
 
 // Sets the accumulator and flags register from the program status word.
 static inline void i8080_set_psw(i8080 * const cpu, emu_buf_t dbl_word) {
     cpu->a = (emu_word_t)buf_hi_word(dbl_word);
-    i8080_set_flags_reg(cpu, (emu_word_t)word_bits(dbl_word));
+    i8080_set_flags_reg(cpu, (emu_word_t)dbl_word);
 }
 
 // Reads a word from [HL]
@@ -297,7 +266,7 @@ static void i8080_add(i8080 * const cpu, emu_word_t word) {
     // We need a larger type so buffer overflow does not occur
     emu_buf_t acc_buf = (emu_buf_t)cpu->a + (emu_buf_t)word;
     // The accumulator only needs to keep the word bits
-    cpu->a = (emu_word_t)word_bits(acc_buf);
+	cpu->a = (emu_word_t)acc_buf;
     // Update remaining flags
     cpu->cy = get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
     update_ZSP(cpu, cpu->a);
@@ -314,7 +283,7 @@ static void i8080_sub(i8080 * const cpu, emu_word_t word) {
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
     // Perform SUB
     emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
-    cpu->a = (emu_word_t)word_bits(acc_buf);
+	cpu->a = (emu_word_t)acc_buf;
     // Update remaining flags
     // Carry is the borrow flag for SUB, SBB etc, invert carry 
     cpu->cy = !get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
@@ -393,7 +362,7 @@ static void i8080_dad(i8080 * const cpu, emu_addr_t reg_pair) {
     // Adds reg_pair, buffering to compute carry
     emu_addr_t hl = i8080_get_hl(cpu);
     emu_buf_t hl_buf = (emu_buf_t)hl + (emu_buf_t)reg_pair;
-    i8080_set_hl(cpu, (emu_addr_t)addr_bits(hl_buf));
+	i8080_set_hl(cpu, (emu_addr_t)hl_buf;
     cpu->cy = get_buf_bit(hl_buf, HALF_ADDR_SIZE * 2);
 }
 
@@ -468,7 +437,7 @@ static void i8080_daa(i8080 * const cpu) {
 // Pushes higher word before lower word.
 static void i8080_push(i8080 * const cpu, emu_buf_t dbl_word) {
     emu_word_t left_word = (emu_word_t)buf_hi_word(dbl_word);
-    emu_word_t right_word = (emu_word_t)word_bits(dbl_word);
+	emu_word_t right_word = (emu_word_t)dbl_word;
     cpu->write_memory(cpu->sp - (emu_addr_t)1, left_word);
     cpu->write_memory(cpu->sp - (emu_addr_t)2, right_word);
     cpu->sp -= 2;
@@ -520,7 +489,7 @@ static inline void i8080_call(i8080 * const cpu, _Bool condition) {
 // Conditional returns take 6 cycles longer if condition is satisfied.
 static inline void i8080_ret(i8080 * const cpu, _Bool condition) {
     if (condition) {
-       cpu->pc = (emu_addr_t)addr_bits(i8080_pop(cpu));
+		cpu->pc = (emu_addr_t)i8080_pop(cpu);
        cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS;
     }
 }
@@ -553,7 +522,7 @@ static inline _Bool emu_ext_call(i8080 * const cpu) {
         i8080_push(cpu, (emu_buf_t)cpu->pc);
         // Quit the emulator if indicated
         should_continue = cpu->emu_ext_call(cpu);
-        cpu->pc = (emu_addr_t)addr_bits(i8080_pop(cpu));
+		cpu->pc = (emu_addr_t)i8080_pop(cpu);
         // Subtract cycles added by this opcode since this is an external call
         cpu->cycles_taken -= OPCODES_CYCLES[EMU_EXT_CALL];
     }
@@ -844,10 +813,10 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case PUSH_D: i8080_push(cpu, i8080_get_de(cpu)); break;
         case PUSH_H: i8080_push(cpu, i8080_get_hl(cpu)); break;
         case PUSH_PSW: i8080_push(cpu, i8080_get_psw(cpu)); break;
-        case POP_B: i8080_set_bc(cpu, (emu_addr_t)addr_bits(i8080_pop(cpu))); break;
-        case POP_D: i8080_set_de(cpu, (emu_addr_t)addr_bits(i8080_pop(cpu))); break;
-        case POP_H: i8080_set_hl(cpu, (emu_addr_t)addr_bits(i8080_pop(cpu))); break;
-        case POP_PSW: i8080_set_psw(cpu, (emu_addr_t)addr_bits(i8080_pop(cpu))); break;
+        case POP_B: i8080_set_bc(cpu, (emu_addr_t)i8080_pop(cpu)); break;
+        case POP_D: i8080_set_de(cpu, (emu_addr_t)i8080_pop(cpu)); break;
+        case POP_H: i8080_set_hl(cpu, (emu_addr_t)i8080_pop(cpu)); break;
+        case POP_PSW: i8080_set_psw(cpu, (emu_addr_t)i8080_pop(cpu)); break;
         
         // Subroutine calls
         // Conditional CALLs take 6 cycles longer if the condition is met

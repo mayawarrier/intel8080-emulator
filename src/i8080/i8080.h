@@ -18,17 +18,17 @@
  * 
  * emu_word_t: An unsigned type with a bit width equal to the virtual machine's word size.
  * emu_addr_t: An unsigned type with a bit width equal to the virtual machine's address size.
- * emu_buf_t: An unsigned type that is at least 1 bit larger than emu_word_t and emu_addr_t.
- * emu_size_t: An unsigned large type. Used to count processor cycles taken. If this is not large enough,
+ * emu_buf_t: An unsigned type that is double the size of emu_word_t and at least 1 bit larger than emu_addr_t.
+ * emu_large_t: An unsigned large type. Used to count processor cycles taken. If this is not large enough,
  *             the emulator will still run properly, but cycles_taken might overflow.
  * 
- * HALF_WORD_SIZE: uint, half the bit width of emu_word_t
- * HALF_ADDR_SIZE: uint, half the bit width of emu_addr_t
- * WORD_T_MAX: uint, max value that can be held by emu_word_t
- * ADDR_T_MAX: uint, max value that can be held by emu_addr_t
- * WORD_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_word_t
- * ADDR_T_FORMAT: quote-enclosed string, hexadecimal format specifier for emu_addr_t
- * WORD_T_PRT_FORMAT: quote-enclosed string, format specifier to print word as ASCII
+ * HALF_WORD_SIZE: half the bit width of emu_word_t
+ * HALF_ADDR_SIZE: half the bit width of emu_addr_t
+ * WORD_T_MAX: max value that can be held by emu_word_t
+ * ADDR_T_MAX: max value that can be held by emu_addr_t
+ * WORD_T_FORMAT: hexadecimal format specifier for emu_word_t
+ * ADDR_T_FORMAT: hexadecimal format specifier for emu_addr_t
+ * WORD_T_PRT_FORMAT: format specifier to print word as ASCII
  */
 
 #include <stdint.h>
@@ -37,11 +37,10 @@
 typedef uint8_t emu_word_t;
 typedef uint16_t emu_addr_t;
 typedef uint32_t emu_buf_t;
-typedef size_t emu_size_t;
+typedef uintmax_t emu_large_t;
 
-extern const int HALF_WORD_SIZE;
-extern const int HALF_ADDR_SIZE;
-
+extern const unsigned int HALF_WORD_SIZE;
+extern const unsigned int HALF_ADDR_SIZE;
 extern const emu_word_t WORD_T_MAX;
 extern const emu_addr_t ADDR_T_MAX;
 
@@ -64,6 +63,15 @@ extern const char WORD_T_PRT_FORMAT[];
  * implemented similarly in cross-platform threading libraries: https://github.com/aseprite/tinythreadpp 
  */
 #include "i8080_sync.h"
+
+// Bit locations of flags in flags register.
+enum flag_bit {
+	CARRY_BIT = 0,
+	PARITY_BIT = 2,
+	AUX_CARRY_BIT = 4,
+	ZERO_BIT = 6,
+	SIGN_BIT = 7
+};
 
 // Define types of read/write streams
 typedef emu_word_t (* emu_read_word_fp)(emu_addr_t);
@@ -124,7 +132,7 @@ typedef struct i8080 {
     emu_mutex_t i_mutex;
     
     // Cycles taken for last emu_runtime
-    emu_size_t cycles_taken;
+    emu_large_t cycles_taken;
     
 } i8080;
 
