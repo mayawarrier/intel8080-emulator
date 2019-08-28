@@ -93,7 +93,7 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             cpm_print_str(cpu, STARTUP_MSG_PTR);
             
             // Max length, excluding trailing null
-            int LEN_INPUT_BUF = 127;
+            const int LEN_INPUT_BUF = 127;
             emu_word_t input_buf[LEN_INPUT_BUF + 1];
             
             // Address from RUN command
@@ -140,7 +140,7 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
                 // Write JMP addr to the bytes immediately after
                 emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
                 emu_word_t hi_addr = (emu_word_t)((run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
-                cpu->write_memory(0xe401, JMP);
+                cpu->write_memory(0xe401, i8080_JMP);
                 cpu->write_memory(0xe402, lo_addr);
                 cpu->write_memory(0xe403, hi_addr);
                 return 1;
@@ -194,8 +194,6 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
 	0x38  // RST 7
 };
 
-static const int NUM_IVT_VECTORS = 8;
-
 void emu_set_cpm_env(i8080 * const cpu) {
     // 0x38 is a special instruction that calls
     // an external fn outside the i8080 runtime.
@@ -204,17 +202,17 @@ void emu_set_cpm_env(i8080 * const cpu) {
     
     if (cpu->write_memory != NULL) {
         // Entry for CP/M BDOS is 0x05.
-        cpu->write_memory(0x05, EMU_EXT_CALL);
-        cpu->write_memory(0x06, RET);
+        cpu->write_memory(0x05, i8080_EMU_EXT_CALL);
+        cpu->write_memory(0x06, i8080_RET);
 
         // Entry to CP/M WBOOT (warm boot). Jumps to command processor,
         // which lies at 0xe400 for 64K machines
-        cpu->write_memory(0x00, JMP);
+        cpu->write_memory(0x00, i8080_JMP);
         cpu->write_memory(0x01, 0x00);
         cpu->write_memory(0x02, 0xe4);
         
         // External call to a simple command processor
-        cpu->write_memory(0xe400, EMU_EXT_CALL);
+        cpu->write_memory(0xe400, i8080_EMU_EXT_CALL);
         
         // Command processor messages, '$'-terminated
         // as is the convention in CP/M.
@@ -228,15 +226,17 @@ void emu_set_cpm_env(i8080 * const cpu) {
         
         // Store messages from 0xe410
         emu_addr_t msgs_loc = 0xe410;
+		char * msg; int msg_len;
         for (int i = 0; i < 5; ++i) {
-            char * msg = CMD_MSGS[i];
-            for (int j = 0; j < strlen(msg); ++j) {
+            msg = CMD_MSGS[i];
+			msg_len = strlen(msg);
+            for (int j = 0; j < msglen; ++j) {
                 cpu->write_memory(msgs_loc++, msg[j]);
             }
         }
         
         // HLT for the rest of the interrupts
-        for (int i = 1; i < NUM_IVT_VECTORS; ++i) {
+        for (int i = 1; i < 8; ++i) {
             cpu->write_memory(INTERRUPT_TABLE[i], HLT);
         }
 
@@ -246,32 +246,20 @@ void emu_set_cpm_env(i8080 * const cpu) {
     }
 }
 
-// Jumps to start of program memory
-static const emu_word_t DEFAULT_BOOTLOADER[] = {
-    JMP,
-    DEFAULT_START_PA,
-    0x00
-};
-
-static const int DEFAULT_BOOTLOADER_SIZE = 3;
-
 void emu_set_default_env(i8080 * const cpu) {
     
     if (cpu->write_memory != NULL) {
         // Create the interrupt vector table
         // Do not write to RST 1 sequence, we'll put our bootloader there instead
-        for (int i = 1; i < NUM_IVT_VECTORS; ++i) {
+        for (int i = 1; i < 8; ++i) {
             // HLT for all interrupts
             cpu->write_memory(INTERRUPT_TABLE[i], HLT);
         }
 
         // Write a default bootloader that jumps to start of program memory
-        emu_addr_t wr_addr = INTERRUPT_TABLE[0]; // start at 0x0
-
-        for (int i = 0; i < DEFAULT_BOOTLOADER_SIZE; ++i) {
-            cpu->write_memory(wr_addr, DEFAULT_BOOTLOADER[i]);
-            wr_addr++;
-        }
+		cpu->write_memory(0x0000, i8080_JMP);
+		cpu->write_memory(0x0001, DEFAULT_START_PA);
+		cpu->write_memory(0x0002, 0x00);
     } else {
         printf(INIT_MEM_STREAM_ERR_MSG);
     }
