@@ -65,7 +65,7 @@ extern const char WORD_T_PRT_FORMAT[];
 #include "i8080_sync.h"
 
 // Bit locations of flags in flags register.
-enum flag_bit {
+enum i8080_flags {
 	CARRY_BIT = 0,
 	PARITY_BIT = 2,
 	AUX_CARRY_BIT = 4,

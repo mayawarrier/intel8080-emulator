@@ -35,6 +35,30 @@ static const emu_large_t CYCLES_OFFSET_COND_SUB_OPS = 6;
 #undef WORD_T_MAX_def
 #undef ADDR_T_MAX_def
 
+/* This cycles table sourced from:
+ * https://github.com/superzazu/8080/blob/master/i8080.c
+ * Correction made: Corrected cycle count of XCHG (0xeb) to 5. */
+ // For conditional RETs and CALLs, add 6 to the cycles if the condition is true.
+static const emu_word_t OPCODES_CYCLES[] = {
+//  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+	4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 0
+	4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 1
+	4,  10, 16, 5,  5,  5,  7,  4,  4,  10, 16, 5,  5,  5,  7,  4,  // 2
+	4,  10, 13, 5,  10, 10, 10, 4,  4,  10, 13, 5,  5,  5,  7,  4,  // 3
+	5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 4
+	5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 5
+	5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 6
+	7,  7,  7,  7,  7,  7,  7,  7,  5,  5,  5,  5,  5,  5,  7,  5,  // 7
+	4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // 8
+	4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // 9
+	4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // A
+	4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // B
+	5,  10, 10, 10, 11, 11, 7,  11, 5,  10, 10, 10, 11, 17, 7,  11, // C
+	5,  10, 10, 10, 11, 11, 7,  11, 5,  10, 10, 10, 11, 17, 7,  11, // D
+	5,  10, 10, 18, 11, 11, 7,  11, 5,  5,  10, 5,  11, 17, 7,  11, // E
+	5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  // F
+};
+
 // Get value of a particular bit position in an emu_word_t.
 static inline _Bool get_word_bit(emu_word_t word, int bit) { return ((word >> bit) & 1); }
 // Get value of a particular bit position in an emu_buf_t.
@@ -72,7 +96,7 @@ static inline emu_buf_t twos_comp_word(emu_word_t word) {
 static inline _Bool aux_carry(emu_word_t word1, emu_word_t word2) { 
 	return (get_word_bit(word_lo_bits(word1) + word_lo_bits(word2), HALF_WORD_SIZE)); 
 }
-// Calculate parity of a word.
+// Calculates parity of a word.
 static inline _Bool parity(emu_word_t word) {
 	_Bool p = 0;
 	// XOR each bit together
@@ -82,6 +106,10 @@ static inline _Bool parity(emu_word_t word) {
 	}
 	// invert for even number of ones
 	return !p;
+}
+// Gets the bit just after the width of an emu_word_t.
+static inline _Bool get_carry_bit(emu_buf_t buf) {
+	return get_buf_bit(buf, HALF_WORD_SIZE * 2);
 }
 
 // Updates the Z, S, P flags based on the word provided.
@@ -261,14 +289,13 @@ static void i8080_mov_reg(i8080 * const cpu, emu_word_t opcode) {
 
 // Performs an add to accumulator and updates flags.
 static void i8080_add(i8080 * const cpu, emu_word_t word) {
-    // this cannot be determined from acc_buf, do this before
+	// Do the addition in a larger type to preserve carry
+	emu_buf_t acc_buf = (emu_buf_t)cpu->a + (emu_buf_t)word;
     cpu->acy = aux_carry(cpu->a, word);
-    // We need a larger type so buffer overflow does not occur
-    emu_buf_t acc_buf = (emu_buf_t)cpu->a + (emu_buf_t)word;
+	cpu->cy = get_carry_bit(acc_buf);
     // The accumulator only needs to keep the word bits
 	cpu->a = (emu_word_t)acc_buf;
     // Update remaining flags
-    cpu->cy = get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
     update_ZSP(cpu, cpu->a);
 }
 
@@ -279,14 +306,11 @@ static inline void i8080_adc(i8080 * const cpu, emu_word_t word) {
 
 // Performs a subtract from accumulator and updates flags
 static void i8080_sub(i8080 * const cpu, emu_word_t word) {
-    // Perform 2's complement subtraction on the lo bits of the word
-    cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
-    // Perform SUB
-    emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
+	emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
+    cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word)); 
+	// Carry is the borrow flag for SUB, SBB etc, invert carry 
+	cpu->cy = !get_carry_bit(acc_buf);
 	cpu->a = (emu_word_t)acc_buf;
-    // Update remaining flags
-    // Carry is the borrow flag for SUB, SBB etc, invert carry 
-    cpu->cy = !get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
     update_ZSP(cpu, cpu->a);
 }
 
@@ -302,7 +326,6 @@ static void i8080_ana(i8080 * const cpu, emu_word_t word) {
     cpu->acy = get_word_bit(cpu->a, HALF_WORD_SIZE - 1) | get_word_bit(word, HALF_WORD_SIZE - 1);
     // Perform ANA
     cpu->a &= word;
-    // Update remaining flags
     update_ZSP(cpu, cpu->a);
     /* In the 8080, AND logical instructions always reset carry:
      * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 63 */
@@ -334,9 +357,8 @@ static void i8080_ora(i8080 * const cpu, emu_word_t word) {
 // Updates flags after subtraction from accumulator, without modifying it.
 static void i8080_cmp(i8080 * const cpu, emu_word_t word) {
     // This is almost identical to i8080_sub, with the exception that the accumulator is not affected
+	emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
-    emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
-    // Carry is inverted for borrow
     cpu->cy = !get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
     update_ZSP(cpu, acc_buf);
 }
@@ -344,7 +366,7 @@ static void i8080_cmp(i8080 * const cpu, emu_word_t word) {
 // Increments and updates flags, and returns the incremented word.
 static emu_word_t i8080_inr(i8080 * const cpu, emu_word_t word) {
     cpu->acy = aux_carry(word, 1);
-    word++; // no need to buffer since overflow is allowed without sign change
+    word++;
     update_ZSP(cpu, word);
     return word;
 }
@@ -352,7 +374,7 @@ static emu_word_t i8080_inr(i8080 * const cpu, emu_word_t word) {
 // Decrements and updates flags, and returns the decremented word.
 static emu_word_t i8080_dcr(i8080 * const cpu, emu_word_t word) {
     cpu->acy = aux_carry(word, twos_comp_lo_word(1));
-    word--; // no need to buffer since underflow is allowed without sign change
+    word--;
     update_ZSP(cpu, word);
     return word;
 }
@@ -361,7 +383,7 @@ static emu_word_t i8080_dcr(i8080 * const cpu, emu_word_t word) {
 static void i8080_dad(i8080 * const cpu, emu_addr_t reg_pair) {
     // Adds reg_pair, buffering to compute carry
     emu_addr_t hl = i8080_get_hl(cpu);
-    emu_buf_t hl_buf = (emu_buf_t)hl + (emu_buf_t)reg_pair;
+    emu_buf_t hl_buf = (emu_buf_t)hl + reg_pair;
 	i8080_set_hl(cpu, (emu_addr_t)hl_buf;
     cpu->cy = get_buf_bit(hl_buf, HALF_ADDR_SIZE * 2);
 }
@@ -468,7 +490,7 @@ static inline void i8080_jmp(i8080 * const cpu, _Bool condition) {
     if (condition) {
         i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
     } else {
-        // advance to word after address
+		// advance to word after address
         cpu->pc += 2;
     }
 }
@@ -480,7 +502,7 @@ static inline void i8080_call(i8080 * const cpu, _Bool condition) {
         i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
         cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS;
     } else {
-        // advance to word after address
+		// advance to word after address
         cpu->pc += 2;
     }
 }
@@ -496,13 +518,11 @@ static inline void i8080_ret(i8080 * const cpu, _Bool condition) {
 
 // Exchanges the top 2 words of the stack with {HL}.
 static inline void i8080_xthl(i8080 * const cpu) {
-    // Gets the top two words on the stack
     emu_word_t prev_right_word = cpu->read_memory(cpu->sp);
     emu_word_t prev_left_word = cpu->read_memory(cpu->sp + (emu_addr_t)1);
-    // Overwrites the top 2 words with H and L
+    // Exchange HL with the top two words on the stack
     cpu->write_memory(cpu->sp, cpu->l);
     cpu->write_memory(cpu->sp + (emu_addr_t)1, cpu->h);
-    // Sets HL to the previous top 2 words on the stack 
     cpu->h = prev_left_word;
     cpu->l = prev_right_word;
 }
@@ -516,7 +536,7 @@ static inline void i8080_xchg(i8080 * const cpu) {
 
 // Makes a call to an external function provided by the user, if it exists.
 // Returns 0 if the external call has indicated the i8080 to be stopped.
-static inline _Bool emu_ext_call(i8080 * const cpu) {
+static _Bool emu_ext_call(i8080 * const cpu) {
     _Bool should_continue = 1;
     if (emu_ext_call != NULL) {
         i8080_push(cpu, (emu_buf_t)cpu->pc);
@@ -541,7 +561,6 @@ void i8080_destroy(i8080 * const cpu) {
 }
 
 void i8080_reset(i8080 * const cpu) {
-    // start executing from beginning again
     cpu->pc = 0;
     cpu->is_halted = 0;
     cpu->ie = 0;
@@ -565,16 +584,14 @@ _Bool i8080_next(i8080 * const cpu) {
     emu_mutex_lock(&cpu->i_mutex);
     // The next opcode to be executed
     emu_word_t opcode;
+	// Service interrupt if pending request exists
     if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
-        // If an interrupt needs to be serviced execute it first
         opcode = cpu->interrupt_acknowledge();
-        // disable interrupts
+        // disable interrupts and bring out of halt
         cpu->ie = 0;
         cpu->pending_interrupt_req = 0;
-        // Bring out of HALT
         cpu->is_halted = 0;
     } else {
-        // regular execution
         if (!cpu->is_halted) {
             opcode = i8080_advance_read_word(cpu);
         }
@@ -819,7 +836,6 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case POP_PSW: i8080_set_psw(cpu, (emu_addr_t)i8080_pop(cpu)); break;
         
         // Subroutine calls
-        // Conditional CALLs take 6 cycles longer if the condition is met
         case CALL: case ALT_CALL0: case ALT_CALL1: case ALT_CALL2: 
             i8080_call(cpu, 1); break;
         case CNZ: i8080_call(cpu, !cpu->z); break;  // CALL on !Z i.e. non-zero acc
@@ -832,7 +848,6 @@ _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case CM: i8080_call(cpu, cpu->s); break;    // CALL on S i.e. acc negative
         
         // Subroutine returns
-        // Conditional RETs take 6 cycles longer if the condition is met
         case RET: case ALT_RET0: 
             i8080_ret(cpu, 1); break;
         case RNZ: i8080_ret(cpu, !cpu->z); break;   // RET on !Z i.e. non-zero acc
