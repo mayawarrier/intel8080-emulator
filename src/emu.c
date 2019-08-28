@@ -7,6 +7,9 @@
 #include "i8080/i8080_opcodes.h"
 #include <string.h>
 
+const emu_word_t CPM_CONSOLE_ADDR = 0x00;
+const emu_addr_t DEFAULT_START_PA = 0x40;
+const emu_addr_t CPM_START_OF_TPA = 0x100;
 // The console port address duplicated across 16-bit address bus for use with port out
 static const emu_addr_t CONSOLE_ADDR_FULL = (emu_addr_t)((CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
 

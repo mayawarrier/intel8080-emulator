@@ -39,14 +39,14 @@ typedef uint16_t emu_addr_t;
 typedef uint32_t emu_buf_t;
 typedef uintmax_t emu_large_t;
 
-extern const unsigned int HALF_WORD_SIZE;
-extern const unsigned int HALF_ADDR_SIZE;
-extern const emu_word_t WORD_T_MAX;
-extern const emu_addr_t ADDR_T_MAX;
+extern const unsigned int HALF_WORD_SIZE;	// = 4
+extern const unsigned int HALF_ADDR_SIZE;	// = 8
+extern const emu_word_t WORD_T_MAX;			// = UINT8_MAX
+extern const emu_addr_t ADDR_T_MAX;			// = UINT16_MAX
 
-extern const char WORD_T_FORMAT[];
-extern const char ADDR_T_FORMAT[];
-extern const char WORD_T_PRT_FORMAT[];
+extern const char WORD_T_FORMAT[];			// = "0x%02x"
+extern const char ADDR_T_FORMAT[];			// = "0x%04x"
+extern const char WORD_T_PRT_FORMAT[];		// = "%c"
 
 /* If the environment is GNUC, and pthreads are available,
  * this must be defined as 1 before including i8080_sync.h. */
