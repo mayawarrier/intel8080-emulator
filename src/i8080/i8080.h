@@ -10,8 +10,11 @@
 #ifndef I_8080_H
 #define I_8080_H
 
- // Build for non-POSIX-compliant compilers (MSVC).
-#include "i8080_build.h"
+// Platform-specific includes, error suppression on MSVC, and an
+/* attempt at portable synchronization functions.
+ * If building on Windows, include this before <stdio.h> in every source file,
+ * and add to it any additional version checks as required. */ 
+#include "i8080_preinclude.h"
 
 /* Below are the i8080 emulator base types, format specifiers and sizes.
  * These can be modified to emulate architectures close to the i8080.
@@ -47,22 +50,6 @@ extern const emu_addr_t ADDR_T_MAX;			// = UINT16_MAX
 extern const char WORD_T_FORMAT[];			// = "0x%02x"
 extern const char ADDR_T_FORMAT[];			// = "0x%04x"
 extern const char WORD_T_PRT_FORMAT[];		// = "%c"
-
-/* If the environment is GNUC, and pthreads are available,
- * this must be defined as 1 before including i8080_sync.h. */
-#define EMU_PTHREADS_AVAILABLE (1)
-
-/* Provides access to portable synchronization functions. 
- * 
- * For GNUC, this is implemented with pthread_mutex_t, which is not
- * compatible with std::thread as defined by the standard, though it
- * usually always is: https://stackoverflow.com/questions/37110571/when-to-use-pthread-mutex-t
- * 
- * For Windows, this is implemented with a CRITICAL_SECTION. I can't find
- * information about compatibility with std::thread, but it seems to be
- * implemented similarly in cross-platform threading libraries: https://github.com/aseprite/tinythreadpp 
- */
-#include "i8080_sync.h"
 
 // Bit locations of flags in flags register.
 enum i8080_flags {
@@ -129,7 +116,7 @@ typedef struct i8080 {
      * with the interrupt generator, so the
      * interrupt is not accidentally double-serviced
      * or missed by the i8080. */
-    emu_mutex_t i_mutex;
+    i8080_mutex_t i_mutex;
     
     // Cycles taken for last emu_runtime
     emu_large_t cycles_taken;

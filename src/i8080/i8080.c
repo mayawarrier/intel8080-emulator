@@ -555,11 +555,11 @@ void i8080_init(i8080 * const cpu) {
     i8080_reset(cpu);
     cpu->cycles_taken = 0;
     // Initialize interrupts synchronization mutex
-    emu_mutex_init(&cpu->i_mutex);
+    i8080_mutex_init(&cpu->i_mutex);
 }
 
 void i8080_destroy(i8080 * const cpu) {
-    emu_mutex_destroy(&cpu->i_mutex);
+    i8080_mutex_destroy(&cpu->i_mutex);
 }
 
 void i8080_reset(i8080 * const cpu) {
@@ -574,16 +574,16 @@ void i8080_reset(i8080 * const cpu) {
  * completely synchronized. */
 
 void i8080_interrupt(i8080 * const cpu) {
-    emu_mutex_lock(&cpu->i_mutex);
+    i8080_mutex_lock(&cpu->i_mutex);
     // When serviced by the i8080, this will be toggled back
     if (cpu->ie && !cpu->pending_interrupt_req) {
         cpu->pending_interrupt_req = 1;
     }
-    emu_mutex_unlock(&cpu->i_mutex);
+    i8080_mutex_unlock(&cpu->i_mutex);
 }
 
 _Bool i8080_next(i8080 * const cpu) {
-    emu_mutex_lock(&cpu->i_mutex);
+    i8080_mutex_lock(&cpu->i_mutex);
     // The next opcode to be executed
     emu_word_t opcode;
 	// Service interrupt if pending request exists
@@ -598,7 +598,7 @@ _Bool i8080_next(i8080 * const cpu) {
             opcode = i8080_advance_read_word(cpu);
         }
     }
-    emu_mutex_unlock(&cpu->i_mutex);
+    i8080_mutex_unlock(&cpu->i_mutex);
     
     if (!cpu->is_halted) {
         return i8080_exec(cpu, opcode);
