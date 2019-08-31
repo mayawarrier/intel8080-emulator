@@ -15,8 +15,8 @@
  * Created on June 30, 2019, 2:56 PM
  */
 
-#ifndef I8080_BUILD_H
-#define I8080_BUILD_H
+#ifndef I8080_PREINCLUDE_H
+#define I8080_PREINCLUDE_H
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(__WINDOWS__) || defined(_MSC_VER)
 	#define I8080_WINDOWS
@@ -55,7 +55,7 @@
  * atomic synchronization functions from version 4.7.0, that can be used to simulate mutexes. */
 #if (defined(__GNUC__) || defined(__GNUG__)) && ((__GNUC__ >= 4) && (__GNUC_MINOR__ >= 7) && (__GNUC_PATCHLEVEL__ >= 0))
 	#define I8080_GNUC_MIN_VER
-#else
+#endif
 
 /* An attempt at providing portable synchronization functions.
  *
@@ -67,14 +67,10 @@
  * tinycthread: https://github.com/tinycthread/tinycthread
  */
 
- // Initialize a mutex.
-inline void i8080_mutex_init(i8080_mutex_t * handle);
-// Waits until the mutex is released, then locks it and takes over control.
-inline void i8080_mutex_lock(i8080_mutex_t * handle);
-// Unlocks/releases a mutex.
-inline void i8080_mutex_unlock(i8080_mutex_t * handle);
-// Destroys a mutex.
-inline void i8080_mutex_destroy(i8080_mutex_t * handle);
+/* i8080_mutex_init() -> Initialize a mutex.
+ * i8080_mutex_lock() -> Waits until the mutex is released, then locks it and takes over control. 
+ * i8080_mutex_unlock() -> Unlocks/releases a mutex. 
+ * i8080_mutex_destroy() -> Destroys a mutex. */
 
 #ifdef I8080_WINDOWS_MIN_VER
 	
@@ -102,6 +98,8 @@ inline void i8080_mutex_destroy(i8080_mutex_t * handle);
 		DeleteCriticalSection(handle);
 	}
 
+	#undef I8080_WINDOWS_MIN_VER
+
 #elif defined(I8080_POSIX_MIN_VER)
 
 	// Use pthreads, since they are available
@@ -123,6 +121,8 @@ inline void i8080_mutex_destroy(i8080_mutex_t * handle);
 	inline void i8080_mutex_destroy(i8080_mutex_t * handle) {
 		pthread_mutex_destroy(handle);
 	}
+
+	#undef I8080_POSIX_MIN_VER
 
 #elif defined(I8080_GNUC_MIN_VER)
 	
@@ -151,7 +151,11 @@ inline void i8080_mutex_destroy(i8080_mutex_t * handle);
 		(void)handle;
 	}
 
-#elif defined(I8080_UNIDENTIFIED)
+	#undef I8080_GNUC_MIN_VER
+
+#else
+	
+	// I8080_UNIDENTIFIED
 
 	/* A volatile char ~should~ provide the best chance
 	 * at proper sync, if nothing else is available. */
@@ -177,4 +181,16 @@ inline void i8080_mutex_destroy(i8080_mutex_t * handle);
 		(void)handle;
 	}
 
+	#undef I8080_UNIDENTIFIED
+
 #endif
+
+// Undef the remaining macros
+#ifdef I8080_UNIX
+	#undef I8080_UNIX
+#endif
+#ifdef I8080_WINDOWS
+	#undef I8080_WINDOWS
+#endif
+
+#endif /* I8080_PREINCLUDE_H */ 
