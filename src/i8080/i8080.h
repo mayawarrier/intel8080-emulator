@@ -2,7 +2,7 @@
  * File:   i8080.h
  * Author: dhruvwarrier
  *
- * Defines the i8080, and provides fns to emulate instructions on it.
+ * Emulate an i8080.
  * 
  * Created on June 30, 2019, 5:28 PM
  */
@@ -10,21 +10,49 @@
 #ifndef I_8080_H
 #define I_8080_H
 
-// Platform-specific includes, error suppression on MSVC, and an
-/* attempt at portable synchronization functions.
- * If building on Windows, include this before <stdio.h> in every source file,
- * and add to it any additional version checks as required. */ 
-#include "i8080_preinclude.h"
+#include "i8080_predef.h"
+ // Suppress MSVC deprecation errors in stdio functions.
+#ifdef I8080_WINDOWS_MIN_VER
+	#ifndef _CRT_SECURE_NO_WARNINGS
+		#define _CRT_SECURE_NO_WARNINGS
+	#endif
+	#ifndef _CRT_SECURE_NO_DEPRECATE
+		#define _CRT_SECURE_NO_DEPRECATE
+	#endif
+#endif
+
+// Determine i8080_mutex_t for different environments.
+#ifdef I8080_WINDOWS_MIN_VER
+	// Critical sections have better performance than standard
+	// Windows mutexes and appear to be compatible with std::thread.
+	#include <Windows.h>
+	typedef CRITICAL_SECTION i8080_mutex_t;
+#elif defined I8080_POSIX_MIN_VER
+	// Use pthreads, since they are available
+	#include <pthreads.h>
+	typedef pthread_mutex_t i8080_mutex_t;
+#elif defined I8080_GNUC_MIN_VER
+	// Simulate a mutex using acquire - release semantics on a char.
+	typedef char i8080_mutex_t;
+#else
+	// A volatile char ~should~provide the best chance at proper sync, 
+	// if nothing else is available.
+	typedef volatile char i8080_mutex_t;
+#endif
+#include "i8080_predef_undef.h"
+
+#include <stdint.h>
+#include <stddef.h>
 
 /* Below are the i8080 emulator base types, format specifiers and sizes.
  * These can be modified to emulate architectures close to the i8080.
- * 
+ *
  * emu_word_t: An unsigned type with a bit width equal to the virtual machine's word size.
  * emu_addr_t: An unsigned type with a bit width equal to the virtual machine's address size.
  * emu_buf_t: An unsigned type that is double the size of emu_word_t and at least 1 bit larger than emu_addr_t.
  * emu_large_t: An unsigned large type. Used to count processor cycles taken. If this is not large enough,
  *             the emulator will still run properly, but cycles_taken might overflow.
- * 
+ *
  * HALF_WORD_SIZE: half the bit width of emu_word_t
  * HALF_ADDR_SIZE: half the bit width of emu_addr_t
  * WORD_T_MAX: max value that can be held by emu_word_t
@@ -34,16 +62,13 @@
  * WORD_T_PRT_FORMAT: format specifier to print word as ASCII
  */
 
-#include <stdint.h>
-#include <stdlib.h>
-
 typedef uint8_t emu_word_t;
 typedef uint16_t emu_addr_t;
 typedef uint32_t emu_buf_t;
 typedef uintmax_t emu_large_t;
 
-extern const unsigned int HALF_WORD_SIZE;	// = 4
-extern const unsigned int HALF_ADDR_SIZE;	// = 8
+extern const size_t HALF_WORD_SIZE;			// = 4
+extern const size_t HALF_ADDR_SIZE;			// = 8
 extern const emu_word_t WORD_T_MAX;			// = UINT8_MAX
 extern const emu_addr_t ADDR_T_MAX;			// = UINT16_MAX
 
@@ -51,18 +76,9 @@ extern const char WORD_T_FORMAT[];			// = "0x%02x"
 extern const char ADDR_T_FORMAT[];			// = "0x%04x"
 extern const char WORD_T_PRT_FORMAT[];		// = "%c"
 
-// Bit locations of flags in flags register.
-enum i8080_flags {
-	CARRY_BIT = 0,
-	PARITY_BIT = 2,
-	AUX_CARRY_BIT = 4,
-	ZERO_BIT = 6,
-	SIGN_BIT = 7
-};
-
 // Define types of read/write streams
-typedef emu_word_t (* emu_read_word_fp)(emu_addr_t);
-typedef void (* emu_write_word_fp)(emu_addr_t, emu_word_t);
+typedef emu_word_t(*emu_read_word_fp)(emu_addr_t);
+typedef void(*emu_write_word_fp)(emu_addr_t, emu_word_t);
 
 typedef struct i8080 {
     // Registers
@@ -116,7 +132,7 @@ typedef struct i8080 {
      * with the interrupt generator, so the
      * interrupt is not accidentally double-serviced
      * or missed by the i8080. */
-    i8080_mutex_t i_mutex;
+	i8080_mutex_t i_mutex;
     
     // Cycles taken for last emu_runtime
     emu_large_t cycles_taken;
@@ -139,13 +155,10 @@ _Bool i8080_next(i8080 * const cpu);
 _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
 
 /* Sends an interrupt to the i8080. This is thread-safe, and it will be serviced when the i8080 is ready. 
- * If your compiler/environment does not support mutexes, this may not work correctly. See i8080_sync.h.
+ * If your compiler/environment does not support mutexes, this may not work correctly. See i8080.c for implementation.
  * 
  * When ready, the i8080 will call interrupt_acknowledge() which should return the vector to be executed. 
  * Interrupts are disabled every time an interrupt is serviced, so they must be enabled again before the next interrupt. */
 void i8080_interrupt(i8080 * const cpu);
-
-/* Destroys i_mutex. */
-void i8080_destroy(i8080 * const cpu);
 
 #endif // I_8080_H

@@ -1,11 +1,114 @@
 /*
- * Implement i8080 emulation.
- * 
+ * Implement i8080.h
  */
 
-#include <stddef.h>
 #include "i8080.h"
 #include "i8080_opcodes.h"
+
+ /* An attempt at providing portable synchronization functions.
+  *
+  * Use pthreads if available on POSIX. This is not standards-compliant with std::thread,
+  * but on systems with pthreads, std::thread is just a wrapper around pthreads:
+  * https://stackoverflow.com/questions/37110571/when-to-use-pthread-mutex-t
+  *
+  * Use CRITICAL_SECTION on Windows. It seems to be implemented similarly in
+  * tinycthread: https://github.com/tinycthread/tinycthread
+  */
+
+  /* i8080_mutex_init() -> Initialize a mutex.
+   * i8080_mutex_lock() -> Waits until the mutex is released, then locks it and takes over control.
+   * i8080_mutex_unlock() -> Unlocks/releases a mutex.
+   * i8080_mutex_destroy() -> Destroys a mutex. */
+
+#include "i8080_predef.h"
+#ifdef I8080_WINDOWS_MIN_VER
+
+	static inline void i8080_mutex_init(i8080_mutex_t * handle) {
+		/* Initializing with a spin count can hugely improve performance,
+		 * by avoiding a kernel call for short critical sections:
+		 * https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-initializecriticalsectionandspincount */
+		InitializeCriticalSectionAndSpinCount(handle, 4000);
+	}
+
+	static inline void i8080_mutex_lock(i8080_mutex_t * handle) {
+		EnterCriticalSection(handle);
+	}
+
+	static inline void i8080_mutex_unlock(i8080_mutex_t * handle) {
+		LeaveCriticalSection(handle);
+	}
+
+	static inline void i8080_mutex_destroy(i8080_mutex_t * handle) {
+		DeleteCriticalSection(handle);
+	}
+
+#elif defined(I8080_POSIX_MIN_VER)
+
+	static inline void i8080_mutex_init(void * handle) {
+		pthread_mutex_init(handle, NULL);
+	}
+
+	static inline void i8080_mutex_lock(void * handle) {
+		pthread_mutex_lock(handle);
+	}
+
+	static inline void i8080_mutex_unlock(void * handle) {
+		pthread_mutex_unlock(handle);
+	}
+
+	static inline void i8080_mutex_destroy(void * handle) {
+		pthread_mutex_destroy(handle);
+	}
+
+#elif defined(I8080_GNUC_MIN_VER)
+
+	static inline void i8080_mutex_init(i8080_mutex_t * handle) {
+		// Puts the mutex in unlocked state
+		*handle = (i8080_mutex_t)0;
+	}
+
+	static inline void i8080_mutex_lock(i8080_mutex_t * handle) {
+		// Stay here until the mutex is unlocked
+		while (__atomic_load_n(handle, __ATOMIC_ACQUIRE) != (i8080_mutex_t)0);
+		// Lock the mutex
+		__atomic_store_n(handle, (i8080_mutex_t)1, __ATOMIC_RELEASE);
+	}
+
+	static inline void i8080_mutex_unlock(i8080_mutex_t * handle) {
+		__atomic_store_n(handle, (i8080_mutex_t)0, __ATOMIC_RELEASE);
+	}
+
+	static inline void i8080_mutex_destroy(i8080_mutex_t * handle) {
+		(void)handle;
+	}
+
+#else
+
+	// I8080_UNIDENTIFIED
+
+	static inline void i8080_mutex_init(i8080_mutex_t * handle) {
+		// init as unlocked
+		*handle = 0;
+	}
+
+	static inline void i8080_mutex_lock(i8080_mutex_t * handle) {
+		// wait until unlocked
+		while (*handle != 0);
+		// lock
+		*handle = 1;
+	}
+
+	static inline void i8080_mutex_unlock(i8080_mutex_t * handle) {
+		*handle = 0;
+	}
+
+	static inline void i8080_mutex_destroy(i8080_mutex_t * handle) {
+		// nothing to do
+		(void)handle;
+	}
+
+#endif
+#include "i8080_predef_undef.h"
 
 // Defines to initialize const variables
 #define HALF_WORD_SIZE_def (4)
@@ -14,8 +117,8 @@
 #define ADDR_T_MAX_def UINT16_MAX
 
 // Format specs and sizes for emu_word_t and emu_addr_t, externed in i8080.h.
-const unsigned int HALF_WORD_SIZE = HALF_WORD_SIZE_def;
-const unsigned int HALF_ADDR_SIZE = HALF_ADDR_SIZE_def;
+const size_t HALF_WORD_SIZE = HALF_WORD_SIZE_def;
+const size_t HALF_ADDR_SIZE = HALF_ADDR_SIZE_def;
 const emu_word_t WORD_T_MAX = WORD_T_MAX_def;
 const emu_addr_t ADDR_T_MAX = ADDR_T_MAX_def;
 const char WORD_T_FORMAT[] = "0x%02x";
@@ -27,7 +130,7 @@ static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE_def) - (emu
 static const emu_word_t WORD_HI_F = (((emu_word_t)1 << HALF_WORD_SIZE_def) - (emu_word_t)1) << HALF_WORD_SIZE_def;
 static const emu_buf_t BUF_HI_WORD_MAX = (emu_buf_t)WORD_T_MAX_def << (HALF_WORD_SIZE_def * 2);
 // Conditional RETs and CALLs (subroutine ops) take 6 cycles longer if the condition is true.
-static const emu_large_t CYCLES_OFFSET_COND_SUB_OPS = 6;
+static const emu_large_t SUBROUTINE_CYCLES_OFFSET = 6;
 
 // Undef these, not required anymore
 #undef HALF_WORD_SIZE_def
@@ -57,6 +160,15 @@ static const emu_word_t OPCODES_CYCLES[] = {
 	5,  10, 10, 10, 11, 11, 7,  11, 5,  10, 10, 10, 11, 17, 7,  11, // D
 	5,  10, 10, 18, 11, 11, 7,  11, 5,  5,  10, 5,  11, 17, 7,  11, // E
 	5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  // F
+};
+
+// Bit locations of flags in flags register.
+enum i8080_flags {
+	CARRY_BIT = 0,
+	PARITY_BIT = 2,
+	AUX_CARRY_BIT = 4,
+	ZERO_BIT = 6,
+	SIGN_BIT = 7
 };
 
 // Get value of a particular bit position in an emu_word_t.
@@ -89,8 +201,8 @@ static inline emu_word_t twos_comp_lo_word(emu_word_t word) {
 	return (((word) ^ WORD_LO_F) + (emu_word_t)1); 
 }
 /* Perform 2's complement on the entire word, up-scaling to a buf_t.
-This is upscaled to preserve the carry bit when subtracting from 0:
-https://retrocomputing.stackexchange.com/questions/6407/intel-8080-behaviour-of-the-carry-bit-when-comparing-a-value-with-0 */
+ * This is upscaled to preserve the carry bit when subtracting from 0:
+ * https://retrocomputing.stackexchange.com/questions/6407/intel-8080-behaviour-of-the-carry-bit-when-comparing-a-value-with-0 */
 static inline emu_buf_t twos_comp_word(emu_word_t word) { 
 	return ((emu_word_t)(~word) + (emu_buf_t)1); 
 }
@@ -361,7 +473,7 @@ static void i8080_cmp(i8080 * const cpu, emu_word_t word) {
     // This is almost identical to i8080_sub, with the exception that the accumulator is not affected
 	emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
-    cpu->cy = !get_buf_bit(acc_buf, HALF_WORD_SIZE * 2);
+    cpu->cy = !get_carry_bit(acc_buf);
     update_ZSP(cpu, acc_buf);
 }
 
@@ -502,7 +614,7 @@ static inline void i8080_jmp(i8080 * const cpu, _Bool condition) {
 static inline void i8080_call(i8080 * const cpu, _Bool condition) {
     if (condition) {
         i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
-        cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS;
+        cpu->cycles_taken += SUBROUTINE_CYCLES_OFFSET;
     } else {
 		// advance to word after address
         cpu->pc += 2;
@@ -514,7 +626,7 @@ static inline void i8080_call(i8080 * const cpu, _Bool condition) {
 static inline void i8080_ret(i8080 * const cpu, _Bool condition) {
     if (condition) {
 		cpu->pc = (emu_addr_t)i8080_pop(cpu);
-       cpu->cycles_taken += CYCLES_OFFSET_COND_SUB_OPS;
+       cpu->cycles_taken += SUBROUTINE_CYCLES_OFFSET;
     }
 }
 
@@ -558,10 +670,6 @@ void i8080_init(i8080 * const cpu) {
     i8080_mutex_init(&cpu->i_mutex);
 }
 
-void i8080_destroy(i8080 * const cpu) {
-    i8080_mutex_destroy(&cpu->i_mutex);
-}
-
 void i8080_reset(i8080 * const cpu) {
     cpu->pc = 0;
     cpu->is_halted = 0;
@@ -585,7 +693,7 @@ void i8080_interrupt(i8080 * const cpu) {
 _Bool i8080_next(i8080 * const cpu) {
     i8080_mutex_lock(&cpu->i_mutex);
     // The next opcode to be executed
-    emu_word_t opcode;
+	emu_word_t opcode = 0;
 	// Service interrupt if pending request exists
     if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
         opcode = cpu->interrupt_acknowledge();
@@ -593,19 +701,21 @@ _Bool i8080_next(i8080 * const cpu) {
         cpu->ie = 0;
         cpu->pending_interrupt_req = 0;
         cpu->is_halted = 0;
-    } else {
-        if (!cpu->is_halted) {
-            opcode = i8080_advance_read_word(cpu);
-        }
+    } else if (!cpu->is_halted) {
+         opcode = i8080_advance_read_word(cpu);
     }
     i8080_mutex_unlock(&cpu->i_mutex);
     
+	bool success;
     if (!cpu->is_halted) {
-        return i8080_exec(cpu, opcode);
+		// Execute the opcode
+        success = i8080_exec(cpu, opcode);
+		if (!success) i8080_mutex_destroy(&cpu->i_mutex);
     } else {
         // indicate success but remain halted
-        return 1;
+		success = 1;
     }
+	return success;
 }
 
 _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode) {
