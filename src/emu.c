@@ -198,10 +198,8 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
 };
 
 void emu_set_cpm_env(i8080 * const cpu) {
-    // 0x38 is a special instruction that calls
-    // an external fn outside the i8080 runtime.
-    // This is used to emulate calls to CP/M BDOS and WBOOT, and
-    // provide a basic command processor.
+
+    // i8080_EMU_EXT_CALL is used to emulate calls to CP/M BDOS and WBOOT.
     
     if (cpu->write_memory != NULL) {
         // Entry for CP/M BDOS is 0x05.
@@ -326,7 +324,7 @@ EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_de
         }
     }
     
-    if (cpu->last_instr_exec == IN || cpu->last_instr_exec == OUT) {
+    if (cpu->last_instr_exec == i8080_IN || cpu->last_instr_exec == i8080_OUT) {
         return EMU_ERR_IO_STREAMS;
     }
     

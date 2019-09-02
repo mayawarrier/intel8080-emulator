@@ -22,8 +22,8 @@
 typedef enum EMU_EXIT_CODES {
     EMU_ERR_MEM_STREAMS,        // A memory stream function (cpu->read_memory, cpu->write_memory) is not initialized.
     EMU_ERR_IO_STREAMS,         // An I/O request was made at runtime but an I/O stream function (cpu->port_in, cpu->port_out) was not initialized.
-    EMU_ERR_MEMORY,             // A memory location is not read/writ-able. Location of failure stored in cpu->pc.
-                                // This error can only be triggered by the startup check.
+    EMU_ERR_MEMORY,             /* A memory location is not read/writ-able. Location of failure stored in cpu->pc.
+                                 * This error can only be triggered by the startup check. */
     EMU_EXIT_SUCCESS            // Successful run.
 } EMU_EXIT_CODE;
 
@@ -48,14 +48,14 @@ extern const emu_word_t CPM_CONSOLE_ADDR; // = 0x00
  * environment. Set this environment with emu_set_default_env(). */
 extern const emu_addr_t DEFAULT_START_PA; // = 0x0040
 
-/* Loads a file into memory. Call only after memory_init(). Returns number of words read. */
+/* Loads a file into memory. Returns number of words read. */
 size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
 
 // Initialize an i8080
 void emu_init_i8080(i8080 * const cpu);
 
 /* Sets up the environment for some basic CP/M 2.2 BIOS emulation.
- * Some programs written for the 8080 need this environment. At the moment, only 
+ * Some programs written for the 8080 need this environment. At the moment, this only 
  * supports CP/M BDOS ops 2 and 9, and WBOOT (which launches into a simple command processor).
  * The command processor has 2 commands:
  * RUN addr: Begins execution of a CP/M program starting at addr.
