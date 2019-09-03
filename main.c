@@ -1,5 +1,7 @@
 
 #include "src/emu.h"
+#include "src/emu_consts.h"
+#include "src/i8080/internal/i8080_consts.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>

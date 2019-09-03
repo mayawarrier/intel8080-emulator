@@ -3,21 +3,17 @@
  */
 
 #include "emu.h"
+#include "emu_consts.h"
 #include "emu_debug.h"
 #include "i8080/internal/i8080_opcodes.h"
 #include "i8080/internal/i8080_consts.h"
 #include <string.h>
+#include <stdint.h>
 
-const emu_word_t CPM_CONSOLE_ADDR = 0x00;
-const emu_addr_t DEFAULT_START_PA = 0x40;
-const emu_addr_t CPM_START_OF_TPA = 0x100;
-
-uintmax_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc) {
+size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc) {
     
     size_t file_size = 0;
-    
     FILE * f_ptr = fopen(file_loc, "rb");
-    
     if (f_ptr == NULL) {
         printf("Error: file cannot be opened.\n");
         goto failure;
@@ -29,13 +25,13 @@ uintmax_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t sta
     rewind(f_ptr);
     
     // check if it can fit into memory
-    if (file_size + start_loc > ADDR_T_MAX + 1) {
+    if (file_size + start_loc > ADDR_T_MAX + (size_t)1) {
         printf("Error: file too large.\n");
         goto failure;
     }
     
     // Attempt to read the entire file
-	uintmax_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
+	size_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
     
     if (words_read != file_size) {
         printf("Error: file read failure.\n");

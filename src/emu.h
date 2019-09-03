@@ -18,7 +18,6 @@
 
 #include "i8080/i8080.h"
 #include <stdio.h>
-#include <stdint.h>
 
 #include "i8080/internal/i8080_predef.h"
 
@@ -41,18 +40,8 @@ I8080_CDECL typedef struct emu_debug_args {
     emu_addr_t mem_dump_end_addr;           // The end address until which to dump memory.
 } emu_debug_args_t;
 
-/* The starting location of the CP/M Transient Program Area i.e. 
- * the first valid location to load a program written for CP/M. 
- * Set this environment with emu_set_cpm_env(). */
-I8080_CDECL_EXTERN const emu_addr_t CPM_START_OF_TPA; // = 0x0100
-// Port address that CP/M will use to read/write characters from/to a console
-I8080_CDECL_EXTERN const emu_word_t CPM_CONSOLE_ADDR; // = 0x00
-/* The first valid location to load a program with the default 
- * environment. Set this environment with emu_set_default_env(). */
-I8080_CDECL_EXTERN const emu_addr_t DEFAULT_START_PA; // = 0x0040
-
 /* Loads a file into memory. Returns number of words read. */
-I8080_CDECL uintmax_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
+I8080_CDECL size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
 
 // Initialize an i8080
 I8080_CDECL void emu_init_i8080(i8080 * const cpu);
@@ -67,7 +56,7 @@ I8080_CDECL void emu_init_i8080(i8080 * const cpu);
 I8080_CDECL void emu_set_cpm_env(i8080 * const cpu);
 /* Sets up the default emulator environment.
  * Creates an interrupt vector table at the top 64 bytes of memory,
- * and writes a RST 0 sequence that jumps to after the IVT (0x40, DEFAULT_START_PA). 
+ * and writes a RST 0 sequence that jumps to after the IVT (0x40, emu_consts.h/DEFAULT_START_PA). 
  * Call this after the emulator's memory streams have been initialized (cpu->read_memory & cpu->write_memory). */
 I8080_CDECL void emu_set_default_env(i8080 * const cpu);
 
