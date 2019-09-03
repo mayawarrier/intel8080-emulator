@@ -18,8 +18,9 @@
 
 #include "i8080/i8080.h"
 #include <stdio.h>
+#include "i8080/i8080_predef.h"
 
-typedef enum EMU_EXIT_CODES {
+I8080_CDECL typedef enum EMU_EXIT_CODES {
     EMU_ERR_MEM_STREAMS,        // A memory stream function (cpu->read_memory, cpu->write_memory) is not initialized.
     EMU_ERR_IO_STREAMS,         // An I/O request was made at runtime but an I/O stream function (cpu->port_in, cpu->port_out) was not initialized.
     EMU_ERR_MEMORY,             /* A memory location is not read/writ-able. Location of failure stored in cpu->pc.
@@ -28,7 +29,7 @@ typedef enum EMU_EXIT_CODES {
 } EMU_EXIT_CODE;
 
 // Args for emu debug mode.
-typedef struct emu_debug_args {
+I8080_CDECL typedef struct emu_debug_args {
     FILE * debug_out;                       // Stream that debug output should go to.
     _Bool should_dump_stats;                // Whether or not to dump status of all registers and flags after each instruction.
     _Bool should_dump_memory;               // Whether or not to dump contents of the memory after each instruction.
@@ -41,18 +42,18 @@ typedef struct emu_debug_args {
 /* The starting location of the CP/M Transient Program Area i.e. 
  * the first valid location to load a program written for CP/M. 
  * Set this environment with emu_set_cpm_env(). */
-extern const emu_addr_t CPM_START_OF_TPA; // = 0x0100
+I8080_CDECL_EXTERN const emu_addr_t CPM_START_OF_TPA; // = 0x0100
 // Port address that CP/M will use to read/write characters from/to a console
-extern const emu_word_t CPM_CONSOLE_ADDR; // = 0x00
+I8080_CDECL_EXTERN const emu_word_t CPM_CONSOLE_ADDR; // = 0x00
 /* The first valid location to load a program with the default 
  * environment. Set this environment with emu_set_default_env(). */
-extern const emu_addr_t DEFAULT_START_PA; // = 0x0040
+I8080_CDECL_EXTERN const emu_addr_t DEFAULT_START_PA; // = 0x0040
 
 /* Loads a file into memory. Returns number of words read. */
-size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
+I8080_CDECL size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
 
 // Initialize an i8080
-void emu_init_i8080(i8080 * const cpu);
+I8080_CDECL void emu_init_i8080(i8080 * const cpu);
 
 /* Sets up the environment for some basic CP/M 2.2 BIOS emulation.
  * Some programs written for the 8080 need this environment. At the moment, this only 
@@ -61,12 +62,12 @@ void emu_init_i8080(i8080 * const cpu);
  * RUN addr: Begins execution of a CP/M program starting at addr.
  * QUIT: Quits the emulator.
  * Call this after the emulator's memory streams have been initialized (cpu->read_memory & cpu->write_memory). */
-void emu_set_cpm_env(i8080 * const cpu);
+I8080_CDECL void emu_set_cpm_env(i8080 * const cpu);
 /* Sets up the default emulator environment.
  * Creates an interrupt vector table at the top 64 bytes of memory,
  * and writes a RST 0 sequence that jumps to after the IVT (0x40, DEFAULT_START_PA). 
  * Call this after the emulator's memory streams have been initialized (cpu->read_memory & cpu->write_memory). */
-void emu_set_default_env(i8080 * const cpu);
+I8080_CDECL void emu_set_default_env(i8080 * const cpu);
 
 /* Begin the emulator. Must have properly set up memory and streams first!
  * Returns an error code if the emulator was not initialized properly or failed the startup check. 
@@ -74,6 +75,8 @@ void emu_set_default_env(i8080 * const cpu);
  * If debug_args is not NULL, emulator will start in debug mode. In this mode, the emulator can print
  * the values of all flags and registers, and can dump the main memory after each instruction is executed to debug_out. 
  * See emu_debug_args to set options on how the output is presented. */
-EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args * debug_args);
+I8080_CDECL EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args * debug_args);
+
+#include "i8080_predef_undef.h"
 
 #endif /* EMU_H */
