@@ -3,140 +3,16 @@
  */
 
 #include "i8080.h"
-#include "i8080_opcodes.h"
-
- /* An attempt at providing portable synchronization functions.
-  *
-  * Use pthreads if available on POSIX. This is not standards-compliant with std::thread,
-  * but on systems with pthreads, std::thread is just a wrapper around pthreads:
-  * https://stackoverflow.com/questions/37110571/when-to-use-pthread-mutex-t
-  *
-  * Use CRITICAL_SECTION on Windows. It seems to be implemented similarly in
-  * tinycthread: https://github.com/tinycthread/tinycthread
-  */
-
-  /* i8080_mutex_init() -> Initialize a mutex.
-   * i8080_mutex_lock() -> Waits until the mutex is released, then locks it and takes over control.
-   * i8080_mutex_unlock() -> Unlocks/releases a mutex.
-   * i8080_mutex_destroy() -> Destroys a mutex. */
-
-#include "i8080_predef.h"
-#ifdef I8080_WINDOWS_MIN_VER
-
-	static inline void i8080_mutex_init(i8080_mutex_t * handle) {
-		/* Initializing with a spin count can hugely improve performance,
-		 * by avoiding a kernel call for short critical sections:
-		 * https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-initializecriticalsectionandspincount */
-		InitializeCriticalSectionAndSpinCount(handle, 4000);
-	}
-
-	static inline void i8080_mutex_lock(i8080_mutex_t * handle) {
-		EnterCriticalSection(handle);
-	}
-
-	static inline void i8080_mutex_unlock(i8080_mutex_t * handle) {
-		LeaveCriticalSection(handle);
-	}
-
-	static inline void i8080_mutex_destroy(i8080_mutex_t * handle) {
-		DeleteCriticalSection(handle);
-	}
-
-#elif defined(I8080_POSIX_MIN_VER)
-
-	static inline void i8080_mutex_init(void * handle) {
-		pthread_mutex_init(handle, NULL);
-	}
-
-	static inline void i8080_mutex_lock(void * handle) {
-		pthread_mutex_lock(handle);
-	}
-
-	static inline void i8080_mutex_unlock(void * handle) {
-		pthread_mutex_unlock(handle);
-	}
-
-	static inline void i8080_mutex_destroy(void * handle) {
-		pthread_mutex_destroy(handle);
-	}
-
-#elif defined(I8080_GNUC_MIN_VER)
-
-	static inline void i8080_mutex_init(i8080_mutex_t * handle) {
-		// Puts the mutex in unlocked state
-		*handle = (i8080_mutex_t)0;
-	}
-
-	static inline void i8080_mutex_lock(i8080_mutex_t * handle) {
-		// Stay here until the mutex is unlocked
-		while (__atomic_load_n(handle, __ATOMIC_ACQUIRE) != (i8080_mutex_t)0);
-		// Lock the mutex
-		__atomic_store_n(handle, (i8080_mutex_t)1, __ATOMIC_RELEASE);
-	}
-
-	static inline void i8080_mutex_unlock(i8080_mutex_t * handle) {
-		__atomic_store_n(handle, (i8080_mutex_t)0, __ATOMIC_RELEASE);
-	}
-
-	static inline void i8080_mutex_destroy(i8080_mutex_t * handle) {
-		(void)handle;
-	}
-
-#else
-
-	// I8080_UNIDENTIFIED
-
-	static inline void i8080_mutex_init(i8080_mutex_t * handle) {
-		// init as unlocked
-		*handle = 0;
-	}
-
-	static inline void i8080_mutex_lock(i8080_mutex_t * handle) {
-		// wait until unlocked
-		while (*handle != 0);
-		// lock
-		*handle = 1;
-	}
-
-	static inline void i8080_mutex_unlock(i8080_mutex_t * handle) {
-		*handle = 0;
-	}
-
-	static inline void i8080_mutex_destroy(i8080_mutex_t * handle) {
-		// nothing to do
-		(void)handle;
-	}
-
-#endif
-#include "i8080_predef_undef.h"
-
-// Defines to initialize const variables
-#define HALF_WORD_SIZE_def (4)
-#define HALF_ADDR_SIZE_def (8)
-#define WORD_T_MAX_def UINT8_MAX
-#define ADDR_T_MAX_def UINT16_MAX
-
-// Format specs and sizes for emu_word_t and emu_addr_t, externed in i8080.h.
-const size_t HALF_WORD_SIZE = HALF_WORD_SIZE_def;
-const size_t HALF_ADDR_SIZE = HALF_ADDR_SIZE_def;
-const emu_word_t WORD_T_MAX = WORD_T_MAX_def;
-const emu_addr_t ADDR_T_MAX = ADDR_T_MAX_def;
-const char WORD_T_FORMAT[] = "0x%02x";
-const char ADDR_T_FORMAT[] = "0x%04x";
-const char WORD_T_PRT_FORMAT[] = "%c";
+#include "internal/i8080_opcodes.h"
+#include "internal/i8080_consts.h"
+#include "internal/i8080_sync.h"
 
 // For internal use
-static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE_def) - (emu_word_t)1;
-static const emu_word_t WORD_HI_F = (((emu_word_t)1 << HALF_WORD_SIZE_def) - (emu_word_t)1) << HALF_WORD_SIZE_def;
-static const emu_buf_t BUF_HI_WORD_MAX = (emu_buf_t)WORD_T_MAX_def << (HALF_WORD_SIZE_def * 2);
+static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1;
+static const emu_word_t WORD_HI_F = (((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1) << HALF_WORD_SIZE;
+static const emu_buf_t BUF_HI_WORD_MAX = (emu_buf_t)WORD_T_MAX << (HALF_WORD_SIZE * 2);
 // Conditional RETs and CALLs (subroutine ops) take 6 cycles longer if the condition is true.
 static const emu_large_t SUBROUTINE_CYCLES_OFFSET = 6;
-
-// Undef these, not required anymore
-#undef HALF_WORD_SIZE_def
-#undef HALF_ADDR_SIZE_def
-#undef WORD_T_MAX_def
-#undef ADDR_T_MAX_def
 
 /* This cycles table sourced from:
  * https://github.com/superzazu/8080/blob/master/i8080.c
@@ -498,7 +374,7 @@ static void i8080_dad(i8080 * const cpu, emu_addr_t reg_pair) {
     // Adds reg_pair, buffering to compute carry
     emu_addr_t hl = i8080_get_hl(cpu);
     emu_buf_t hl_buf = (emu_buf_t)hl + reg_pair;
-	i8080_set_hl(cpu, (emu_addr_t)hl_buf;
+	i8080_set_hl(cpu, (emu_addr_t)hl_buf);
     cpu->cy = get_buf_bit(hl_buf, HALF_ADDR_SIZE * 2);
 }
 
