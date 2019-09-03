@@ -4,7 +4,8 @@
 
 #include "emu.h"
 #include "emu_debug.h"
-#include "i8080/i8080_opcodes.h"
+#include "i8080/internal/i8080_opcodes.h"
+#include "i8080/internal/i8080_consts.h"
 #include <string.h>
 
 const emu_word_t CPM_CONSOLE_ADDR = 0x00;
@@ -143,8 +144,8 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             
             command_run: {
                 // Write JMP addr to the bytes immediately after
-                emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
-                emu_word_t hi_addr = (emu_word_t)((run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
+				emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
+                emu_word_t hi_addr = (emu_word_t)((emu_addr_t)(run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
                 cpu->write_memory(0xe401, i8080_JMP);
                 cpu->write_memory(0xe402, lo_addr);
                 cpu->write_memory(0xe403, hi_addr);
