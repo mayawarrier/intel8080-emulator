@@ -38,16 +38,14 @@ static emu_word_t cpm_env_port_in(emu_addr_t addr) {
 struct emu_runtime_args {
     i8080 * const cpu;
     _Bool perform_startup_check;
-    emu_debug_args * const debug_args;
-    EMU_EXIT_CODE exit_code;
+    emu_debug_args_t * const debug_args;
+	emu_exit_code_t exit_code;
 };
 
 static void * emu_runtime_thread(void * args) { 
     struct emu_runtime_args * emu_args = (struct emu_runtime_args *)args;
     // Begin the emulator.
     emu_args->exit_code = emu_runtime(emu_args->cpu, emu_args->perform_startup_check, emu_args->debug_args);
-    // Destroy i8080 when emulator quits.
-    i8080_destroy(emu_args->cpu);
     return NULL;
 }
 

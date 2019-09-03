@@ -50,7 +50,7 @@ static const char * DEBUG_DISASSEMBLY_TABLE[] = {
 	"rst 6", "rm", "sphl", "jm $", "ei", "cm $", "undocumented", "cpi #", "rst 7"
 };
 
-void dump_memory(i8080 * const cpu, const emu_debug_args * args) {
+void dump_memory(i8080 * const cpu, const emu_debug_args_t * args) {
     if (args->debug_out != NULL) {
         fprintf(args->debug_out, "**** Memory dump: ****\n");
         for (emu_addr_t i = args->mem_dump_start_addr; i <= args->mem_dump_end_addr; ++i) {
@@ -85,11 +85,11 @@ void dump_cpu_stats(i8080 * const cpu, FILE * const stream) {
 }
 
 // Debug args to be used with debug next
-static emu_debug_args * DEBUG_ARGS;
+static emu_debug_args_t * DEBUG_ARGS;
 
 /* i8080_debug_next() is expected to have the signature _Bool (*)(i8080 * const),
  * so the options have to be passed in separately. */
-void set_debug_next_options(emu_debug_args * args) {
+void set_debug_next_options(emu_debug_args_t * args) {
 	// Maximum size of mem_dump_format, including NULL
 	const int EMU_DEBUG_FMAX = 128;
     // Check if mem_dump_format is a valid string and format specifier

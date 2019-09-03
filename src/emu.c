@@ -294,7 +294,7 @@ static _Bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
     return 1;
 }
 
-EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args * d_args) {
+emu_exit_code_t emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args_t * d_args) {
     
     if (cpu->read_memory == NULL || cpu->write_memory == NULL) {
         return EMU_ERR_MEM_STREAMS;

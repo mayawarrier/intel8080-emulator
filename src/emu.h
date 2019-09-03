@@ -20,13 +20,13 @@
 #include <stdio.h>
 #include "i8080/i8080_predef.h"
 
-I8080_CDECL typedef enum EMU_EXIT_CODES {
+I8080_CDECL typedef enum EMU_EXIT_CODE {
     EMU_ERR_MEM_STREAMS,        // A memory stream function (cpu->read_memory, cpu->write_memory) is not initialized.
     EMU_ERR_IO_STREAMS,         // An I/O request was made at runtime but an I/O stream function (cpu->port_in, cpu->port_out) was not initialized.
     EMU_ERR_MEMORY,             /* A memory location is not read/writ-able. Location of failure stored in cpu->pc.
                                  * This error can only be triggered by the startup check. */
     EMU_EXIT_SUCCESS            // Successful run.
-} EMU_EXIT_CODE;
+} emu_exit_code_t;
 
 // Args for emu debug mode.
 I8080_CDECL typedef struct emu_debug_args {
@@ -37,7 +37,7 @@ I8080_CDECL typedef struct emu_debug_args {
     int mem_dump_newline_after;             // The number of words after which a newline is inserted in the memory dump.
     emu_addr_t mem_dump_start_addr;         // The start address from which to dump memory.
     emu_addr_t mem_dump_end_addr;           // The end address until which to dump memory.
-} emu_debug_args;
+} emu_debug_args_t;
 
 /* The starting location of the CP/M Transient Program Area i.e. 
  * the first valid location to load a program written for CP/M. 
@@ -75,7 +75,7 @@ I8080_CDECL void emu_set_default_env(i8080 * const cpu);
  * If debug_args is not NULL, emulator will start in debug mode. In this mode, the emulator can print
  * the values of all flags and registers, and can dump the main memory after each instruction is executed to debug_out. 
  * See emu_debug_args to set options on how the output is presented. */
-I8080_CDECL EMU_EXIT_CODE emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args * debug_args);
+I8080_CDECL emu_exit_code_t emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args_t * debug_args);
 
 #include "i8080_predef_undef.h"
 
