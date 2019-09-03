@@ -2,6 +2,7 @@
  * Implement emu_debug.h
  */
 
+#include "i8080/internal/i8080_types.h"
 #include "i8080/internal/i8080_opcodes.h"
 #include "i8080/internal/i8080_consts.h"
 #include "i8080/internal/i8080_sync.h"
@@ -113,7 +114,7 @@ void set_debug_next_options(emu_debug_args_t * args) {
 
 _Bool i8080_debug_next(i8080 * const cpu) {
     // Get the opcode
-    emu_mutex_lock(&cpu->i_mutex);
+    i8080_mutex_lock(&cpu->i_mutex);
     emu_word_t opcode;
     if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
         opcode = cpu->interrupt_acknowledge();
@@ -125,7 +126,7 @@ _Bool i8080_debug_next(i8080 * const cpu) {
             opcode = cpu->read_memory(cpu->pc++);
         }
     }
-    emu_mutex_unlock(&cpu->i_mutex);
+    i8080_mutex_unlock(&cpu->i_mutex);
     
     _Bool success = 0;
     
