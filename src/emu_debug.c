@@ -66,15 +66,15 @@ void dump_memory(i8080 * const cpu, const emu_debug_args_t * args) {
 void dump_cpu_stats(i8080 * const cpu, FILE * const stream) {
     if (stream != NULL) {
         fprintf(stream, "**** CPU status: ****\n");
-        fprintf(stream, "A: " WORD_T_FORMAT ", ", cpu->a);
-        fprintf(stream, "B: " WORD_T_FORMAT ", ", cpu->b);
-        fprintf(stream, "C: " WORD_T_FORMAT ",\n", cpu->c);
-        fprintf(stream, "D: " WORD_T_FORMAT ", ", cpu->d);
-        fprintf(stream, "E: " WORD_T_FORMAT ", ", cpu->e);
-        fprintf(stream, "H: " WORD_T_FORMAT ", ", cpu->h);
-        fprintf(stream, "L: " WORD_T_FORMAT ",\n", cpu->l);
-        fprintf(stream, "PC: " ADDR_T_FORMAT ", ", cpu->pc);
-        fprintf(stream, "SP: " ADDR_T_FORMAT "\n", cpu->sp);
+        fprintf(stream, "A: ", WORD_T_FORMAT, ", ", cpu->a);
+        fprintf(stream, "B: ", WORD_T_FORMAT, ", ", cpu->b);
+        fprintf(stream, "C: ", WORD_T_FORMAT, ",\n", cpu->c);
+        fprintf(stream, "D: ", WORD_T_FORMAT, ", ", cpu->d);
+        fprintf(stream, "E: ", WORD_T_FORMAT, ", ", cpu->e);
+        fprintf(stream, "H: ", WORD_T_FORMAT, ", ", cpu->h);
+        fprintf(stream, "L: ", WORD_T_FORMAT, ",\n", cpu->l);
+        fprintf(stream, "PC: ", ADDR_T_FORMAT, ", ", cpu->pc);
+        fprintf(stream, "SP: ", ADDR_T_FORMAT, "\n", cpu->sp);
         fprintf(stream, "Zero: %d, ", cpu->z);
         fprintf(stream, "Sign: %d, ", cpu->s);
         fprintf(stream, "Parity: %d,\n", cpu->p);

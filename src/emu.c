@@ -10,10 +10,8 @@
 const emu_word_t CPM_CONSOLE_ADDR = 0x00;
 const emu_addr_t DEFAULT_START_PA = 0x40;
 const emu_addr_t CPM_START_OF_TPA = 0x100;
-// The console port address duplicated across 16-bit address bus for use with port out
-static const emu_addr_t CONSOLE_ADDR_FULL = (emu_addr_t)((CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
 
-size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc) {
+uintmax_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc) {
     
     size_t file_size = 0;
     
@@ -36,7 +34,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
     }
     
     // Attempt to read the entire file
-    size_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
+	uintmax_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
     
     if (words_read != file_size) {
         printf("Error: file read failure.\n");
@@ -53,7 +51,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
 }
 
 // Prints the string at str_addr to CPM console, terminated by '$'
-static void cpm_print_str(i8080 * const cpu, emu_addr_t str_addr) {
+static void cpm_print_str(emu_addr_t console_addr, emu_addr_t str_addr, i8080 * const cpu) {
     // Print each character until we hit a '$'
     while (1) {
         emu_word_t str_char = cpu->read_memory(str_addr);
@@ -61,7 +59,7 @@ static void cpm_print_str(i8080 * const cpu, emu_addr_t str_addr) {
             break;
         } else {
             // cpu->port_out can decide how to format the characters
-            cpu->port_out(CONSOLE_ADDR_FULL, str_char);
+            cpu->port_out(console_addr, str_char);
             str_addr++;
         }
     }
@@ -73,6 +71,8 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
     
     i8080 * const cpu = (i8080 * const)udata;
 
+	// The console port address duplicated across 16-bit address bus for use with port out
+	const emu_addr_t CONSOLE_ADDR_FULL = (emu_addr_t)((CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
     // The return address on the stack
     emu_addr_t ret_addr = (cpu->read_memory(cpu->sp + (emu_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
     
@@ -93,10 +93,10 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             const emu_addr_t CMD_PROMPT_PTR = HELP_MSG_PTR + 0x78;      // "> "
             
             // Print startup message
-            cpm_print_str(cpu, STARTUP_MSG_PTR);
+            cpm_print_str(CONSOLE_ADDR_FULL, STARTUP_MSG_PTR, cpu);
             
-            // Max length, excluding trailing null
-            const int LEN_INPUT_BUF = 127;
+            // Max length, excluding trailing null (MSVC cannot initialize arrays with const values)
+			#define LEN_INPUT_BUF 127
             emu_word_t input_buf[LEN_INPUT_BUF + 1];
             
             // Address from RUN command
@@ -105,7 +105,7 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             // Keep getting input from the console until a valid command is entered
             while(1) {
                 // Prints a prompt "> "
-                cpm_print_str(cpu, CMD_PROMPT_PTR);
+                cpm_print_str(CONSOLE_ADDR_FULL, CMD_PROMPT_PTR, cpu);
                 // reset buffer
                 int buf_loc = 0;
                 
@@ -122,18 +122,20 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
                     if (sscanf(&input_buf[4], ADDR_T_FORMAT, &run_addr) == 1
                             && run_addr >= 0 && run_addr <= 0xffff) {
                         // address is in correct format and within bounds
+						#undef LEN_INPUT_BUF
                         goto command_run;
                     } else {
                         // Invalid address error
-                        cpm_print_str(cpu, ERROR_ADDR_PTR);
+                        cpm_print_str(CONSOLE_ADDR_FULL, ERROR_ADDR_PTR, cpu);
                     }
                 } else if (strncmp(input_buf, "QUIT", 4) == 0) {
+					#undef LEN_INPUT_BUF
                     goto command_quit;
                 } else if (strncmp(input_buf, "HELP", 4) == 0) {
-                    cpm_print_str(cpu, HELP_MSG_PTR);
+                    cpm_print_str(CONSOLE_ADDR_FULL, HELP_MSG_PTR, cpu);
                 } else {
                     // Invalid command error
-                    cpm_print_str(cpu, ERROR_CMD_PTR);
+                    cpm_print_str(CONSOLE_ADDR_FULL, ERROR_CMD_PTR, cpu);
                 }
                 // Print a newline
                 cpu->port_out(CONSOLE_ADDR_FULL, '\n');
@@ -164,7 +166,7 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
                     // Writes an output string terminated by '$'
                     // Address of string is {DE}
                     emu_addr_t str_addr = (emu_addr_t)((cpu->d << HALF_ADDR_SIZE) | cpu->e);
-                    cpm_print_str(cpu, str_addr);
+                    cpm_print_str(CONSOLE_ADDR_FULL, str_addr, cpu);
                     break;
                 }
 
@@ -231,14 +233,14 @@ void emu_set_cpm_env(i8080 * const cpu) {
         for (int i = 0; i < 5; ++i) {
             msg = CMD_MSGS[i];
 			msg_len = strlen(msg);
-            for (int j = 0; j < msglen; ++j) {
+            for (int j = 0; j < msg_len; ++j) {
                 cpu->write_memory(msgs_loc++, msg[j]);
             }
         }
         
         // HLT for the rest of the interrupts
         for (int i = 1; i < 8; ++i) {
-            cpu->write_memory(INTERRUPT_TABLE[i], HLT);
+            cpu->write_memory(INTERRUPT_TABLE[i], i8080_HLT);
         }
 
         cpu->emu_ext_call = i8080_cpm_zero_page;
@@ -254,7 +256,7 @@ void emu_set_default_env(i8080 * const cpu) {
         // Do not write to RST 1 sequence, we'll put our bootloader there instead
         for (int i = 1; i < 8; ++i) {
             // HLT for all interrupts
-            cpu->write_memory(INTERRUPT_TABLE[i], HLT);
+            cpu->write_memory(INTERRUPT_TABLE[i], i8080_HLT);
         }
 
         // Write a default bootloader that jumps to start of program memory

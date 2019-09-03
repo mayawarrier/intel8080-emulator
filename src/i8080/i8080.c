@@ -706,7 +706,7 @@ _Bool i8080_next(i8080 * const cpu) {
     }
     i8080_mutex_unlock(&cpu->i_mutex);
     
-	bool success;
+	_Bool success;
     if (!cpu->is_halted) {
 		// Execute the opcode
         success = i8080_exec(cpu, opcode);
