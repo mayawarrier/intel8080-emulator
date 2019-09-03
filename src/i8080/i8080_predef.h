@@ -50,4 +50,16 @@
 	#define I8080_GNUC_MIN_VER
 #endif
 
+// Allow C++ compilers to link to C headers
+#ifdef __cplusplus
+	// if compiled with C++, extern as C
+	#define I8080_CDECL extern "C"
+	#define I8080_CDECL_EXTERN extern "C"
+#else
+	// if compiled with C, no extern required
+	#define I8080_CDECL
+	// regular c99 extern if compiled with C
+	#define I8080_CDECL_EXTERN extern
+#endif
+
 #endif /* I8080_PREDEF_H */
