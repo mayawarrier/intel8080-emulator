@@ -19,7 +19,7 @@ static void cpm_env_port_out(emu_addr_t addr, emu_word_t word) {
     // Address is duplicated, pick lower 8 bits
     emu_word_t port_addr = (emu_word_t)(addr & WORD_T_MAX);
     if (port_addr == CPM_CONSOLE_ADDR) {
-        printf(WORD_T_PRT_FORMAT, word);
+        printf(WORD_T_ASCII_FORMAT, word);
         // Some OSs buffer stdout, flush this buffer so that future scanfs
         // don't read from this buffer but from stdin instead
         fflush(stdout);
@@ -32,7 +32,7 @@ static emu_word_t cpm_env_port_in(emu_addr_t addr) {
      // Address is duplicated, pick lower 8 bits
     emu_word_t port_addr = (emu_word_t)(addr & WORD_T_MAX);
     if (port_addr == CPM_CONSOLE_ADDR) {
-        scanf(WORD_T_PRT_FORMAT, &rw);
+        scanf(WORD_T_ASCII_FORMAT, &rw);
     }
     return rw;
 }
