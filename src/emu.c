@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdint.h>
 
-size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc) {
+size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc) {
     
     size_t file_size = 0;
     FILE * f_ptr = fopen(file_loc, "rb");
@@ -48,10 +48,11 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_
 }
 
 // Prints the string at str_addr to CPM console, terminated by '$'
-static void cpm_print_str(emu_addr_t console_addr, emu_addr_t str_addr, i8080 * const cpu) {
+static void cpm_print_str(const emu_addr_t console_addr, emu_addr_t str_addr, i8080 * const cpu) {
     // Print each character until we hit a '$'
+	emu_word_t str_char;
     while (1) {
-        emu_word_t str_char = cpu->read_memory(str_addr);
+        str_char = cpu->read_memory(str_addr);
         if (str_char == '$') {
             break;
         } else {
@@ -69,9 +70,9 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
     i8080 * const cpu = (i8080 * const)udata;
 
 	// The console port address duplicated across 16-bit address bus for use with port out
-	const emu_addr_t CONSOLE_ADDR_FULL = (emu_addr_t)((CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
+	const emu_addr_t CONSOLE_ADDR_FULL = ((emu_addr_t)(CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
     // The return address on the stack
-    emu_addr_t ret_addr = (cpu->read_memory(cpu->sp + (emu_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
+    const emu_addr_t ret_addr = (emu_addr_t)(cpu->read_memory(cpu->sp + (emu_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
     
     switch(ret_addr) {
         
@@ -92,9 +93,11 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             // Print startup message
             cpm_print_str(CONSOLE_ADDR_FULL, STARTUP_MSG_PTR, cpu);
             
-            // Max length, excluding trailing null (MSVC cannot initialize arrays with const values)
+            // Max length, excluding trailing null
 			#define LEN_INPUT_BUF 127
             emu_word_t input_buf[LEN_INPUT_BUF + 1];
+			size_t buf_loc = 0;
+			emu_word_t buf_ch;
             
             // Address from RUN command
             emu_addr_t run_addr;
@@ -104,20 +107,19 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
                 // Prints a prompt "> "
                 cpm_print_str(CONSOLE_ADDR_FULL, CMD_PROMPT_PTR, cpu);
                 // reset buffer
-                int buf_loc = 0;
+				buf_loc = 0;
                 
                 // Get console input till end of line
                 while (buf_loc != LEN_INPUT_BUF) {
-                    emu_word_t ch = cpu->port_in(CONSOLE_ADDR_FULL);
-                    if (ch == '\n') break;
-                    input_buf[buf_loc++] = ch;
+                    buf_ch = cpu->port_in(CONSOLE_ADDR_FULL);
+                    if (buf_ch == '\n') break;
+                    input_buf[buf_loc++] = buf_ch;
                 }
                 input_buf[buf_loc] = '\0';
 
                 // Process commands
                 if (strncmp(input_buf, "RUN ", 4) == 0) {
-                    if (sscanf(&input_buf[4], ADDR_T_FORMAT, &run_addr) == 1
-                            && run_addr >= 0 && run_addr <= 0xffff) {
+                    if (sscanf(&input_buf[4], ADDR_T_FORMAT, &run_addr) == 1 && run_addr >= 0 && run_addr <= 0xffff) {
                         // address is in correct format and within bounds
 						#undef LEN_INPUT_BUF
                         goto command_run;
@@ -140,8 +142,8 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             
             command_run: {
                 // Write JMP addr to the bytes immediately after
-				emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
-                emu_word_t hi_addr = (emu_word_t)((emu_addr_t)(run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
+				const emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
+                const emu_word_t hi_addr = (emu_word_t)((emu_addr_t)(run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
                 cpu->write_memory(0xe401, i8080_JMP);
                 cpu->write_memory(0xe402, lo_addr);
                 cpu->write_memory(0xe403, hi_addr);
@@ -155,14 +157,12 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
         {
             // This is a BDOS call
             // BDOS arg is stored in C
-            int operation = cpu->c;
-
-            switch(operation) {
+            switch(cpu->c) {
                 case 9:
                 {
                     // Writes an output string terminated by '$'
                     // Address of string is {DE}
-                    emu_addr_t str_addr = (emu_addr_t)((cpu->d << HALF_ADDR_SIZE) | cpu->e);
+                    const emu_addr_t str_addr = ((emu_addr_t)(cpu->d << HALF_ADDR_SIZE) | cpu->e);
                     cpm_print_str(CONSOLE_ADDR_FULL, str_addr, cpu);
                     break;
                 }
@@ -223,20 +223,23 @@ void emu_set_cpm_env(i8080 * const cpu) {
             "\nRUN addr: Start executing instructions from addr. For eg. RUN 0x0100\nHELP: Bring up this list of commands.\nQUIT: quit\n$",
             "> $"
         };
-        
-        // Store messages from 0xe410
+
+		// loop indices
+		size_t i, j;
+
+		// Store messages from 0xe410
         emu_addr_t msgs_loc = 0xe410;
-		char * msg; int msg_len;
-        for (int i = 0; i < 5; ++i) {
+		char * msg; size_t msg_len;
+        for (i = 0; i < 5; ++i) {
             msg = CMD_MSGS[i];
 			msg_len = strlen(msg);
-            for (int j = 0; j < msg_len; ++j) {
+            for (j = 0; j < msg_len; ++j) {
                 cpu->write_memory(msgs_loc++, msg[j]);
             }
         }
         
         // HLT for the rest of the interrupts
-        for (int i = 1; i < 8; ++i) {
+        for (i = 1; i < 8; ++i) {
             cpu->write_memory(INTERRUPT_TABLE[i], i8080_HLT);
         }
 
@@ -251,7 +254,8 @@ void emu_set_default_env(i8080 * const cpu) {
     if (cpu->write_memory != NULL) {
         // Create the interrupt vector table
         // Do not write to RST 1 sequence, we'll put our bootloader there instead
-        for (int i = 1; i < 8; ++i) {
+		size_t i;
+        for (i = 1; i < 8; ++i) {
             // HLT for all interrupts
             cpu->write_memory(INTERRUPT_TABLE[i], i8080_HLT);
         }
@@ -277,13 +281,14 @@ void emu_init_i8080(i8080 * const cpu) {
 
 // Writes test_word to all locations, then reads test_word from all locations.
 // Returns 0 if a read failed to return test_word, and stores the failed location in cpu->pc.
-static _Bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
+static _Bool memory_write_read_pass(i8080 * const cpu, const emu_word_t test_word) {
     // Write pass
-    for (emu_addr_t i = 0; i <= ADDR_T_MAX; ++i) {
+	emu_addr_t i = 0;
+    for (i = 0; i <= ADDR_T_MAX; ++i) {
         cpu->write_memory(i, test_word);
     }
     // Read pass
-    for (emu_addr_t i = 0; i <= ADDR_T_MAX; ++i) {
+    for (i = 0; i <= ADDR_T_MAX; ++i) {
         if (cpu->read_memory(i) != test_word) {
             // indicate to user which location failed
             cpu->pc = i;
@@ -293,7 +298,7 @@ static _Bool memory_write_read_pass(i8080 * const cpu, emu_word_t test_word) {
     return 1;
 }
 
-emu_exit_code_t emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args_t * d_args) {
+emu_exit_code_t emu_runtime(i8080 * const cpu, const _Bool perform_startup_check, emu_debug_args_t * d_args) {
     
     if (cpu->read_memory == NULL || cpu->write_memory == NULL) {
         return EMU_ERR_MEM_STREAMS;

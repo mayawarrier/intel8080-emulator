@@ -41,7 +41,7 @@ I8080_CDECL typedef struct emu_debug_args {
 } emu_debug_args_t;
 
 /* Loads a file into memory. Returns number of words read. */
-I8080_CDECL size_t memory_load(const char * file_loc, emu_word_t * memory, emu_addr_t start_loc);
+I8080_CDECL size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc);
 
 // Initialize an i8080
 I8080_CDECL void emu_init_i8080(i8080 * const cpu);
@@ -66,7 +66,7 @@ I8080_CDECL void emu_set_default_env(i8080 * const cpu);
  * If debug_args is not NULL, emulator will start in debug mode. In this mode, the emulator can print
  * the values of all flags and registers, and can dump the main memory after each instruction is executed to debug_out. 
  * See emu_debug_args to set options on how the output is presented. */
-I8080_CDECL emu_exit_code_t emu_runtime(i8080 * const cpu, _Bool perform_startup_check, emu_debug_args_t * debug_args);
+I8080_CDECL emu_exit_code_t emu_runtime(i8080 * const cpu, const _Bool perform_startup_check, emu_debug_args_t * debug_args);
 
 #include "i8080/internal/i8080_predef_undef.h"
 
