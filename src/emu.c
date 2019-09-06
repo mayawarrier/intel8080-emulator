@@ -73,7 +73,7 @@ static void cpm_print_str(const emu_addr_t console_addr, emu_addr_t str_addr, i8
 
 // Provides limited emulation of CP/M BDOS and zero page. At the moment, this only works with BDOS op 2 and 9, and WBOOT.
 // WBOOT launches into a simple command processor so programs can be run and the emulator can quit.
-static _Bool i8080_cpm_zero_page(void * const udata) {
+static int i8080_cpm_zero_page(void * const udata) {
     
     i8080 * const cpu = (i8080 * const)udata;
 
@@ -286,10 +286,10 @@ void emu_init_i8080(i8080 * const cpu) {
 
 // Writes test_word to all locations, then reads test_word from all locations.
 // Returns 0 if a read failed to return test_word, and stores the failed location in cpu->pc.
-static _Bool memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const emu_word_t test_word, const _Bool descriptive) {
+static int memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const emu_word_t test_word, const int descriptive) {
 	size_t i = 0;
 	if (descriptive) {
-		_Bool success = 1;
+		int success = 1;
 		// Write pass
 		printf("Write pass: " WORD_T_PRT_FORMAT "\n", test_word);
 		for (i = start_addr; i <= end_addr; ++i) {
@@ -327,7 +327,7 @@ static _Bool memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_ad
 	}
 }
 
-_Bool memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const _Bool descriptive) {
+int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const int descriptive) {
 	if (descriptive) printf("Checking memory...\n");
 	// Pass 1
 	if (!memory_write_read_pass(cpu, start_addr, end_addr, 0x55, descriptive)) return 0;
@@ -344,7 +344,7 @@ emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * d_args) {
     }
     
     // If in debug mode, this is overridden by i8080_debug_next
-    _Bool (* i8080_next_ovrd)(i8080 * const) = i8080_next;
+    int (* i8080_next_ovrd)(i8080 * const) = i8080_next;
     
     if(d_args != NULL) {
         // In debug mode, override i8080_next()

@@ -21,11 +21,11 @@ I8080_CDECL typedef struct i8080 {
     
     // Flags: sign, zero, auxiliary carry,
     // carry, parity, interrupt enable
-    _Bool s, z, acy, cy, p, ie;
+    int s, z, acy, cy, p, ie;
     
     // True if in HALT state. Only interrupts
     // and RESET can bring i8080 out of this state. 
-    _Bool is_halted;
+    int is_halted;
     
     // provide your own read/write streams
     
@@ -46,7 +46,7 @@ I8080_CDECL typedef struct i8080 {
      * and provides a reference to the i8080.
      * Return true if i8080 should continue 
      * execution after this call. */
-    _Bool (* emu_ext_call)(void * const);
+    int (* emu_ext_call)(void * const);
     // Records the last instruction executed.
     // Can be used to debug upon emu_ext_call.
     emu_word_t last_instr_exec;
@@ -58,7 +58,7 @@ I8080_CDECL typedef struct i8080 {
      * are disabled again. */
     emu_word_t (* interrupt_acknowledge)(void);
     // Whether there is a pending interrupt request to service.
-    _Bool pending_interrupt_req;
+    int pending_interrupt_req;
     
     /* When an interrupt comes on another thread,
      * this mutex is used to sync i8080 status
@@ -81,11 +81,11 @@ I8080_CDECL void i8080_reset(i8080 * const cpu);
 
 /* Executes the next instruction. If an interrupt is pending, services it.
  * Returns 0 if it isn't safe to continue execution. */
-I8080_CDECL _Bool i8080_next(i8080 * const cpu);
+I8080_CDECL int i8080_next(i8080 * const cpu);
 
 /* Executes the opcode on cpu, updating its cycle count, registers and flags.
  * Returns 0 if it isn't safe to continue execution. */
-I8080_CDECL _Bool i8080_exec(i8080 * const cpu, emu_word_t opcode);
+I8080_CDECL int i8080_exec(i8080 * const cpu, emu_word_t opcode);
 
 /* Sends an interrupt to the i8080. This is thread-safe, and it will be serviced when the i8080 is ready. 
  * If your compiler/environment does not support mutexes, this may not work correctly. See i8080.c for implementation.

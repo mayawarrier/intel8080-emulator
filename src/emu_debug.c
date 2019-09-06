@@ -54,9 +54,9 @@ static const char * const DEBUG_DISASSEMBLY_TABLE[] = {
 };
 
 // Checks if format spec has a max of 128 chars, and can be applied to an emu_word_t.
-static _Bool is_valid_format_spec(const char * f) {
+static int is_valid_format_spec(const char * f) {
 	// Check if f is a valid string and format specifier
-	_Bool is_valid_str = 0;
+	int is_valid_str = 0;
 	// Maximum size is 128, including trailing null
 	for (size_t i = 0; i < 128; ++i) {
 		if (f[i] == '\0') {
@@ -66,25 +66,25 @@ static _Bool is_valid_format_spec(const char * f) {
 	}
 	// check if this format can actually be applied to a word
 	emu_word_t out_word;
-	_Bool is_valid_format = (sscanf("0x38", f, &out_word) == 1);
+	int is_valid_format = (sscanf("0x38", f, &out_word) == 1);
 
 	return is_valid_str && is_valid_format;
 }
 
-static inline _Bool in_range(size_t num, size_t lt_bound, size_t rt_bound, _Bool inclusive) {
+static inline int in_range(size_t num, size_t lt_bound, size_t rt_bound, int inclusive) {
 	if (inclusive) return (num >= lt_bound && num <= rt_bound);
 	else return (num > lt_bound && num < rt_bound);
 }
 
-static inline _Bool is_valid_args(const emu_debug_args_t * args) {
+static inline int is_valid_args(const emu_debug_args_t * args) {
 	return (args->debug_out != NULL && 
 		is_valid_format_spec(args->mem_dump_format) && 
 		in_range(args->mem_dump_start_addr, 0, ADDR_T_MAX, 1) && 
 		in_range(args->mem_dump_end_addr, 0, ADDR_T_MAX, 1) &&
 		args->mem_dump_end_addr >= args->mem_dump_start_addr &&
 		in_range(args->mem_dump_newline_after, 1, ADDR_T_MAX, 1) &&
-		(_Bool)args->should_dump_memory == args->should_dump_memory &&
-		(_Bool)args->should_dump_stats == args->should_dump_stats);
+		(int)args->should_dump_memory == args->should_dump_memory &&
+		(int)args->should_dump_stats == args->should_dump_stats);
 }
 
 // Dump memory without validation checks
@@ -127,14 +127,14 @@ void dump_cpu_stats(i8080 * const cpu, FILE * const stream) {
 // Debug args to be used with debug next
 static emu_debug_args_t * DEBUG_ARGS;
 
-/* i8080_debug_next() is expected to have the signature _Bool (*)(i8080 * const),
+/* i8080_debug_next() is expected to have the signature int (*)(i8080 * const),
  * so the options have to be passed in separately. */
 void set_debug_next_options(emu_debug_args_t * args) {
     if (is_valid_args(args)) DEBUG_ARGS = args;
 	else printf("Error: Bad mem_dump_format.\n");
 }
 
-_Bool i8080_debug_next(i8080 * const cpu) {
+int i8080_debug_next(i8080 * const cpu) {
 	i8080_mutex_lock(&cpu->i_mutex);
 	emu_word_t opcode = 0;
 	if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
@@ -149,7 +149,7 @@ _Bool i8080_debug_next(i8080 * const cpu) {
 	i8080_mutex_unlock(&cpu->i_mutex);
     
 	// Execute opcode
-    _Bool success = 0;
+    int success = 0;
     if (!cpu->is_halted) {
         success = i8080_exec(cpu, opcode);
         // Print disassembly

@@ -26,7 +26,7 @@ I8080_CDECL void set_debug_next_options(emu_debug_args_t * args);
  * - The instruction executed
  * - State of all registers and flags in the i8080
  * - Dump of the main memory, formatted as mem_dump_format. A newline is inserted every mem_dump_newline_after words. */
-I8080_CDECL _Bool i8080_debug_next(i8080 * const cpu);
+I8080_CDECL int i8080_debug_next(i8080 * const cpu);
 
 #include "i8080/internal/i8080_predef_undef.h"
 
