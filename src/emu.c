@@ -281,35 +281,61 @@ void emu_init_i8080(i8080 * const cpu) {
 
 // Writes test_word to all locations, then reads test_word from all locations.
 // Returns 0 if a read failed to return test_word, and stores the failed location in cpu->pc.
-static _Bool memory_write_read_pass(i8080 * const cpu, const emu_word_t test_word) {
-    // Write pass
-	emu_addr_t i = 0;
-    for (i = 0; i <= ADDR_T_MAX; ++i) {
-        cpu->write_memory(i, test_word);
-    }
-    // Read pass
-    for (i = 0; i <= ADDR_T_MAX; ++i) {
-        if (cpu->read_memory(i) != test_word) {
-            // indicate to user which location failed
-            cpu->pc = i;
-            return 0;
-        }
-    }
-    return 1;
+static _Bool memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const emu_word_t test_word, const _Bool descriptive) {
+	size_t i = 0;
+	if (descriptive) {
+		_Bool success = 1;
+		// Write pass
+		printf("Write pass: " WORD_T_PRT_FORMAT "\n", test_word);
+		for (i = start_addr; i <= end_addr; ++i) {
+			// Show progress
+			printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", i);
+			cpu->write_memory((emu_addr_t)i, test_word);
+		}
+		// Read pass
+		printf("\nRead pass: " WORD_T_PRT_FORMAT "\n", test_word);
+		for (i = start_addr; i <= end_addr; ++i) {
+			// Show progress
+			printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", i);
+			if (cpu->read_memory((emu_addr_t)i) != test_word) {
+				// indicate to user which location failed
+				printf("\nLocation " ADDR_T_PRT_FORMAT " failed.", i);
+				cpu->pc = (emu_addr_t)i;
+				success = 0;
+				break;
+			}
+		}
+		printf("\n");
+		return success;
+	}
+	else {
+		for (i = start_addr; i <= end_addr; ++i) {
+			cpu->write_memory((emu_addr_t)i, test_word);
+		}
+		for (i = start_addr; i <= end_addr; ++i) {
+			if (cpu->read_memory((emu_addr_t)i) != test_word) {
+				cpu->pc = (emu_addr_t)i;
+				return 0;
+			}
+		}
+		return 1;
+	}
 }
 
-emu_exit_code_t emu_runtime(i8080 * const cpu, const _Bool perform_startup_check, emu_debug_args_t * d_args) {
+_Bool memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const _Bool descriptive) {
+	if (descriptive) printf("Checking memory...\n");
+	// Pass 1
+	if (!memory_write_read_pass(cpu, start_addr, end_addr, 0x55, descriptive)) return 0;
+	// Pass 2, check alternate bits
+	if (!memory_write_read_pass(cpu, start_addr, end_addr, 0xAA, descriptive)) return 0;
+	if (descriptive) printf("All memory locations functional.\n");
+	return 1;
+}
+
+emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * d_args) {
     
     if (cpu->read_memory == NULL || cpu->write_memory == NULL) {
         return EMU_ERR_MEM_STREAMS;
-    }
-    
-    // Check if all memory locations are read/write-able
-    if (perform_startup_check) {
-        // Pass 1
-        if (!memory_write_read_pass(cpu, 0x55)) return EMU_ERR_MEMORY;
-        // Pass 2, check alternate bits
-        if (!memory_write_read_pass(cpu, 0xAA)) return EMU_ERR_MEMORY;
     }
     
     // If in debug mode, this is overridden by i8080_debug_next

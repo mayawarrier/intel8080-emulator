@@ -24,8 +24,6 @@
 I8080_CDECL typedef enum EMU_EXIT_CODE {
     EMU_ERR_MEM_STREAMS,        // A memory stream function (cpu->read_memory, cpu->write_memory) is not initialized.
     EMU_ERR_IO_STREAMS,         // An I/O request was made at runtime but an I/O stream function (cpu->port_in, cpu->port_out) was not initialized.
-    EMU_ERR_MEMORY,             /* A memory location is not read/writ-able. Location of failure stored in cpu->pc.
-                                 * This error can only be triggered by the startup check. */
     EMU_EXIT_SUCCESS            // Successful run.
 } emu_exit_code_t;
 
@@ -42,6 +40,10 @@ I8080_CDECL typedef struct emu_debug_args {
 
 /* Loads a file into memory. Returns number of words read. */
 I8080_CDECL size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc);
+// Checks all locations from start_addr to end_addr for read/write errors, using cpu.read_memory() and cpu.write_memory().
+// Returns if failure occured, with location stored in cpu->pc.
+// Param descriptive = 1 shows the write/read progress.
+I8080_CDECL _Bool memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const _Bool descriptive);
 
 // Initialize an i8080
 I8080_CDECL void emu_init_i8080(i8080 * const cpu);
@@ -61,12 +63,12 @@ I8080_CDECL void emu_set_cpm_env(i8080 * const cpu);
 I8080_CDECL void emu_set_default_env(i8080 * const cpu);
 
 /* Begin the emulator. Must have properly set up memory and streams first!
- * Returns an error code if the emulator was not initialized properly or failed the startup check. 
+ * Returns an error code if the emulator was not initialized properly.
  * 
  * If debug_args is not NULL, emulator will start in debug mode. In this mode, the emulator can print
  * the values of all flags and registers, and can dump the main memory after each instruction is executed to debug_out. 
  * See emu_debug_args to set options on how the output is presented. */
-I8080_CDECL emu_exit_code_t emu_runtime(i8080 * const cpu, const _Bool perform_startup_check, emu_debug_args_t * debug_args);
+I8080_CDECL emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * debug_args);
 
 #include "i8080/internal/i8080_predef_undef.h"
 
