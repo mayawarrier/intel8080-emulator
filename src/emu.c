@@ -220,7 +220,7 @@ void emu_set_cpm_env(i8080 * const cpu) {
         
         // Command processor messages, '$'-terminated
         // as is the convention in CP/M.
-        char * const CMD_MSGS[] = {
+        const char * const CMD_MSGS[] = {
             "Invalid address.$", 
             "Invalid command.$",
             "RUN addr: Start executing instructions from addr. For eg. RUN 0x0100\nHELP: Bring up this list of commands.\nQUIT: quit$",
@@ -232,7 +232,7 @@ void emu_set_cpm_env(i8080 * const cpu) {
 
 		// Store messages from 0xe410
         emu_addr_t msgs_loc = 0xe410;
-		char * msg; size_t msg_len;
+		const char * msg; size_t msg_len;
         for (i = 0; i < 4; ++i) {
             msg = CMD_MSGS[i];
 			msg_len = strlen(msg);

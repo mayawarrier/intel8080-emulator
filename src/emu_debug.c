@@ -16,7 +16,7 @@
 
   // Pretty print disassembly, indexed by opcode
   // e.g. DEBUG_DISASSEMBLY_TABLE[RST_7]
-static const char * DEBUG_DISASSEMBLY_TABLE[] = {
+static const char * const DEBUG_DISASSEMBLY_TABLE[] = {
 	"nop", "lxi b,#", "stax b", "inx b", "inr b", "dcr b", "mvi b,#", "rlc",
 	"undocumented", "dad b", "ldax b", "dcx b", "inr c", "dcr c", "mvi c,#", "rrc",
 	"undocumented", "lxi d,#", "stax d", "inx d", "inr d", "dcr d", "mvi d,#", "ral",
@@ -135,40 +135,33 @@ void set_debug_next_options(emu_debug_args_t * args) {
 }
 
 _Bool i8080_debug_next(i8080 * const cpu) {
-    // Get the opcode
-    i8080_mutex_lock(&cpu->i_mutex);
-    emu_word_t opcode;
-    if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
-        opcode = cpu->interrupt_acknowledge();
-        cpu->ie = 0;
-        cpu->pending_interrupt_req = 0;
-        cpu->is_halted = 0;
-    } else {
-        if (!cpu->is_halted) {
-            opcode = cpu->read_memory(cpu->pc++);
-        }
-    }
-    i8080_mutex_unlock(&cpu->i_mutex);
+	i8080_mutex_lock(&cpu->i_mutex);
+	emu_word_t opcode = 0;
+	if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
+		opcode = cpu->interrupt_acknowledge();
+		cpu->ie = 0;
+		cpu->pending_interrupt_req = 0;
+		cpu->is_halted = 0;
+	}
+	else if (!cpu->is_halted) {
+		opcode = cpu->read_memory(cpu->pc++);
+	}
+	i8080_mutex_unlock(&cpu->i_mutex);
     
+	// Execute opcode
     _Bool success = 0;
-    
-    // Execute the instruction
     if (!cpu->is_halted) {
         success = i8080_exec(cpu, opcode);
-
         // Print disassembly
         printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
         // Dump cpu stats and main memory
-        if (DEBUG_ARGS->should_dump_stats) {
-            dump_cpu_stats(cpu, DEBUG_ARGS->debug_out);
-        }
-        if (DEBUG_ARGS->should_dump_memory) {
-            dump_memory_raw(cpu, DEBUG_ARGS);
-        }
+        if (DEBUG_ARGS->should_dump_stats) dump_cpu_stats(cpu, DEBUG_ARGS->debug_out);
+        if (DEBUG_ARGS->should_dump_memory) dump_memory_raw(cpu, DEBUG_ARGS);
     } else {
         // indicate success but stay halted
         success = 1;
     }
     
+	if (!success) i8080_mutex_destroy(&cpu->i_mutex);
     return success;
 }

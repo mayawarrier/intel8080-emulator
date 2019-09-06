@@ -582,15 +582,16 @@ _Bool i8080_next(i8080 * const cpu) {
     }
     i8080_mutex_unlock(&cpu->i_mutex);
     
+	// Execute opcode
 	_Bool success;
     if (!cpu->is_halted) {
 		// Execute the opcode
         success = i8080_exec(cpu, opcode);
-		if (!success) i8080_mutex_destroy(&cpu->i_mutex);
     } else {
         // indicate success but remain halted
 		success = 1;
     }
+	if (!success) i8080_mutex_destroy(&cpu->i_mutex);
 	return success;
 }
 
