@@ -20,9 +20,6 @@ static void cpm_env_port_out(emu_addr_t addr, emu_word_t word) {
     emu_word_t port_addr = (emu_word_t)(addr & WORD_T_MAX);
     if (port_addr == CPM_CONSOLE_ADDR) {
         printf(WORD_T_ASCII_FORMAT, word);
-        // Some OSs buffer stdout, flush this buffer so that future scanfs
-        // don't read from this buffer but from stdin instead
-        fflush(stdout);
     } 
 }
 
@@ -39,26 +36,25 @@ static emu_word_t cpm_env_port_in(emu_addr_t addr) {
 
 struct emu_runtime_args {
     i8080 * const cpu;
-    _Bool perform_startup_check;
     emu_debug_args_t * const debug_args;
 	emu_exit_code_t exit_code;
 };
 
-static void * emu_runtime_thread(void * args) { 
+static void * emu_runtime_thr(void * args) { 
     struct emu_runtime_args * emu_args = (struct emu_runtime_args *)args;
     // Begin the emulator.
-    emu_args->exit_code = emu_runtime(emu_args->cpu, emu_args->perform_startup_check, emu_args->debug_args);
+    emu_args->exit_code = emu_runtime(emu_args->cpu, emu_args->debug_args);
     return NULL;
 }
 
-static void * interrupt_gen_thread(void * args) {
+static void * interrupt_gen_thr(void * args) {
     /* Mark this as cancel-able so when the emulator quits
      * it can cancel this thread. */
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     i8080 * const cpu = (i8080 * const)args;
     
     // Wait for 10 seconds and send an interrupt
-    unsigned int return_time = time(0) + 10;
+    time_t return_time = time(0) + (time_t)10;
     while(time(0) < return_time);
     i8080_interrupt(cpu);
     
@@ -98,10 +94,10 @@ int main(int argc, char ** argv) {
 
     // Start the emulator and an interrupt generator on different threads
     pthread_t emu_thread, intgen_thread;    
-    struct emu_runtime_args emu_args = {.cpu = &cpu, .perform_startup_check = 0, .debug_args = NULL};
+    struct emu_runtime_args emu_args = {.cpu = &cpu, .debug_args = NULL};
     
-    pthread_create(&emu_thread, NULL, &emu_runtime_thread, (void *)&emu_args);
-    pthread_create(&intgen_thread, NULL, &interrupt_gen_thread, (void *)&cpu);
+    pthread_create(&emu_thread, NULL, &emu_runtime_thr, (void *)&emu_args);
+    pthread_create(&intgen_thread, NULL, &interrupt_gen_thr, (void *)&cpu);
     
     pthread_join(emu_thread, NULL);
     pthread_cancel(intgen_thread);
