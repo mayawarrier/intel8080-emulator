@@ -10,6 +10,14 @@
 #include <string.h>
 #include <stdint.h>
 
+typedef enum emu_env {
+	CPM,
+	DEFAULT
+} emu_env_t;
+
+// The current emulator environment set before runtime
+static emu_env_t EMU_ENV = (enum emu_env)DEFAULT;
+
 size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc) {
     
     size_t file_size = 0;
@@ -86,12 +94,8 @@ static _Bool i8080_cpm_zero_page(void * const udata) {
             // Addresses of command proc messages
             const emu_addr_t ERROR_ADDR_PTR = 0xe410;                   // "\nInvalid address."
             const emu_addr_t ERROR_CMD_PTR = ERROR_ADDR_PTR + 0x11;     // "\nInvalid command."
-            const emu_addr_t STARTUP_MSG_PTR = ERROR_CMD_PTR + 0x11;    // Startup message
-            const emu_addr_t HELP_MSG_PTR = STARTUP_MSG_PTR + 0x49;     // Message shown on HELP
-            const emu_addr_t CMD_PROMPT_PTR = HELP_MSG_PTR + 0x78;      // "> "
-            
-            // Print startup message
-            cpm_print_str(CONSOLE_ADDR_FULL, STARTUP_MSG_PTR, cpu);
+            const emu_addr_t HELP_MSG_PTR = ERROR_CMD_PTR + 0x11;		// Message shown on HELP
+            const emu_addr_t CMD_PROMPT_PTR = HELP_MSG_PTR + 0x76;      // "> "
             
             // Max length, excluding trailing null
 			#define LEN_INPUT_BUF 127
@@ -219,9 +223,8 @@ void emu_set_cpm_env(i8080 * const cpu) {
         char * const CMD_MSGS[] = {
             "Invalid address.$", 
             "Invalid command.$",
-            "\nintel8080-emulator, CP/M Warm Boot.\nType HELP for a list of commands.\n\n$",
-            "\nRUN addr: Start executing instructions from addr. For eg. RUN 0x0100\nHELP: Bring up this list of commands.\nQUIT: quit\n$",
-            "> $"
+            "RUN addr: Start executing instructions from addr. For eg. RUN 0x0100\nHELP: Bring up this list of commands.\nQUIT: quit$",
+            "\n> $"
         };
 
 		// loop indices
@@ -230,7 +233,7 @@ void emu_set_cpm_env(i8080 * const cpu) {
 		// Store messages from 0xe410
         emu_addr_t msgs_loc = 0xe410;
 		char * msg; size_t msg_len;
-        for (i = 0; i < 5; ++i) {
+        for (i = 0; i < 4; ++i) {
             msg = CMD_MSGS[i];
 			msg_len = strlen(msg);
             for (j = 0; j < msg_len; ++j) {
@@ -244,6 +247,7 @@ void emu_set_cpm_env(i8080 * const cpu) {
         }
 
         cpu->emu_ext_call = i8080_cpm_zero_page;
+		EMU_ENV = (enum emu_env)CPM;
     } else {
         printf(INIT_MEM_STREAM_ERR_MSG);
     }
@@ -264,6 +268,7 @@ void emu_set_default_env(i8080 * const cpu) {
 		cpu->write_memory(0x0000, i8080_JMP);
 		cpu->write_memory(0x0001, DEFAULT_START_PA);
 		cpu->write_memory(0x0002, 0x00);
+		EMU_ENV = (enum emu_env)DEFAULT;
     } else {
         printf(INIT_MEM_STREAM_ERR_MSG);
     }
@@ -347,6 +352,10 @@ emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * d_args) {
         i8080_next_ovrd = i8080_debug_next;
     }
     
+	// Print welcome message
+	printf("intel8080-emulator, with limited CP/M BIOS support.\nSee github.com/dhruvwarrier/intel8080-emulator/ for more.\n");
+	if (EMU_ENV == (enum emu_env)CPM) printf("\nCP/M Warm Boot. Type HELP for a list of commands.");
+
     // Execute all instructions until failure/quit
     while(1) {
         if (!i8080_next_ovrd(cpu)) {
