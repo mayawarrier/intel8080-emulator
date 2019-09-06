@@ -294,17 +294,17 @@ static _Bool memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_ad
 		printf("Write pass: " WORD_T_PRT_FORMAT "\n", test_word);
 		for (i = start_addr; i <= end_addr; ++i) {
 			// Show progress
-			printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", i);
+			printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", (emu_addr_t)i);
 			cpu->write_memory((emu_addr_t)i, test_word);
 		}
 		// Read pass
 		printf("\nRead pass: " WORD_T_PRT_FORMAT "\n", test_word);
 		for (i = start_addr; i <= end_addr; ++i) {
 			// Show progress
-			printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", i);
+			printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", (emu_addr_t)i);
 			if (cpu->read_memory((emu_addr_t)i) != test_word) {
 				// indicate to user which location failed
-				printf("\nLocation " ADDR_T_PRT_FORMAT " failed.", i);
+				printf("\nLocation " ADDR_T_PRT_FORMAT " failed.", (emu_addr_t)i);
 				cpu->pc = (emu_addr_t)i;
 				success = 0;
 				break;
