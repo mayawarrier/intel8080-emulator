@@ -53,17 +53,54 @@ static const char * DEBUG_DISASSEMBLY_TABLE[] = {
 	"rst 6", "rm", "sphl", "jm $", "ei", "cm $", "undocumented", "cpi #", "rst 7"
 };
 
+// Checks if format spec has a max of 128 chars, and can be applied to an emu_word_t.
+static _Bool is_valid_format_spec(const char * f) {
+	// Check if f is a valid string and format specifier
+	_Bool is_valid_str = 0;
+	// Maximum size is 128, including trailing null
+	for (size_t i = 0; i < 128; ++i) {
+		if (f[i] == '\0') {
+			is_valid_str = 1;
+			break;
+		}
+	}
+	// check if this format can actually be applied to a word
+	emu_word_t out_word;
+	_Bool is_valid_format = (sscanf("0x38", f, &out_word) == 1);
+
+	return is_valid_str && is_valid_format;
+}
+
+static inline _Bool in_range(size_t num, size_t lt_bound, size_t rt_bound, _Bool inclusive) {
+	if (inclusive) return (num >= lt_bound && num <= rt_bound);
+	else return (num > lt_bound && num < rt_bound);
+}
+
+static inline _Bool is_valid_args(const emu_debug_args_t * args) {
+	return (args->debug_out != NULL && 
+		is_valid_format_spec(args->mem_dump_format) && 
+		in_range(args->mem_dump_start_addr, 0, ADDR_T_MAX, 1) && 
+		in_range(args->mem_dump_end_addr, 0, ADDR_T_MAX, 1) &&
+		args->mem_dump_end_addr >= args->mem_dump_start_addr &&
+		in_range(args->mem_dump_newline_after, 1, ADDR_T_MAX, 1) &&
+		(_Bool)args->should_dump_memory == args->should_dump_memory &&
+		(_Bool)args->should_dump_stats == args->should_dump_stats);
+}
+
+// Dump memory without validation checks
+static void dump_memory_raw(i8080 * const cpu, const emu_debug_args_t * args) {
+	fprintf(args->debug_out, "**** Memory dump: ****\n");
+	for (emu_addr_t i = args->mem_dump_start_addr; i <= args->mem_dump_end_addr; ++i) {
+		fprintf(args->debug_out, args->mem_dump_format, cpu->read_memory(i));
+		// End-line every newline_after words
+		if ((i + 1) % args->mem_dump_newline_after == 0) {
+			fprintf(args->debug_out, "\n");
+		}
+	}
+}
+
 void dump_memory(i8080 * const cpu, const emu_debug_args_t * args) {
-    if (args->debug_out != NULL) {
-        fprintf(args->debug_out, "**** Memory dump: ****\n");
-        for (emu_addr_t i = args->mem_dump_start_addr; i <= args->mem_dump_end_addr; ++i) {
-            fprintf(args->debug_out, args->mem_dump_format, cpu->read_memory(i));
-            // End-line every newline_after words
-            if ((i + 1) % args->mem_dump_newline_after == 0) {
-                fprintf(args->debug_out, "\n");
-            }
-        }
-    }
+	if (is_valid_args(args)) dump_memory_raw(cpu, args);
 }
 
 void dump_cpu_stats(i8080 * const cpu, FILE * const stream) {
@@ -93,23 +130,8 @@ static emu_debug_args_t * DEBUG_ARGS;
 /* i8080_debug_next() is expected to have the signature _Bool (*)(i8080 * const),
  * so the options have to be passed in separately. */
 void set_debug_next_options(emu_debug_args_t * args) {
-	// Maximum size of mem_dump_format, including NULL
-	const int EMU_DEBUG_FMAX = 128;
-    // Check if mem_dump_format is a valid string and format specifier
-    _Bool is_valid_str = 0;
-    for (int i = 0; i < EMU_DEBUG_FMAX; ++i) {
-        if (args->mem_dump_format[i] == '\0') {
-            is_valid_str = 1;
-        }
-    }
-    emu_word_t out_word;
-    _Bool is_valid_format = (sscanf("0x38", args->mem_dump_format, &out_word) == 1);
-    
-    if (is_valid_str && is_valid_format) {
-        DEBUG_ARGS = args;
-    } else {
-        printf("Error: Bad mem_dump_format.\n");
-    }
+    if (is_valid_args(args)) DEBUG_ARGS = args;
+	else printf("Error: Bad mem_dump_format.\n");
 }
 
 _Bool i8080_debug_next(i8080 * const cpu) {
@@ -141,7 +163,7 @@ _Bool i8080_debug_next(i8080 * const cpu) {
             dump_cpu_stats(cpu, DEBUG_ARGS->debug_out);
         }
         if (DEBUG_ARGS->should_dump_memory) {
-            dump_memory(cpu, DEBUG_ARGS);
+            dump_memory_raw(cpu, DEBUG_ARGS);
         }
     } else {
         // indicate success but stay halted
