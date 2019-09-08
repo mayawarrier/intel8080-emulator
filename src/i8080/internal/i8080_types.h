@@ -25,7 +25,7 @@
     I8080_CDECL typedef CRITICAL_SECTION i8080_mutex_t;
 #elif defined I8080_POSIX_MIN_VER
     // Use pthreads, since they are available
-    #include <pthreads.h>
+    #include <pthread.h>
     I8080_CDECL typedef pthread_mutex_t i8080_mutex_t;
 #elif defined I8080_GNUC_MIN_VER
     // Simulate a mutex using acquire - release semantics on a char.

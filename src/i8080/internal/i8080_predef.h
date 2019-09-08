@@ -36,6 +36,8 @@
 
 // Detect minimum supported version for POSIX.
 #ifdef I8080_UNIX
+    // Defining this forces features from 199506 to be defined, if available
+    #define _POSIX_C_SOURCE 199506L
     #include <unistd.h>
     // Pthreads first appeared in the POSIX standard in IEEE 1003.1c-1995, published in 06/1995:
     // https://standards.ieee.org/standard/1003_1c-1995.html
@@ -54,12 +56,9 @@
 #ifdef __cplusplus
     // if compiled with C++, extern as C
     #define I8080_CDECL extern "C"
-    #define I8080_CDECL_EXTERN extern "C"
 #else
     // if compiled with C, no extern required
     #define I8080_CDECL
-    // regular c99 extern if compiled with C
-    #define I8080_CDECL_EXTERN extern
 #endif
 
 #endif /* I8080_PREDEF_H */
