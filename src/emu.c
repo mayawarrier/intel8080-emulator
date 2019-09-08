@@ -11,8 +11,8 @@
 #include <stdint.h>
 
 typedef enum emu_env {
-	CPM,
-	DEFAULT
+    CPM,
+    DEFAULT
 } emu_env_t;
 
 // The current emulator environment set before runtime
@@ -39,7 +39,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t 
     }
     
     // Attempt to read the entire file
-	size_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
+    size_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
     
     if (words_read != file_size) {
         printf("Error: file read failure.\n");
@@ -58,7 +58,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t 
 // Prints the string at str_addr to CPM console, terminated by '$'
 static void cpm_print_str(const emu_addr_t console_addr, emu_addr_t str_addr, i8080 * const cpu) {
     // Print each character until we hit a '$'
-	emu_word_t str_char;
+    emu_word_t str_char;
     while (1) {
         str_char = cpu->read_memory(str_addr);
         if (str_char == '$') {
@@ -78,7 +78,7 @@ static int i8080_cpm_zero_page(void * const udata) {
     i8080 * const cpu = (i8080 * const)udata;
 
 	// The console port address duplicated across 16-bit address bus for use with port out
-	const emu_addr_t CONSOLE_ADDR_FULL = ((emu_addr_t)(CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
+    const emu_addr_t CONSOLE_ADDR_FULL = ((emu_addr_t)(CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
     // The return address on the stack
     const emu_addr_t ret_addr = (emu_addr_t)(cpu->read_memory(cpu->sp + (emu_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
     
@@ -98,10 +98,10 @@ static int i8080_cpm_zero_page(void * const udata) {
             const emu_addr_t CMD_PROMPT_PTR = HELP_MSG_PTR + 0x76;      // "> "
             
             // Max length, excluding trailing null
-			#define LEN_INPUT_BUF 127
+            #define LEN_INPUT_BUF 127
             emu_word_t input_buf[LEN_INPUT_BUF + 1];
-			size_t buf_loc = 0;
-			emu_word_t buf_ch;
+            size_t buf_loc = 0;
+            emu_word_t buf_ch;
             
             // Address from RUN command
             emu_addr_t run_addr;
@@ -111,7 +111,7 @@ static int i8080_cpm_zero_page(void * const udata) {
                 // Prints a prompt "> "
                 cpm_print_str(CONSOLE_ADDR_FULL, CMD_PROMPT_PTR, cpu);
                 // reset buffer
-				buf_loc = 0;
+                buf_loc = 0;
                 
                 // Get console input till end of line
                 while (buf_loc != LEN_INPUT_BUF) {
@@ -125,14 +125,14 @@ static int i8080_cpm_zero_page(void * const udata) {
                 if (strncmp(input_buf, "RUN ", 4) == 0) {
                     if (sscanf(&input_buf[4], ADDR_T_SCN_FORMAT, &run_addr) == 1 && run_addr >= 0 && run_addr <= 0xffff) {
                         // address is in correct format and within bounds
-						#undef LEN_INPUT_BUF
+                        #undef LEN_INPUT_BUF
                         goto command_run;
                     } else {
                         // Invalid address error
                         cpm_print_str(CONSOLE_ADDR_FULL, ERROR_ADDR_PTR, cpu);
                     }
                 } else if (strncmp(input_buf, "QUIT", 4) == 0) {
-					#undef LEN_INPUT_BUF
+                    #undef LEN_INPUT_BUF
                     goto command_quit;
                 } else if (strncmp(input_buf, "HELP", 4) == 0) {
                     cpm_print_str(CONSOLE_ADDR_FULL, HELP_MSG_PTR, cpu);
@@ -146,7 +146,7 @@ static int i8080_cpm_zero_page(void * const udata) {
             
             command_run: {
                 // Write JMP addr to the bytes immediately after
-				const emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
+                const emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
                 const emu_word_t hi_addr = (emu_word_t)((emu_addr_t)(run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
                 cpu->write_memory(0xe401, i8080_JMP);
                 cpu->write_memory(0xe402, lo_addr);
@@ -227,15 +227,15 @@ void emu_set_cpm_env(i8080 * const cpu) {
             "\n> $"
         };
 
-		// loop indices
-		size_t i, j;
+        // loop indices
+        size_t i, j;
 
 		// Store messages from 0xe410
         emu_addr_t msgs_loc = 0xe410;
-		const char * msg; size_t msg_len;
+        const char * msg; size_t msg_len;
         for (i = 0; i < 4; ++i) {
             msg = CMD_MSGS[i];
-			msg_len = strlen(msg);
+            msg_len = strlen(msg);
             for (j = 0; j < msg_len; ++j) {
                 cpu->write_memory(msgs_loc++, msg[j]);
             }
@@ -247,7 +247,7 @@ void emu_set_cpm_env(i8080 * const cpu) {
         }
 
         cpu->emu_ext_call = i8080_cpm_zero_page;
-		EMU_ENV = (enum emu_env)CPM;
+        EMU_ENV = (enum emu_env)CPM;
     } else {
         printf(INIT_MEM_STREAM_ERR_MSG);
     }
@@ -258,17 +258,17 @@ void emu_set_default_env(i8080 * const cpu) {
     if (cpu->write_memory != NULL) {
         // Create the interrupt vector table
         // Do not write to RST 1 sequence, we'll put our bootloader there instead
-		size_t i;
+        size_t i;
         for (i = 1; i < 8; ++i) {
             // HLT for all interrupts
             cpu->write_memory(INTERRUPT_TABLE[i], i8080_HLT);
         }
 
         // Write a default bootloader that jumps to start of program memory
-		cpu->write_memory(0x0000, i8080_JMP);
-		cpu->write_memory(0x0001, DEFAULT_START_PA);
-		cpu->write_memory(0x0002, 0x00);
-		EMU_ENV = (enum emu_env)DEFAULT;
+        cpu->write_memory(0x0000, i8080_JMP);
+        cpu->write_memory(0x0001, DEFAULT_START_PA);
+        cpu->write_memory(0x0002, 0x00);
+        EMU_ENV = (enum emu_env)DEFAULT;
     } else {
         printf(INIT_MEM_STREAM_ERR_MSG);
     }
@@ -287,54 +287,54 @@ void emu_init_i8080(i8080 * const cpu) {
 // Writes test_word to all locations, then reads test_word from all locations.
 // Returns 0 if a read failed to return test_word, and stores the failed location in cpu->pc.
 static int memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const emu_word_t test_word, const int descriptive) {
-	size_t i = 0;
-	if (descriptive) {
-		int success = 1;
-		// Write pass
-		printf("Write pass: " WORD_T_PRT_FORMAT "\n", test_word);
-		for (i = start_addr; i <= end_addr; ++i) {
-			// Show progress
-			printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", (emu_addr_t)i);
-			cpu->write_memory((emu_addr_t)i, test_word);
-		}
-		// Read pass
-		printf("\nRead pass: " WORD_T_PRT_FORMAT "\n", test_word);
-		for (i = start_addr; i <= end_addr; ++i) {
-			// Show progress
-			printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", (emu_addr_t)i);
-			if (cpu->read_memory((emu_addr_t)i) != test_word) {
-				// indicate to user which location failed
-				printf("\nLocation " ADDR_T_PRT_FORMAT " failed.", (emu_addr_t)i);
-				cpu->pc = (emu_addr_t)i;
-				success = 0;
-				break;
-			}
-		}
-		printf("\n");
-		return success;
-	}
-	else {
-		for (i = start_addr; i <= end_addr; ++i) {
-			cpu->write_memory((emu_addr_t)i, test_word);
-		}
-		for (i = start_addr; i <= end_addr; ++i) {
-			if (cpu->read_memory((emu_addr_t)i) != test_word) {
-				cpu->pc = (emu_addr_t)i;
-				return 0;
-			}
-		}
-		return 1;
-	}
+    size_t i = 0;
+    if (descriptive) {
+        int success = 1;
+        // Write pass
+        printf("Write pass: " WORD_T_PRT_FORMAT "\n", test_word);
+        for (i = start_addr; i <= end_addr; ++i) {
+            // Show progress
+            printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", (emu_addr_t)i);
+            cpu->write_memory((emu_addr_t)i, test_word);
+        }
+        // Read pass
+        printf("\nRead pass: " WORD_T_PRT_FORMAT "\n", test_word);
+        for (i = start_addr; i <= end_addr; ++i) {
+            // Show progress
+            printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", (emu_addr_t)i);
+            if (cpu->read_memory((emu_addr_t)i) != test_word) {
+                // indicate to user which location failed
+                printf("\nLocation " ADDR_T_PRT_FORMAT " failed.", (emu_addr_t)i);
+                cpu->pc = (emu_addr_t)i;
+                success = 0;
+                break;
+            }
+        }
+        printf("\n");
+        return success;
+    }
+    else {
+        for (i = start_addr; i <= end_addr; ++i) {
+            cpu->write_memory((emu_addr_t)i, test_word);
+        }
+        for (i = start_addr; i <= end_addr; ++i) {
+            if (cpu->read_memory((emu_addr_t)i) != test_word) {
+                cpu->pc = (emu_addr_t)i;
+                return 0;
+            }
+        }
+        return 1;
+    }
 }
 
 int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const int descriptive) {
-	if (descriptive) printf("Checking memory...\n");
-	// Pass 1
-	if (!memory_write_read_pass(cpu, start_addr, end_addr, 0x55, descriptive)) return 0;
-	// Pass 2, check alternate bits
-	if (!memory_write_read_pass(cpu, start_addr, end_addr, 0xAA, descriptive)) return 0;
-	if (descriptive) printf("All memory locations functional.\n");
-	return 1;
+    if (descriptive) printf("Checking memory...\n");
+    // Pass 1
+    if (!memory_write_read_pass(cpu, start_addr, end_addr, 0x55, descriptive)) return 0;
+    // Pass 2, check alternate bits
+    if (!memory_write_read_pass(cpu, start_addr, end_addr, 0xAA, descriptive)) return 0;
+    if (descriptive) printf("All memory locations functional.\n");
+    return 1;
 }
 
 emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * d_args) {
@@ -351,10 +351,10 @@ emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * d_args) {
         set_debug_next_options(d_args);
         i8080_next_ovrd = i8080_debug_next;
     }
-    
-	// Print welcome message
-	printf("intel8080-emulator, with limited CP/M BIOS support.\nSee github.com/dhruvwarrier/intel8080-emulator/ for more.\n");
-	if (EMU_ENV == (enum emu_env)CPM) printf("\nCP/M Warm Boot. Type HELP for a list of commands.");
+
+    // Print welcome message
+    printf("intel8080-emulator, with limited CP/M BIOS support.\nSee github.com/dhruvwarrier/intel8080-emulator/ for more.\n");
+    if (EMU_ENV == (enum emu_env)CPM) printf("\nCP/M Warm Boot. Type HELP for a list of commands.");
 
     // Execute all instructions until failure/quit
     while(1) {

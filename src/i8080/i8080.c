@@ -7,7 +7,7 @@
 #include "internal/i8080_consts.h"
 #include "internal/i8080_sync.h"
 
-// For internal use
+ // For internal use
 static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1;
 static const emu_word_t WORD_HI_F = (((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1) << HALF_WORD_SIZE;
 static const emu_buf_t BUF_HI_WORD_MAX = (emu_buf_t)WORD_T_MAX << (HALF_WORD_SIZE * 2);
@@ -19,32 +19,32 @@ static const emu_large_t SUBROUTINE_CYCLES_OFFSET = 6;
  * Correction made: Corrected cycle count of XCHG (0xeb) to 5. */
  // For conditional RETs and CALLs, add 6 to the cycles if the condition is true.
 static const emu_word_t OPCODES_CYCLES[] = {
-//  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
-	4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 0
-	4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 1
-	4,  10, 16, 5,  5,  5,  7,  4,  4,  10, 16, 5,  5,  5,  7,  4,  // 2
-	4,  10, 13, 5,  10, 10, 10, 4,  4,  10, 13, 5,  5,  5,  7,  4,  // 3
-	5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 4
-	5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 5
-	5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 6
-	7,  7,  7,  7,  7,  7,  7,  7,  5,  5,  5,  5,  5,  5,  7,  5,  // 7
-	4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // 8
-	4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // 9
-	4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // A
-	4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // B
-	5,  10, 10, 10, 11, 11, 7,  11, 5,  10, 10, 10, 11, 17, 7,  11, // C
-	5,  10, 10, 10, 11, 11, 7,  11, 5,  10, 10, 10, 11, 17, 7,  11, // D
-	5,  10, 10, 18, 11, 11, 7,  11, 5,  5,  10, 5,  11, 17, 7,  11, // E
-	5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  // F
+    //  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+        4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 0
+        4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  // 1
+        4,  10, 16, 5,  5,  5,  7,  4,  4,  10, 16, 5,  5,  5,  7,  4,  // 2
+        4,  10, 13, 5,  10, 10, 10, 4,  4,  10, 13, 5,  5,  5,  7,  4,  // 3
+        5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 4
+        5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 5
+        5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5,  7,  5,  // 6
+        7,  7,  7,  7,  7,  7,  7,  7,  5,  5,  5,  5,  5,  5,  7,  5,  // 7
+        4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // 8
+        4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // 9
+        4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // A
+        4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4,  7,  4,  // B
+        5,  10, 10, 10, 11, 11, 7,  11, 5,  10, 10, 10, 11, 17, 7,  11, // C
+        5,  10, 10, 10, 11, 11, 7,  11, 5,  10, 10, 10, 11, 17, 7,  11, // D
+        5,  10, 10, 18, 11, 11, 7,  11, 5,  5,  10, 5,  11, 17, 7,  11, // E
+        5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  // F
 };
 
 // Bit locations of flags in flags register.
 enum i8080_flags {
-	CARRY_BIT = 0,
-	PARITY_BIT = 2,
-	AUX_CARRY_BIT = 4,
-	ZERO_BIT = 6,
-	SIGN_BIT = 7
+    CARRY_BIT = 0,
+    PARITY_BIT = 2,
+    AUX_CARRY_BIT = 4,
+    ZERO_BIT = 6,
+    SIGN_BIT = 7
 };
 
 // Get value of a particular bit position in an emu_word_t.
@@ -53,53 +53,53 @@ static inline int get_word_bit(emu_word_t word, int bit) { return ((word >> bit)
 static inline int get_buf_bit(emu_buf_t buf, int bit) { return ((buf >> bit) & 1); }
 // Set value of a particular bit position in an emu_word_t.
 static inline void set_word_bit(emu_word_t * word, int bit, int val) {
-	if (val) {
-		*word |= ((emu_word_t)1 << bit);
-	} else {
-		*word &= ~((emu_word_t)1 << bit);
-	}
+    if (val) {
+        *word |= ((emu_word_t)1 << bit);
+    } else {
+        *word &= ~((emu_word_t)1 << bit);
+    }
 }
 
 // Picks the lower half of the word.
-static inline emu_word_t word_lo_bits(emu_word_t word) { 
-	return (word & WORD_LO_F); 
+static inline emu_word_t word_lo_bits(emu_word_t word) {
+    return (word & WORD_LO_F);
 }
 // Picks the upper half of the word.
-static inline emu_word_t word_hi_bits(emu_word_t word) { 
-	return (word & WORD_HI_F); 
+static inline emu_word_t word_hi_bits(emu_word_t word) {
+    return (word & WORD_HI_F);
 }
 // Picks the word bits from the hi part of buf_t.
-static inline emu_word_t buf_hi_word(emu_buf_t buf) { 
-	return ((buf & BUF_HI_WORD_MAX) >> (2 * HALF_WORD_SIZE)); 
+static inline emu_word_t buf_hi_word(emu_buf_t buf) {
+    return ((buf & BUF_HI_WORD_MAX) >> (2 * HALF_WORD_SIZE));
 }
 // Performs 2's complement on the lower half of the word.
-static inline emu_word_t twos_comp_lo_word(emu_word_t word) { 
-	return (((word) ^ WORD_LO_F) + (emu_word_t)1); 
+static inline emu_word_t twos_comp_lo_word(emu_word_t word) {
+    return (((word) ^ WORD_LO_F) + (emu_word_t)1);
 }
 /* Perform 2's complement on the entire word, up-scaling to a buf_t.
  * This is upscaled to preserve the carry bit when subtracting from 0:
  * https://retrocomputing.stackexchange.com/questions/6407/intel-8080-behaviour-of-the-carry-bit-when-comparing-a-value-with-0 */
-static inline emu_buf_t twos_comp_word(emu_word_t word) { 
-	return ((emu_word_t)(~word) + (emu_buf_t)1); 
+static inline emu_buf_t twos_comp_word(emu_word_t word) {
+    return ((emu_word_t)(~word) + (emu_buf_t)1);
 }
 // Finds the auxiliary carry generated by adding two words.
-static inline int aux_carry(emu_word_t word1, emu_word_t word2) { 
-	return (get_word_bit(word_lo_bits(word1) + word_lo_bits(word2), HALF_WORD_SIZE)); 
+static inline int aux_carry(emu_word_t word1, emu_word_t word2) {
+    return (get_word_bit(word_lo_bits(word1) + word_lo_bits(word2), HALF_WORD_SIZE));
 }
 // Calculates parity of a word.
 static inline int parity(emu_word_t word) {
-	int p = 0;
-	// XOR each bit together
-	int word_size = HALF_WORD_SIZE * 2;
-	for (int i = 0; i < word_size; ++i) {
-		p ^= get_word_bit(word, i);
-	}
-	// invert for even number of ones
-	return !p;
+    int p = 0;
+    // XOR each bit together
+    int word_size = HALF_WORD_SIZE * 2;
+    for (int i = 0; i < word_size; ++i) {
+        p ^= get_word_bit(word, i);
+    }
+    // invert for even number of ones
+    return !p;
 }
 // Gets the bit just after the width of an emu_word_t.
 static inline int get_carry_bit(emu_buf_t buf) {
-	return get_buf_bit(buf, HALF_WORD_SIZE * 2);
+    return get_buf_bit(buf, HALF_WORD_SIZE * 2);
 }
 
 // Updates the Z, S, P flags based on the word provided.
@@ -108,7 +108,7 @@ static inline void update_ZSP(i8080 * const cpu, emu_word_t word) {
     /* Bit 7 of the accumulator is used for signing, so the 8080
      * can only deal with -127 to 127 if using signed numbers */
     cpu->s = get_word_bit(word, 2 * HALF_WORD_SIZE - 1);
-	cpu->p = parity(word);
+    cpu->p = parity(word);
 }
 
 // Concatenates two words and returns a double word.
@@ -139,7 +139,7 @@ static void i8080_set_flags_reg(i8080 * const cpu, emu_word_t flags_reg) {
     cpu->acy = get_word_bit(flags_reg, (int)AUX_CARRY_BIT);
     cpu->z = get_word_bit(flags_reg, (int)ZERO_BIT);
     cpu->s = get_word_bit(flags_reg, (int)SIGN_BIT);
-} 
+}
 
 // Get address represented by {BC}
 static inline emu_addr_t i8080_get_bc(i8080 * const cpu) {
@@ -170,13 +170,13 @@ static inline void i8080_set_bc(i8080 * const cpu, emu_buf_t dbl_word) {
 // Sets D to hi dbl_word, and E to lo dbl_word
 static inline void i8080_set_de(i8080 * const cpu, emu_buf_t dbl_word) {
     cpu->d = (emu_word_t)buf_hi_word(dbl_word);
-	cpu->e = (emu_word_t)dbl_word;
+    cpu->e = (emu_word_t)dbl_word;
 }
 
 // Sets H to hi dbl_word, and L to lo dbl_word
 static inline void i8080_set_hl(i8080 * const cpu, emu_buf_t dbl_word) {
     cpu->h = (emu_word_t)buf_hi_word(dbl_word);
-	cpu->l = (emu_word_t)dbl_word;
+    cpu->l = (emu_word_t)dbl_word;
 }
 
 // Sets the accumulator and flags register from the program status word.
@@ -211,16 +211,16 @@ static inline emu_addr_t i8080_advance_read_addr(i8080 * const cpu) {
 
 // Returns pointers to the left and right registers for a mov operation.
 static void i8080_mov_get_reg_pair(i8080 * const cpu, emu_word_t opcode, emu_word_t ** left, emu_word_t ** right) {
-    
+
     *left = NULL; *right = NULL;
-    
+
     emu_word_t lo_opcode = opcode & 0x0f;
     emu_word_t hi_opcode = opcode & 0xf0;
-    
-    switch(lo_opcode) {
+
+    switch (lo_opcode) {
         case 0x00: case 0x08:
             *right = &cpu->b; break;
-        case 0x01: case 0x09: 
+        case 0x01: case 0x09:
             *right = &cpu->c; break;
         case 0x02: case 0x0a:
             *right = &cpu->d; break;
@@ -232,11 +232,11 @@ static void i8080_mov_get_reg_pair(i8080 * const cpu, emu_word_t opcode, emu_wor
             *right = &cpu->l; break;
         case 0x07: case 0x0f:
             *right = &cpu->a; break;
-        // Moving from M = [HL] should be dealt with separately
+            // Moving from M = [HL] should be dealt with separately
         default: *right = NULL; break;
     }
-    
-    switch(hi_opcode) {
+
+    switch (hi_opcode) {
         case 0x40:
             if (lo_opcode >= 0x00 && lo_opcode <= 0x07) {
                 *left = &cpu->b;
@@ -271,7 +271,7 @@ static void i8080_mov_get_reg_pair(i8080 * const cpu, emu_word_t opcode, emu_wor
 // Performs a move operation from register to register.
 static void i8080_mov_reg(i8080 * const cpu, emu_word_t opcode) {
     // get the register pair from this opcode
-    emu_word_t * left_pptr[1], * right_pptr[1];
+    emu_word_t * left_pptr[1], *right_pptr[1];
     i8080_mov_get_reg_pair(cpu, opcode, left_pptr, right_pptr);
     // perform move
     *(*left_pptr) = *(*right_pptr);
@@ -279,12 +279,12 @@ static void i8080_mov_reg(i8080 * const cpu, emu_word_t opcode) {
 
 // Performs an add to accumulator and updates flags.
 static void i8080_add(i8080 * const cpu, emu_word_t word) {
-	// Do the addition in a larger type to preserve carry
-	emu_buf_t acc_buf = (emu_buf_t)cpu->a + (emu_buf_t)word;
+    // Do the addition in a larger type to preserve carry
+    emu_buf_t acc_buf = (emu_buf_t)cpu->a + (emu_buf_t)word;
     cpu->acy = aux_carry(cpu->a, word);
-	cpu->cy = get_carry_bit(acc_buf);
+    cpu->cy = get_carry_bit(acc_buf);
     // The accumulator only needs to keep the word bits
-	cpu->a = (emu_word_t)acc_buf;
+    cpu->a = (emu_word_t)acc_buf;
     // Update remaining flags
     update_ZSP(cpu, cpu->a);
 }
@@ -296,11 +296,11 @@ static inline void i8080_adc(i8080 * const cpu, emu_word_t word) {
 
 // Performs a subtract from accumulator and updates flags
 static void i8080_sub(i8080 * const cpu, emu_word_t word) {
-	emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
-    cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word)); 
-	// Carry is the borrow flag for SUB, SBB etc, invert carry 
-	cpu->cy = !get_carry_bit(acc_buf);
-	cpu->a = (emu_word_t)acc_buf;
+    emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
+    cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
+    // Carry is the borrow flag for SUB, SBB etc, invert carry 
+    cpu->cy = !get_carry_bit(acc_buf);
+    cpu->a = (emu_word_t)acc_buf;
     update_ZSP(cpu, cpu->a);
 }
 
@@ -347,7 +347,7 @@ static void i8080_ora(i8080 * const cpu, emu_word_t word) {
 // Updates flags after subtraction from accumulator, without modifying it.
 static void i8080_cmp(i8080 * const cpu, emu_word_t word) {
     // This is almost identical to i8080_sub, with the exception that the accumulator is not affected
-	emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
+    emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
     cpu->cy = !get_carry_bit(acc_buf);
     update_ZSP(cpu, acc_buf);
@@ -374,7 +374,7 @@ static void i8080_dad(i8080 * const cpu, emu_addr_t reg_pair) {
     // Adds reg_pair, buffering to compute carry
     emu_addr_t hl = i8080_get_hl(cpu);
     emu_buf_t hl_buf = (emu_buf_t)hl + reg_pair;
-	i8080_set_hl(cpu, (emu_addr_t)hl_buf);
+    i8080_set_hl(cpu, (emu_addr_t)hl_buf);
     cpu->cy = get_buf_bit(hl_buf, HALF_ADDR_SIZE * 2);
 }
 
@@ -449,7 +449,7 @@ static void i8080_daa(i8080 * const cpu) {
 // Pushes higher word before lower word.
 static void i8080_push(i8080 * const cpu, emu_buf_t dbl_word) {
     emu_word_t left_word = (emu_word_t)buf_hi_word(dbl_word);
-	emu_word_t right_word = (emu_word_t)dbl_word;
+    emu_word_t right_word = (emu_word_t)dbl_word;
     cpu->write_memory(cpu->sp - (emu_addr_t)1, left_word);
     cpu->write_memory(cpu->sp - (emu_addr_t)2, right_word);
     cpu->sp -= 2;
@@ -467,7 +467,7 @@ static emu_buf_t i8080_pop(i8080 * const cpu) {
 // Jumps to address addr.
 static inline void i8080_jmp_addr(i8080 * const cpu, emu_addr_t addr) {
     cpu->pc = addr;
-} 
+}
 
 // Pushes the current PC and jumps to addr.
 static inline void i8080_call_addr(i8080 * const cpu, emu_addr_t addr) {
@@ -480,7 +480,7 @@ static inline void i8080_jmp(i8080 * const cpu, int condition) {
     if (condition) {
         i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
     } else {
-		// advance to word after address
+        // advance to word after address
         cpu->pc += 2;
     }
 }
@@ -492,7 +492,7 @@ static inline void i8080_call(i8080 * const cpu, int condition) {
         i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
         cpu->cycles_taken += SUBROUTINE_CYCLES_OFFSET;
     } else {
-		// advance to word after address
+        // advance to word after address
         cpu->pc += 2;
     }
 }
@@ -501,8 +501,8 @@ static inline void i8080_call(i8080 * const cpu, int condition) {
 // Conditional returns take 6 cycles longer if condition is satisfied.
 static inline void i8080_ret(i8080 * const cpu, int condition) {
     if (condition) {
-		cpu->pc = (emu_addr_t)i8080_pop(cpu);
-       cpu->cycles_taken += SUBROUTINE_CYCLES_OFFSET;
+        cpu->pc = (emu_addr_t)i8080_pop(cpu);
+        cpu->cycles_taken += SUBROUTINE_CYCLES_OFFSET;
     }
 }
 
@@ -532,7 +532,7 @@ static int emu_ext_call(i8080 * const cpu) {
         i8080_push(cpu, (emu_buf_t)cpu->pc);
         // Quit the emulator if indicated
         should_continue = cpu->emu_ext_call(cpu);
-		cpu->pc = (emu_addr_t)i8080_pop(cpu);
+        cpu->pc = (emu_addr_t)i8080_pop(cpu);
         // Subtract cycles added by this opcode since this is an external call
         cpu->cycles_taken -= OPCODES_CYCLES[i8080_EMU_EXT_CALL];
     }
@@ -569,8 +569,8 @@ void i8080_interrupt(i8080 * const cpu) {
 int i8080_next(i8080 * const cpu) {
     i8080_mutex_lock(&cpu->i_mutex);
     // The next opcode to be executed
-	emu_word_t opcode = 0;
-	// Service interrupt if pending request exists
+    emu_word_t opcode = 0;
+    // Service interrupt if pending request exists
     if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
         opcode = cpu->interrupt_acknowledge();
         // disable interrupts and bring out of halt
@@ -578,39 +578,39 @@ int i8080_next(i8080 * const cpu) {
         cpu->pending_interrupt_req = 0;
         cpu->is_halted = 0;
     } else if (!cpu->is_halted) {
-         opcode = i8080_advance_read_word(cpu);
+        opcode = i8080_advance_read_word(cpu);
     }
     i8080_mutex_unlock(&cpu->i_mutex);
-    
-	// Execute opcode
-	int success;
+
+    // Execute opcode
+    int success;
     if (!cpu->is_halted) {
-		// Execute the opcode
+        // Execute the opcode
         success = i8080_exec(cpu, opcode);
     } else {
         // indicate success but remain halted
-		success = 1;
+        success = 1;
     }
-	if (!success) i8080_mutex_destroy(&cpu->i_mutex);
-	return success;
+    if (!success) i8080_mutex_destroy(&cpu->i_mutex);
+    return success;
 }
 
 int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
-    
+
     cpu->cycles_taken += OPCODES_CYCLES[opcode];
     // If the emulator should continue after executing this instruction 
     int continue_runtime = 1;
-    
-    switch(opcode) {
-        
+
+    switch (opcode) {
+
         // No operation + undocumented NOPs. Does nothing.
-        case i8080_NOP: case i8080_ALT_NOP0: case i8080_ALT_NOP1: case i8080_ALT_NOP2: 
-		case i8080_ALT_NOP3: case i8080_ALT_NOP4: case i8080_ALT_NOP5:
+        case i8080_NOP: case i8080_ALT_NOP0: case i8080_ALT_NOP1: case i8080_ALT_NOP2:
+        case i8080_ALT_NOP3: case i8080_ALT_NOP4: case i8080_ALT_NOP5:
             break;
-            
+
         // 0x38: External emulator call to inspect emulator state or provide out-of-i8080 functionality.
         case i8080_EMU_EXT_CALL: continue_runtime = emu_ext_call(cpu); break;
-            
+
         // Move between registers
         case i8080_MOV_B_B: case i8080_MOV_B_C: case i8080_MOV_B_D: case i8080_MOV_B_E: case i8080_MOV_B_H: case i8080_MOV_B_L: case i8080_MOV_B_A:
         case i8080_MOV_C_B: case i8080_MOV_C_C: case i8080_MOV_C_D: case i8080_MOV_C_E: case i8080_MOV_C_H: case i8080_MOV_C_L: case i8080_MOV_C_A:
@@ -619,8 +619,8 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case i8080_MOV_H_B: case i8080_MOV_H_C: case i8080_MOV_H_D: case i8080_MOV_H_E: case i8080_MOV_H_H: case i8080_MOV_H_L: case i8080_MOV_H_A:
         case i8080_MOV_L_B: case i8080_MOV_L_C: case i8080_MOV_L_D: case i8080_MOV_L_E: case i8080_MOV_L_H: case i8080_MOV_L_L: case i8080_MOV_L_A:
         case i8080_MOV_A_B: case i8080_MOV_A_C: case i8080_MOV_A_D: case i8080_MOV_A_E: case i8080_MOV_A_H: case i8080_MOV_A_L: case i8080_MOV_A_A:
-            i8080_mov_reg(cpu, opcode); break;    
-            
+            i8080_mov_reg(cpu, opcode); break;
+
         // Move from memory to registers      
         case i8080_MOV_B_M: cpu->b = i8080_read_memory(cpu); break;
         case i8080_MOV_C_M: cpu->c = i8080_read_memory(cpu); break;
@@ -780,31 +780,31 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         // Load/store accumulator immediate
         case i8080_STA: cpu->write_memory(i8080_advance_read_addr(cpu), cpu->a); break;
         case i8080_LDA: cpu->a = cpu->read_memory(i8080_advance_read_addr(cpu)); break;
-        
+
         // Store HL to memory address
         case i8080_SHLD:
         {
             emu_addr_t addr = i8080_advance_read_addr(cpu);
             cpu->write_memory(addr, cpu->l);
-            cpu->write_memory(addr + (emu_addr_t) 1, cpu->h);
+            cpu->write_memory(addr + (emu_addr_t)1, cpu->h);
             break;
         }
-        
+
         // Read HL from memory address
         case i8080_LHLD:
         {
             emu_addr_t addr = i8080_advance_read_addr(cpu);
             cpu->l = cpu->read_memory(addr);
-            cpu->h = cpu->read_memory(addr + (emu_addr_t) 1);
+            cpu->h = cpu->read_memory(addr + (emu_addr_t)1);
             break;
         }
-        
+
         // Rotate
         case i8080_RLC: i8080_rlc(cpu); break;  // Rotate accumulator left
         case i8080_RRC: i8080_rrc(cpu); break;  // Rotate accumulator right
         case i8080_RAL: i8080_ral(cpu); break;  // Rotate accumulator left through carry
         case i8080_RAR: i8080_rar(cpu); break;  // Rotate accumulator right through carry
-        
+
         // Arithmetic / logical / compare immediate
         case i8080_ADI: i8080_add(cpu, i8080_advance_read_word(cpu)); break;
         case i8080_ACI: i8080_adc(cpu, i8080_advance_read_word(cpu)); break;
@@ -814,7 +814,7 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case i8080_XRI: i8080_xra(cpu, i8080_advance_read_word(cpu)); break;
         case i8080_ORI: i8080_ora(cpu, i8080_advance_read_word(cpu)); break;
         case i8080_CPI: i8080_cmp(cpu, i8080_advance_read_word(cpu)); break;
-        
+
         // Stack push / pop
         case i8080_PUSH_B: i8080_push(cpu, i8080_get_bc(cpu)); break;
         case i8080_PUSH_D: i8080_push(cpu, i8080_get_de(cpu)); break;
@@ -824,9 +824,9 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case i8080_POP_D: i8080_set_de(cpu, (emu_addr_t)i8080_pop(cpu)); break;
         case i8080_POP_H: i8080_set_hl(cpu, (emu_addr_t)i8080_pop(cpu)); break;
         case i8080_POP_PSW: i8080_set_psw(cpu, (emu_addr_t)i8080_pop(cpu)); break;
-        
+
         // Subroutine calls
-        case i8080_CALL: case i8080_ALT_CALL0: case i8080_ALT_CALL1: case i8080_ALT_CALL2: 
+        case i8080_CALL: case i8080_ALT_CALL0: case i8080_ALT_CALL1: case i8080_ALT_CALL2:
             i8080_call(cpu, 1); break;
         case i8080_CNZ: i8080_call(cpu, !cpu->z); break;  // CALL on !Z i.e. non-zero acc
         case i8080_CZ: i8080_call(cpu, cpu->z); break;    // CALL on Z i.e. zero acc
@@ -836,9 +836,9 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case i8080_CPE: i8080_call(cpu, cpu->p); break;   // CALL on P i.e. acc parity even
         case i8080_CP:  i8080_call(cpu, !cpu->s); break;  // CALL on !S i.e. acc positive
         case i8080_CM: i8080_call(cpu, cpu->s); break;    // CALL on S i.e. acc negative
-        
+
         // Subroutine returns
-        case i8080_RET: case i8080_ALT_RET0: 
+        case i8080_RET: case i8080_ALT_RET0:
             i8080_ret(cpu, 1); break;
         case i8080_RNZ: i8080_ret(cpu, !cpu->z); break;   // RET on !Z i.e. non-zero acc
         case i8080_RZ: i8080_ret(cpu, cpu->z); break;     // RET on Z i.e. zero acc
@@ -848,10 +848,10 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case i8080_RPE: i8080_ret(cpu, cpu->p); break;    // RET on P i.e. acc parity even
         case i8080_RP: i8080_ret(cpu, !cpu->s); break;    // RET on !S i.e. acc positive
         case i8080_RM: i8080_ret(cpu, cpu->s); break;     // RET on S i.e. acc negative
-        
+
         // Jumps
-        case i8080_JMP: case i8080_ALT_JMP0: 
-            i8080_jmp(cpu, 1); break;     
+        case i8080_JMP: case i8080_ALT_JMP0:
+            i8080_jmp(cpu, 1); break;
         case i8080_JNZ: i8080_jmp(cpu, !cpu->z); break;    // JMP on !Z i.e. non-zero acc
         case i8080_JZ: i8080_jmp(cpu, cpu->z); break;      // JMP on Z i.e. zero acc
         case i8080_JNC: i8080_jmp(cpu, !cpu->cy); break;   // JMP on !CY i.e. carry reset
@@ -860,7 +860,7 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case i8080_JPE: i8080_jmp(cpu, cpu->p); break;     // JMP on P i.e. acc parity even
         case i8080_JP: i8080_jmp(cpu, !cpu->s); break;     // JMP on !S i.e. acc positive
         case i8080_JM: i8080_jmp(cpu, cpu->s); break;      // JMP on S i.e. acc negative
-        
+
         // Special instructions
         case i8080_DAA: i8080_daa(cpu); break;      // Decimal adjust acc (convert acc to BCD)
         case i8080_CMA: cpu->a = ~cpu->a; break;    // Complement accumulator
@@ -870,12 +870,12 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case i8080_SPHL: cpu->sp = i8080_get_hl(cpu); break; // Move HL into SP
         case i8080_XTHL: i8080_xthl(cpu); break;             // Exchange top of stack with H&L
         case i8080_XCHG: i8080_xchg(cpu); break;             // Exchanges the contents of BC and DE
-        
+
         // I/O, accumulator <-> word
         /* In the 8080, the port address is duplicated across the 16-bit address bus:
          * https://stackoverflow.com/questions/13551973/intel-8080-instruction-out
          * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 97 */
-        case i8080_IN: 
+        case i8080_IN:
         {
             if (cpu->port_in != NULL) {
                 emu_word_t port_addr = i8080_advance_read_word(cpu);
@@ -885,17 +885,17 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
             }
             break;
         }
-        case i8080_OUT: 
+        case i8080_OUT:
         {
             if (cpu->port_out != NULL) {
-               emu_word_t port_addr = i8080_advance_read_word(cpu);
-               cpu->port_out((emu_addr_t)concatenate(port_addr, port_addr), cpu->a); 
+                emu_word_t port_addr = i8080_advance_read_word(cpu);
+                cpu->port_out((emu_addr_t)concatenate(port_addr, port_addr), cpu->a);
             } else {
                 continue_runtime = 0;
             }
             break;
         }
-        
+
         // Restart / software interrupts
         case i8080_RST_0: i8080_call_addr(cpu, 0x0000); break;
         case i8080_RST_1: i8080_call_addr(cpu, 0x0008); break;
@@ -905,19 +905,19 @@ int i8080_exec(i8080 * const cpu, emu_word_t opcode) {
         case i8080_RST_5: i8080_call_addr(cpu, 0x0028); break;
         case i8080_RST_6: i8080_call_addr(cpu, 0x0030); break;
         case i8080_RST_7: i8080_call_addr(cpu, 0x0038); break;
-        
+
         // Enable / disable interrupts
         case i8080_EI: cpu->ie = 1; break;
         case i8080_DI: cpu->ie = 0; break;
-        
+
         // HALT processor
         // Can only be brought out by interrupt or RESET.
         case i8080_HLT: cpu->is_halted = 1; break;
-        
+
         default: continue_runtime = 0; // instruction was not identifiable
     }
-    
+
     cpu->last_instr_exec = opcode;
-    
+
     return continue_runtime;
 }

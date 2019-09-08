@@ -26,7 +26,7 @@ static void cpm_env_port_out(emu_addr_t addr, emu_word_t word) {
 // CPU port in for the CP/M environment.
 static emu_word_t cpm_env_port_in(emu_addr_t addr) {
     emu_word_t rw = 0x00;
-     // Address is duplicated, pick lower 8 bits
+    // Address is duplicated, pick lower 8 bits
     emu_word_t port_addr = (emu_word_t)(addr & WORD_T_MAX);
     if (port_addr == CPM_CONSOLE_ADDR) {
         scanf(WORD_T_ASCII_FORMAT, &rw);
@@ -37,7 +37,7 @@ static emu_word_t cpm_env_port_in(emu_addr_t addr) {
 struct emu_runtime_args {
     i8080 * const cpu;
     emu_debug_args_t * const debug_args;
-	emu_exit_code_t exit_code;
+    emu_exit_code_t exit_code;
 };
 
 static void * emu_runtime_thr(void * args) { 
