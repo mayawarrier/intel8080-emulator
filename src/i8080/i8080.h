@@ -66,7 +66,7 @@ I8080_CDECL typedef struct i8080 {
      * interrupt is not accidentally double-serviced
      * or missed by the i8080. */
     i8080_mutex_t i_mutex;
-
+    
     // Cycles taken for last emu_runtime
     emu_large_t cycles_taken;
 

@@ -47,7 +47,7 @@
         pthread_mutex_init(handle, NULL);
     }
 
-    inline void i8080_mutex_lock(i8080_mutex * handle) {
+    inline void i8080_mutex_lock(i8080_mutex_t * handle) {
         pthread_mutex_lock(handle);
     }
 
