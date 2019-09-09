@@ -1,21 +1,21 @@
-/* 
+/*
  * File:   opcodes.h
  * Author: dhruvwarrier
- * 
+ *
  * All the opcodes in the INTEL 8080.
  * Roughly categorized by instruction type.
- * 
+ *
  * Conditional RETs and CALLs take 6 extra cycles if the condition succeeds.
  *
  * ALT_s are undocumented opcodes that are alternatives
  * for existing ones.
- * 
+ *
  * Created on June 23, 2019, 11:02 PM
  */
 
 #ifndef OPCODES_H
 #define OPCODES_H
-								/*    size       flags       details                           cycles  */
+                                /*    size       flags       details                           cycles  */
 #define i8080_NOP 0x00          /*      1                    no operation                         4    */
 #define i8080_LXI_B 0x01        /*      3                    B <- byte 3, C <- byte 2             10   */
 #define i8080_STAX_B 0x02       /*      1                    [BC] <- A                            7    */
@@ -60,8 +60,8 @@
 #define i8080_DCR_H 0x25        /*      1       Z,S,P,AC     H <- H - 1                           5    */
 #define i8080_MVI_H 0x26        /*      2                    H <- byte 2                          7    */
 #define i8080_DAA 0x27          /*      1       Z,S,P,AC     A to BCD, add 6 to lower nibble      
-															 if AC or > 9, add 6 to higher
-															 nibble if CY or > 9                  4    */
+                                                             if AC or > 9, add 6 to higher
+                                                             nibble if CY or > 9                  4    */
 #define i8080_ALT_NOP4 0x28
 
 #define i8080_DAD_H 0x29        /*      1       CY           HL <- HL + HL                        10   */
@@ -146,7 +146,7 @@
 #define i8080_MOV_M_H 0x74      /*      1                    [HL] <- H                            7    */
 #define i8080_MOV_M_L 0x75      /*      1                    [HL] <- L                            7    */
 #define i8080_HLT 0x76          /*      1                    halt, S0, S1 = 0, interrupt
-															 brings it out of this state          7    */
+                                                             brings it out of this state          7    */
 #define i8080_MOV_M_A 0x77      /*      1                    [HL] <- A                            7    */
 #define i8080_MOV_A_B 0x78      /*      1                    A <- B                               5    */
 #define i8080_MOV_A_C 0x79      /*      1                    A <- C                               5    */
