@@ -1,9 +1,9 @@
 # Project files
-intel8080-emulator/
+*.vs/
+windows-build/
 nbproject/
 *.dep.inc
 *.mk
-Makefile
 
 # Prerequisites
 *.d
