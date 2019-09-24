@@ -7,7 +7,6 @@
 #include "emu_debug.h"
 #include "i8080/internal/i8080_opcodes.h"
 #include "i8080/internal/i8080_consts.h"
-#include <string.h>
 #include <stdint.h>
 
 typedef enum emu_env {
@@ -15,44 +14,35 @@ typedef enum emu_env {
     DEFAULT
 } emu_env_t;
 
-// The current emulator environment set before runtime
+// The current emulator environment
 static emu_env_t EMU_ENV = (enum emu_env)DEFAULT;
 
 size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc) {
     
     size_t file_size = 0;
+    size_t words_read = 0;
     FILE * f_ptr = fopen(file_loc, "rb");
-    if (f_ptr == NULL) {
-        printf("Error: file cannot be opened.\n");
-        goto failure;
-    }
+
+    // Error: file cannot be opened
+    if (f_ptr == NULL) goto end;
     
     // get the file size
     fseek(f_ptr, 0, SEEK_END);
     file_size = ftell(f_ptr);
     rewind(f_ptr);
     
-    // check if it can fit into memory
-    if (file_size + start_loc > ADDR_T_MAX + (size_t)1) {
-        printf("Error: file too large.\n");
-        goto failure;
-    }
+    // Error: file cannot fit into memory
+    if (file_size + start_loc > ADDR_T_MAX + (size_t)1) goto end;
     
     // Attempt to read the entire file
-    size_t words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
+    words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
     
-    if (words_read != file_size) {
-        printf("Error: file read failure.\n");
-        goto failure;
-    }
+    // Error: file read failure
+    if (words_read != file_size) words_read = 0;
     
+    end:
     fclose(f_ptr);
     return words_read;
-    
-    failure: {
-        fclose(f_ptr);
-        return 0;
-    }
 }
 
 // Prints the string at str_addr to CPM console, terminated by '$'
@@ -186,8 +176,6 @@ static int i8080_cpm_zero_page(void * const udata) {
     }
 }
 
-static const char INIT_MEM_STREAM_ERR_MSG[] = "Error: Cannot write to memory. Initialize emulator memory streams first.\n";
-
 // Reserved locations for interrupt vector table
 static const emu_addr_t INTERRUPT_TABLE[] = {
 	0x00, // RESET, RST 0
@@ -200,7 +188,9 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
 	0x38  // RST 7
 };
 
-void emu_set_cpm_env(i8080 * const cpu) {
+int emu_set_cpm_env(i8080 * const cpu) {
+
+    int success = 0;
 
     // i8080_EMU_EXT_CALL is used to emulate calls to CP/M BDOS and WBOOT.
     
@@ -248,13 +238,16 @@ void emu_set_cpm_env(i8080 * const cpu) {
 
         cpu->emu_ext_call = i8080_cpm_zero_page;
         EMU_ENV = (enum emu_env)CPM;
-    } else {
-        printf(INIT_MEM_STREAM_ERR_MSG);
+
+        success = 1;
     }
+
+    return success;
 }
 
-void emu_set_default_env(i8080 * const cpu) {
+int emu_set_default_env(i8080 * const cpu) {
     
+    int success = 0;
     if (cpu->write_memory != NULL) {
         // Create the interrupt vector table
         // Do not write to RST 1 sequence, we'll put our bootloader there instead
@@ -269,9 +262,11 @@ void emu_set_default_env(i8080 * const cpu) {
         cpu->write_memory(0x0001, DEFAULT_START_PA);
         cpu->write_memory(0x0002, 0x00);
         EMU_ENV = (enum emu_env)DEFAULT;
-    } else {
-        printf(INIT_MEM_STREAM_ERR_MSG);
+
+        success = 1;
     }
+
+    return success;
 }
 
 void emu_init_i8080(i8080 * const cpu) {
@@ -286,54 +281,25 @@ void emu_init_i8080(i8080 * const cpu) {
 
 // Writes test_word to all locations, then reads test_word from all locations.
 // Returns 0 if a read failed to return test_word, and stores the failed location in cpu->pc.
-static int memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const emu_word_t test_word, const int descriptive) {
+static int memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const emu_word_t test_word) {
     size_t i = 0;
-    if (descriptive) {
-        int success = 1;
-        // Write pass
-        printf("Write pass: " WORD_T_PRT_FORMAT "\n", test_word);
-        for (i = start_addr; i <= end_addr; ++i) {
-            // Show progress
-            printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", (emu_addr_t)i);
-            cpu->write_memory((emu_addr_t)i, test_word);
-        }
-        // Read pass
-        printf("\nRead pass: " WORD_T_PRT_FORMAT "\n", test_word);
-        for (i = start_addr; i <= end_addr; ++i) {
-            // Show progress
-            printf("\r(" ADDR_T_PRT_FORMAT "/0xffff)", (emu_addr_t)i);
-            if (cpu->read_memory((emu_addr_t)i) != test_word) {
-                // indicate to user which location failed
-                printf("\nLocation " ADDR_T_PRT_FORMAT " failed.", (emu_addr_t)i);
-                cpu->pc = (emu_addr_t)i;
-                success = 0;
-                break;
-            }
-        }
-        printf("\n");
-        return success;
+    for (i = start_addr; i <= end_addr; ++i) {
+        cpu->write_memory((emu_addr_t)i, test_word);
     }
-    else {
-        for (i = start_addr; i <= end_addr; ++i) {
-            cpu->write_memory((emu_addr_t)i, test_word);
+    for (i = start_addr; i <= end_addr; ++i) {
+        if (cpu->read_memory((emu_addr_t)i) != test_word) {
+            cpu->pc = (emu_addr_t)i;
+            return 0;
         }
-        for (i = start_addr; i <= end_addr; ++i) {
-            if (cpu->read_memory((emu_addr_t)i) != test_word) {
-                cpu->pc = (emu_addr_t)i;
-                return 0;
-            }
-        }
-        return 1;
     }
+    return 1;
 }
 
-int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const int descriptive) {
-    if (descriptive) printf("Checking memory...\n");
+int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr) {
     // Pass 1
-    if (!memory_write_read_pass(cpu, start_addr, end_addr, 0x55, descriptive)) return 0;
+    if (!memory_write_read_pass(cpu, start_addr, end_addr, 0x55)) return 0;
     // Pass 2, check alternate bits
-    if (!memory_write_read_pass(cpu, start_addr, end_addr, 0xAA, descriptive)) return 0;
-    if (descriptive) printf("All memory locations functional.\n");
+    if (!memory_write_read_pass(cpu, start_addr, end_addr, 0xAA)) return 0;
     return 1;
 }
 
@@ -351,10 +317,6 @@ emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * d_args) {
         set_debug_next_options(d_args);
         i8080_next_ovrd = i8080_debug_next;
     }
-
-    // Print welcome message
-    printf("intel8080-emulator, with limited CP/M BIOS support.\nSee github.com/dhruvwarrier/intel8080-emulator/ for more.\n");
-    if (EMU_ENV == (enum emu_env)CPM) printf("\nCP/M Warm Boot. Type HELP for a list of commands.");
 
     // Execute all instructions until failure/quit
     while(1) {

@@ -42,8 +42,7 @@ I8080_CDECL typedef struct emu_debug_args {
 I8080_CDECL size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc);
 // Checks all locations from start_addr to end_addr for read/write errors, using cpu.read_memory() and cpu.write_memory().
 // Returns if failure occured, with location stored in cpu->pc.
-// Param descriptive = 1 shows the write/read progress.
-I8080_CDECL int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const int descriptive);
+I8080_CDECL int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr);
 
 // Initialize an i8080
 I8080_CDECL void emu_init_i8080(i8080 * const cpu);
@@ -54,13 +53,15 @@ I8080_CDECL void emu_init_i8080(i8080 * const cpu);
  * The command processor has 2 commands:
  * RUN addr: Begins execution of a CP/M program starting at addr.
  * QUIT: Quits the emulator.
- * Call this after the emulator's memory streams have been initialized (cpu->read_memory & cpu->write_memory). */
-I8080_CDECL void emu_set_cpm_env(i8080 * const cpu);
+ * Call this after the emulator's memory streams have been initialized (cpu.read_memory() & cpu.write_memory()). 
+ * Returns 1 on success, 0 on failure. */
+I8080_CDECL int emu_set_cpm_env(i8080 * const cpu);
 /* Sets up the default emulator environment.
  * Creates an interrupt vector table at the top 64 bytes of memory,
  * and writes a RST 0 sequence that jumps to after the IVT (0x40, emu_consts.h/DEFAULT_START_PA). 
- * Call this after the emulator's memory streams have been initialized (cpu->read_memory & cpu->write_memory). */
-I8080_CDECL void emu_set_default_env(i8080 * const cpu);
+ * Call this after the emulator's memory streams have been initialized (cpu.read_memory() & cpu.write_memory()). 
+ * Returns 1 on success, 0 on failure. */
+I8080_CDECL int emu_set_default_env(i8080 * const cpu);
 
 /* Begin the emulator. Must have properly set up memory and streams first!
  * Returns an error code if the emulator was not initialized properly.
