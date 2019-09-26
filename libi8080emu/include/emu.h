@@ -1,7 +1,4 @@
 /* 
- * File:   emu.h
- * Author: dhruvwarrier
- *
  * This is the emulator layer over the base i8080 implementation.
  * 
  * It provides debugging functionality, and limited emulation of the 
@@ -9,8 +6,6 @@
  * programs.
  * 
  * See below for what is supported in the CP/M 2.2 environment.
- * 
- * Created on June 30, 2019, 5:28 PM
  */
 
 #ifndef EMU_H

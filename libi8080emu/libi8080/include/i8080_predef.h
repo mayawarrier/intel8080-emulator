@@ -1,7 +1,4 @@
 /*
- * File:   i8080_predef.h
- * Author: dhruvwarrier
- *
  * Predefs for different machines/compilers.
  * Undef the macros defined here by including i8080_predef_undef.h
  *
@@ -9,8 +6,6 @@
  * https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/unistd.h.html
  * https://sourceforge.net/p/predef/wiki/Standards/
  * http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system
- *
- * Created on June 30, 2019, 2:56 PM
  */
 
 #ifndef I8080_PREDEF_H

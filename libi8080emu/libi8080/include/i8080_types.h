@@ -1,3 +1,8 @@
+/*
+ * Provides definitions for all i8080 types and function pointers,
+ * and suppresses warnings & errors from MSVC. If including this in an MSVC project,
+ * it should be included before any Windows header or before including <stdio.h>.
+ */
 
 #ifndef I8080_TYPES_H
 #define I8080_TYPES_H

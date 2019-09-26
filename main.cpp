@@ -1,3 +1,6 @@
+/*
+ * Provide a simple command processor as a frontend to libi8080emu.
+ */
 
 #include "libi8080emu/include/emu.h"
 #include "libi8080emu/include/emu_consts.h"

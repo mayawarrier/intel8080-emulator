@@ -1,10 +1,5 @@
 /* 
- * File:   emu_debug.h
- * Author: dhruvwarrier
- *
- * Contains some functions to help debug.
- * 
- * Created on June 30, 2019, 8:24 PM
+ * Functions to debug emulator state.
  */
 
 #ifndef EMU_DEBUG_H

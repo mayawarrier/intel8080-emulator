@@ -1,4 +1,6 @@
-
+/* 
+ * libi8080emu constants.
+ */
 
 /* The starting location of the CP/M Transient Program Area i.e.
  * the first valid location to load a program written for CP/M.

@@ -1,10 +1,12 @@
 /*
- * File:   i8080.h
- * Author: dhruvwarrier
- *
  * Emulate an i8080.
  *
- * Created on June 30, 2019, 5:28 PM
+ * - Supports all instructions, documented and undocumented.
+ * - Supports asynchronous interrupts (given that the build environment supports mutexes or 
+ *   atomic synchronization, see i8080_sync.c)
+ * - Instruction 0x38 (undocumented NOP) is repurposed to act as a debugging/inspection opcode. 
+ *   Upon hitting 0x38, the PC is pushed to the stack, and i8080.emu_ext_call() is called with a
+ *   pointer to the i8080 instance.
  */
 
 #ifndef I_8080_H

@@ -1,3 +1,7 @@
+/*
+ * libi8080 constants.
+ * Format specifiers and bit widths for i8080 types.
+ */
 
 #ifndef I8080_CONSTS_H
 #define I8080_CONSTS_H

@@ -1,16 +1,9 @@
 /*
- * File:   opcodes.h
- * Author: dhruvwarrier
- *
  * All the opcodes in the INTEL 8080.
  * Roughly categorized by instruction type.
  *
  * Conditional RETs and CALLs take 6 extra cycles if the condition succeeds.
- *
- * ALT_s are undocumented opcodes that are alternatives
- * for existing ones.
- *
- * Created on June 23, 2019, 11:02 PM
+ * ALT_s are undocumented opcodes and are alternatives for existing opcodes.
  */
 
 #ifndef OPCODES_H

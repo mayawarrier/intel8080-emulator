@@ -1,10 +1,5 @@
 /*
- * File:   i8080_predef_undef.h
- * Author: dhruvwarrier
- *
- * Undef the macros defined in i8080_predef.h
- *
- * Created on June 30, 2019, 2:56 PM
+ * Include this to unndef the macros defined in i8080_predef.h.
  */
 
 #undef I8080_WINDOWS

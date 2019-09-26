@@ -1,3 +1,8 @@
+/*
+ * Run all the tests for libi8080emu and pretty-print them to console.
+ * This shows many examples on how to use libi8080emu, and some documentation on setup.
+ */
+
 #include "../include/emu.h"
 #include "../include/emu_consts.h"
 #include "../libi8080/include/i8080_consts.h"
