@@ -48,7 +48,7 @@
 
 /* If being compiled with GNUC and mutex primitives are not available, GNUC provides
  * atomic synchronization functions from version 4.7.0, that can be used to simulate mutexes. */
-#if (defined(__GNUC__) || defined(__GNUG__)) && ((__GNUC__ >= 4) && (__GNUC_MINOR__ >= 7) && (__GNUC_PATCHLEVEL__ >= 0))
+#if (defined(__GNUC__) || defined(__GNUG__)) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 7) || (__GNUC__ == 4 && __GNUC_MINOR__ == 7 && __GNUC_PATCHLEVEL__ >= 0))
     #define I8080_GNUC_MIN_VER
 #endif
 
