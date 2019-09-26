@@ -136,7 +136,7 @@ int run_all_tests() {
     num_tests_passed += run_interrupted_test(&cpu, interrupts_test_fileloc, CPM_START_OF_TPA, 200);
     std::cout << "\n-------------------------------------------------------------------------\n";
 
-    std::cout << "\n(" << num_tests_passed << "/" << num_tests << ") tests passed." << std::endl;
+    std::cout << "\n" << num_tests_passed << "/" << num_tests << " tests passed." << std::endl;
     i8080_destroy(&cpu);
 
     return (num_tests_passed == 3) ? 1 : 0;

@@ -23,31 +23,38 @@ struct emu_cmd_state : cmd_state {
     bool is_cpm_env;
     bool is_runnable;
     bool is_testing;
+    bool is_showing_help;
     std::string bin_file;
-    emu_cmd_state() : cmd_state(), 
-        is_cpm_env(false), 
-        is_runnable(false), 
+    emu_cmd_state() : cmd_state(),
+        is_cpm_env(false),
+        is_runnable(false),
         is_testing(false),
+        is_showing_help(false),
         bin_file("") {}
 };
 
-void print_help_msg() {
-    std::cerr << "i8080-emu, an emulator for the INTEL 8080 microprocessor with some CP/M 2.2 BIOS support.\n"
-        << "Supports async interrupts, CPM 2.2 BDOS ops 2 and 9, and a simple command processor at CP/M WBOOT.\n\n"
-        << "Usage: i8080-emu [options]\n"
-        << "Options:\n"
-        << "   -h\t--help\t\t\tPrint this help message.\n"
-        << "   -e\t--env ENV\t\tSet the environment. \"default\" or \"cpm\".\n"
-        << "   -f\t--file FILE\t\tExecute the file as i8080 binary.\n"
-        << "   --run-all-tests\t\tRun all the test files under tests/." << std::endl;
-}
+const std::string cmdline_help_msg = 
+"\ni8080-emu, an emulator for the INTEL 8080 microprocessor with some CP/M 2.2 BIOS support.\n"
+"Supports async interrupts, CPM 2.2 BDOS ops 2 and 9, and a simple command processor at CP/M WBOOT.\n\n"
+"Usage: i8080-emu [options]\n"
+"Options:\n"
+"   -h\t--help\t\t\tPrint this help message.\n"
+"   -e\t--env ENV\t\tSet the environment. \"default\" or \"cpm\".\n"
+"   -f\t--file FILE\t\tExecute the file as i8080 binary.\n"
+"   --run-all-tests\t\tRun all the test files under tests/.\n";
 
 // Prints the help message and returns EXIT failure
 int cmd_print_help_msg_and_exit(cmd_state & cmd_state, std::vector<std::string>::iterator &) {
     emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
-    print_help_msg();
     // if args were valid, return normally i.e. came here from --help/-h
-    return (int)emu_cmd_state.is_args_valid;
+    if (emu_cmd_state.is_args_valid) {
+        emu_cmd_state.is_showing_help = true;
+        std::cout << cmdline_help_msg.c_str();
+        return 1;
+    } else {
+        std::cerr << cmdline_help_msg.c_str();
+        return 0;
+    }
 }
 
 int cmd_set_emu_env(cmd_state & cmd_state, std::vector<std::string>::iterator & opt_args_itr) {
@@ -182,7 +189,7 @@ int run_all_tests();
 int run_i8080_bin(const std::string & bin_file, bool is_cpm_env);
 
 int main(int argc, char ** argv) {
-    int exit_success = 0;
+    int exit_success = EXIT_FAILURE;
     //if (EMU_ENV == (enum emu_env)CPM) printf("\nCP/M Warm Boot. Type HELP for a list of commands.");
     emu_cmd_state EMU_CMD_STATE;
     int cmd_success = process_cmdline(argc, argv, EMU_CMD_STATE);
@@ -196,7 +203,7 @@ int main(int argc, char ** argv) {
         exit_success = EXIT_SUCCESS;
     }
     // not runnable, no file provided
-    if (!EMU_CMD_STATE.is_runnable && cmd_success) { // TODO: check that --help is not called on its own before printing msg
+    if (!EMU_CMD_STATE.is_runnable && !EMU_CMD_STATE.is_showing_help && cmd_success) {
         std::cout << "Use --file to specify source of i8080 binary." << std::endl;
         exit_success = EXIT_FAILURE;
     }
