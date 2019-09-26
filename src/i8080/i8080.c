@@ -541,9 +541,13 @@ static int emu_ext_call(i8080 * const cpu) {
 
 void i8080_init(i8080 * const cpu) {
     i8080_reset(cpu);
-    cpu->cycles_taken = 0;
     // Initialize interrupts synchronization mutex
     i8080_mutex_init(&cpu->i_mutex);
+}
+
+void i8080_destroy(i8080 * const cpu) {
+    // release any internal OS resources for the mutex if they exist
+    i8080_mutex_destroy(&cpu->i_mutex);
 }
 
 void i8080_reset(i8080 * const cpu) {
@@ -551,6 +555,7 @@ void i8080_reset(i8080 * const cpu) {
     cpu->is_halted = 0;
     cpu->ie = 0;
     cpu->pending_interrupt_req = 0;
+    cpu->cycles_taken = 0;
 }
 
 /* i8080_interrupt() and i8080_next() can be on different threads, so lock
@@ -591,7 +596,6 @@ int i8080_next(i8080 * const cpu) {
         // indicate success but remain halted
         success = 1;
     }
-    if (!success) i8080_mutex_destroy(&cpu->i_mutex);
     return success;
 }
 

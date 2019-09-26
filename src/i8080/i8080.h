@@ -75,6 +75,9 @@ I8080_CDECL typedef struct i8080 {
 /* Resets the i8080, and performs first time initialization. */
 I8080_CDECL void i8080_init(i8080 * const cpu);
 
+/* Destroys any internal resources held by the OS for i8080.i_mutex. */
+I8080_CDECL void i8080_destroy(i8080 * const cpu);
+
 /* Resets the i8080. PC is set to 0, i8080 exits halt state, and cycles taken is reset to 0.
  * No other working registers or flags are affected. Equivalent to pulling RESET low. */
 I8080_CDECL void i8080_reset(i8080 * const cpu);
