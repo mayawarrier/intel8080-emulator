@@ -9,13 +9,16 @@
 #include "i8080/internal/i8080_consts.h"
 #include <stdint.h>
 
-typedef enum emu_env {
+enum emu_env {
     CPM,
     DEFAULT
-} emu_env_t;
+};
 
-// The current emulator environment
-static emu_env_t EMU_ENV = (enum emu_env)DEFAULT;
+// Current state of the emulator
+static struct {
+    enum emu_env env;
+    int enable_cmd_proc;
+} EMU_STATE = { .env = (enum emu_env)DEFAULT,.enable_cmd_proc = 1 };
 
 size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc) {
     
@@ -76,6 +79,20 @@ static int i8080_cpm_zero_page(void * const udata) {
         
         case 0xe401:
         {
+            // Enable/disable WBOOT command processor as required
+            emu_word_t wboot_cmd_code = cpu->read_memory(0x0003);
+            if (wboot_cmd_code == 0x01) {
+                // WBOOT command proc is disabled, first run
+                // Overwrite the return address
+                cpu->write_memory(cpu->sp + (emu_addr_t)1, 0x01);
+                cpu->write_memory(cpu->sp, 0x00);
+                cpu->write_memory(0x0003, 0x00);
+                return 1;
+            } else if (wboot_cmd_code == 0x00) {
+                // second run, quit the emulator
+                return 0;
+            }
+            
             // This is a basic command processor, entered upon WBOOT. Commands are: RUN addr, HELP, and QUIT.
             // RUN addr starts executing instructions from addr. addr should be in 16-bit hex format eg. 0x0000 or 0x1234
             // HELP shows the list of commands.
@@ -188,65 +205,79 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
 	0x38  // RST 7
 };
 
-int emu_set_cpm_env(i8080 * const cpu) {
-
-    int success = 0;
+void emu_set_cpm_env_load_bios(i8080 * const cpu) {
 
     // i8080_EMU_EXT_CALL is used to emulate calls to CP/M BDOS and WBOOT.
-    
-    if (cpu->write_memory != NULL) {
-        // Entry for CP/M BDOS is 0x05.
-        cpu->write_memory(0x05, i8080_EMU_EXT_CALL);
-        cpu->write_memory(0x06, i8080_RET);
 
-        // Entry to CP/M WBOOT (warm boot). Jumps to command processor,
-        // which lies at 0xe400 for 64K machines
-        cpu->write_memory(0x00, i8080_JMP);
-        cpu->write_memory(0x01, 0x00);
-        cpu->write_memory(0x02, 0xe4);
-        
-        // External call to a simple command processor
-        cpu->write_memory(0xe400, i8080_EMU_EXT_CALL);
-        
-        // Command processor messages, '$'-terminated
-        // as is the convention in CP/M.
-        const char * const CMD_MSGS[] = {
-            "Invalid address.$", 
-            "Invalid command.$",
-            "RUN addr: Start executing instructions from addr. For eg. RUN 0x0100\nHELP: Bring up this list of commands.\nQUIT: quit$",
-            "\n> $"
-        };
+    // Entry to CP/M BDOS
+    cpu->write_memory(0x05, i8080_EMU_EXT_CALL);
+    cpu->write_memory(0x06, i8080_RET);
 
-        // loop indices
-        size_t i, j;
+    // Entry to CP/M WBOOT (warm boot), jumps to command processor
+    cpu->write_memory(0x00, i8080_JMP);
+    cpu->write_memory(0x01, 0x00);
+    cpu->write_memory(0x02, 0xe4);
 
-		// Store messages from 0xe410
-        emu_addr_t msgs_loc = 0xe410;
-        const char * msg; size_t msg_len;
-        for (i = 0; i < 4; ++i) {
-            msg = CMD_MSGS[i];
-            msg_len = strlen(msg);
-            for (j = 0; j < msg_len; ++j) {
-                cpu->write_memory(msgs_loc++, msg[j]);
-            }
+    // Entry to command processor
+    cpu->write_memory(0xe400, i8080_EMU_EXT_CALL);
+
+    // Command processor messages, '$'-terminated
+    // as is the convention in CP/M.
+    const char * const CMD_MSGS[] = {
+        "Invalid address.$",
+        "Invalid command.$",
+        "RUN addr: Start executing instructions from addr. For eg. RUN 0x0100\nHELP: Bring up this list of commands.\nQUIT: quit$",
+        "\n> $"
+    };
+
+    // loop indices
+    size_t i, j;
+
+    // Store messages from 0xe410
+    emu_addr_t msgs_loc = 0xe410;
+    const char * msg; size_t msg_len;
+    for (i = 0; i < 4; ++i) {
+        msg = CMD_MSGS[i];
+        msg_len = strlen(msg);
+        for (j = 0; j < msg_len; ++j) {
+            cpu->write_memory(msgs_loc++, msg[j]);
         }
-        
-        // HLT for the rest of the interrupts
-        for (i = 1; i < 8; ++i) {
-            cpu->write_memory(INTERRUPT_TABLE[i], i8080_HLT);
-        }
-
-        cpu->emu_ext_call = i8080_cpm_zero_page;
-        EMU_ENV = (enum emu_env)CPM;
-
-        success = 1;
     }
 
+    // HLT for the rest of the interrupts
+    for (i = 1; i < 8; ++i) {
+        cpu->write_memory(INTERRUPT_TABLE[i], i8080_HLT);
+    }
+
+    cpu->emu_ext_call = i8080_cpm_zero_page;
+}
+
+static void emu_reset_cpm_env(i8080 * const cpu) {
+    // Enable/disable WBOOT command processor
+        // 2 -> enable cmd proc
+        // 1 -> disable cmd proc
+    if (EMU_STATE.enable_cmd_proc) {
+        cpu->write_memory(0x03, 0x02);
+    } else {
+        cpu->write_memory(0x03, 0x01);
+    }
+}
+
+int emu_set_cpm_env(i8080 * const cpu, int enable_cmd_proc) {
+    int success = 0;
+    if (cpu->write_memory != NULL) {
+        EMU_STATE.enable_cmd_proc = enable_cmd_proc;
+        EMU_STATE.env = (enum emu_env)CPM;
+        // load command processor and BDOS
+        emu_set_cpm_env_load_bios(cpu);
+        // reset cmd processor
+        emu_reset_cpm_env(cpu);
+        success = 1;
+    }
     return success;
 }
 
-int emu_set_default_env(i8080 * const cpu) {
-    
+int emu_set_default_env(i8080 * const cpu) {    
     int success = 0;
     if (cpu->write_memory != NULL) {
         // Create the interrupt vector table
@@ -261,8 +292,8 @@ int emu_set_default_env(i8080 * const cpu) {
         cpu->write_memory(0x0000, i8080_JMP);
         cpu->write_memory(0x0001, DEFAULT_START_PA);
         cpu->write_memory(0x0002, 0x00);
-        EMU_ENV = (enum emu_env)DEFAULT;
 
+        EMU_STATE.env = (enum emu_env)DEFAULT;
         success = 1;
     }
 
@@ -303,7 +334,7 @@ int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const em
     return 1;
 }
 
-emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * d_args) {
+emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args * d_args) {
     
     if (cpu->read_memory == NULL || cpu->write_memory == NULL) {
         return EMU_ERR_MEM_STREAMS;
@@ -317,6 +348,9 @@ emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * d_args) {
         set_debug_next_options(d_args);
         i8080_next_ovrd = i8080_debug_next;
     }
+    
+    // If previous environment was CPM, reset WBOOT cmd proc
+    if (EMU_STATE.env == (enum enum_env)CPM) emu_reset_cpm_env(cpu);
 
     // Execute all instructions until failure/quit
     while(1) {

@@ -28,7 +28,7 @@ I8080_CDECL typedef enum EMU_EXIT_CODE {
 } emu_exit_code_t;
 
 // Args for emu debug mode.
-I8080_CDECL typedef struct emu_debug_args {
+I8080_CDECL typedef struct {
     FILE * debug_out;                       // Stream that debug output should go to.
     int should_dump_stats;                // Whether or not to dump status of all registers and flags after each instruction.
     int should_dump_memory;               // Whether or not to dump contents of the memory after each instruction.
@@ -36,7 +36,7 @@ I8080_CDECL typedef struct emu_debug_args {
     int mem_dump_newline_after;             // The number of words after which a newline is inserted in the memory dump.
     emu_addr_t mem_dump_start_addr;         // The start address from which to dump memory.
     emu_addr_t mem_dump_end_addr;           // The end address until which to dump memory.
-} emu_debug_args_t;
+} emu_debug_args;
 
 /* Loads a file into memory. Returns number of words read. */
 I8080_CDECL size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc);
@@ -48,14 +48,20 @@ I8080_CDECL int memory_check_errors(i8080 * const cpu, const emu_addr_t start_ad
 I8080_CDECL void emu_init_i8080(i8080 * const cpu);
 
 /* Sets up the environment for some basic CP/M 2.2 BIOS emulation.
- * Some programs written for the 8080 need this environment. At the moment, this only 
- * supports CP/M BDOS ops 2 and 9, and WBOOT (which launches into a simple command processor).
- * The command processor has 2 commands:
+ * Some programs written for the 8080 need this environment.
+ *
+ * At the moment, this only supports CP/M BDOS ops 2 and 9, 
+ * and WBOOT at 0x0000 (which launches into a simple command processor).
+ * The command processor at WBOOT has 2 commands:
  * RUN addr: Begins execution of a CP/M program starting at addr.
  * QUIT: Quits the emulator.
- * Call this after the emulator's memory streams have been initialized (cpu.read_memory() & cpu.write_memory()). 
+ *
+ * It can be disabled by setting enable_cmd_proc = 0. When disabled, WBOOT jumps
+ * to 0x0100 (CPM_START_OF_TPA) instead, and quits the emulator if called again.
+ *
+ * Call this after the emulator's memory streams have been initialized (cpu.read_memory() & cpu.write_memory()).
  * Returns 1 on success, 0 on failure. */
-I8080_CDECL int emu_set_cpm_env(i8080 * const cpu);
+I8080_CDECL int emu_set_cpm_env(i8080 * const cpu, int enable_cmd_proc);
 /* Sets up the default emulator environment.
  * Creates an interrupt vector table at the top 64 bytes of memory,
  * and writes a RST 0 sequence that jumps to after the IVT (0x40, emu_consts.h/DEFAULT_START_PA). 
@@ -69,7 +75,7 @@ I8080_CDECL int emu_set_default_env(i8080 * const cpu);
  * If debug_args is not NULL, emulator will start in debug mode. In this mode, the emulator can print
  * the values of all flags and registers, and can dump the main memory after each instruction is executed to debug_out. 
  * See emu_debug_args to set options on how the output is presented. */
-I8080_CDECL emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args_t * debug_args);
+I8080_CDECL emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args * debug_args);
 
 #include "i8080/internal/i8080_predef_undef.h"
 
