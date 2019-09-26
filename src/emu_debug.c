@@ -76,19 +76,19 @@ static inline int in_range(size_t num, size_t lt_bound, size_t rt_bound, int inc
     else return (num > lt_bound && num < rt_bound);
 }
 
-static inline int is_valid_args(const emu_debug_args_t * args) {
+static inline int is_valid_args(const emu_debug_args * args) {
     return (args->debug_out != NULL &&
         is_valid_format_spec(args->mem_dump_format) &&
         in_range(args->mem_dump_start_addr, 0, ADDR_T_MAX, 1) &&
         in_range(args->mem_dump_end_addr, 0, ADDR_T_MAX, 1) &&
         args->mem_dump_end_addr >= args->mem_dump_start_addr &&
         in_range(args->mem_dump_newline_after, 1, ADDR_T_MAX, 1) &&
-        (int)args->should_dump_memory == args->should_dump_memory &&
-        (int)args->should_dump_stats == args->should_dump_stats);
+        (args->should_dump_memory == 1 || args->should_dump_memory == 0) &&
+        (args->should_dump_stats == 1 || args->should_dump_stats == 0));
 }
 
 // Dump memory without validation checks
-static void dump_memory_raw(i8080 * const cpu, const emu_debug_args_t * args) {
+static void dump_memory_raw(i8080 * const cpu, const emu_debug_args * args) {
     fprintf(args->debug_out, "**** Memory dump: ****\n");
     for (emu_addr_t i = args->mem_dump_start_addr; i <= args->mem_dump_end_addr; ++i) {
         fprintf(args->debug_out, args->mem_dump_format, cpu->read_memory(i));
@@ -99,7 +99,7 @@ static void dump_memory_raw(i8080 * const cpu, const emu_debug_args_t * args) {
     }
 }
 
-void dump_memory(i8080 * const cpu, const emu_debug_args_t * args) {
+void dump_memory(i8080 * const cpu, const emu_debug_args * args) {
     if (is_valid_args(args)) dump_memory_raw(cpu, args);
 }
 
@@ -125,11 +125,11 @@ void dump_cpu_stats(i8080 * const cpu, FILE * const stream) {
 }
 
 // Debug args to be used with debug next
-static emu_debug_args_t * DEBUG_ARGS;
+static emu_debug_args * DEBUG_ARGS;
 
 /* i8080_debug_next() is expected to have the signature int (*)(i8080 * const),
  * so the options have to be passed in separately. */
-void set_debug_next_options(emu_debug_args_t * args) {
+void set_debug_next_options(emu_debug_args * args) {
     if (is_valid_args(args)) DEBUG_ARGS = args;
     else printf("Error: Bad mem_dump_format.\n");
 }
@@ -162,7 +162,5 @@ int i8080_debug_next(i8080 * const cpu) {
         // indicate success but stay halted
         success = 1;
     }
-
-    if (!success) i8080_mutex_destroy(&cpu->i_mutex);
     return success;
 }
