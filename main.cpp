@@ -1,5 +1,6 @@
 
 #include "libi8080emu/include/emu.h"
+#include "libi8080emu/include/emu_consts.h"
 #include "libi8080emu/libi8080/include/i8080_consts.h"
 #include <cstdlib>
 
@@ -184,9 +185,29 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
     return exec_success;
 }
 
-// See run.cpp. These functions show example usage of lib-i8080emu.
-int run_all_tests();
-int run_i8080_bin(const std::string & bin_file, bool is_cpm_env);
+/* The following are externed from run.cpp.
+   See run.cpp for examples on how to use libi8080emu,
+   and how to configure the emulator before it is ready to run. */
+
+// Shows example usage of libi8080emu.
+extern int run_all_tests(); 
+// Loads memory and calls emu_runtime.
+extern int run_generic_test(i8080 * const cpu, const std::string & file_loc, emu_addr_t prog_start_loc);
+// Initializes the CP/M 2.2 environment to run tests in.
+extern i8080 init_i8080_emu_cpm();
+// Initializes the default environment to run tests in.
+extern i8080 init_i8080_emu_default();
+
+// Loads and executes the file at bin_file_loc, as i8080 binary.
+int run_i8080_bin(const std::string & bin_file_loc, bool is_cpm_env) {
+    std::cout << std::endl;
+    i8080 cpu = is_cpm_env ? init_i8080_emu_cpm() : init_i8080_emu_default();
+    emu_addr_t program_start_loc = is_cpm_env ? CPM_START_OF_TPA : DEFAULT_START_PA;
+    int success = run_generic_test(&cpu, bin_file_loc, program_start_loc);
+    i8080_destroy(&cpu);
+    std::cout << std::endl;
+    return success;
+}
 
 int main(int argc, char ** argv) {
     int exit_success = EXIT_FAILURE;

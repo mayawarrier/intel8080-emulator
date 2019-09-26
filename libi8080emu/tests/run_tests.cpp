@@ -40,6 +40,10 @@ static emu_word_t cpm_env_port_in(emu_addr_t addr) {
     return rw;
 }
 
+static emu_word_t i8080_interrupt_handler(void) {
+    return 0xc7; // RST 0, this exits to WBOOT in the CP/M environment
+}
+
 // Minimum required calls to set up i8080 emulator.
 i8080 init_i8080_emu_default() {
     i8080 cpu;
@@ -95,8 +99,8 @@ i8080 init_i8080_emu_cpm() {
     return cpu;
 }
 
-static int run_generic_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc);
-static int run_interrupted_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc, int ms_to_interrupt);
+int run_generic_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc);
+int run_interrupted_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc, int ms_to_interrupt);
 
 int run_all_tests() {
     // test locations
@@ -142,27 +146,13 @@ int run_all_tests() {
     return (num_tests_passed == 3) ? 1 : 0;
 }
 
-int run_i8080_bin(const std::string & bin_file_loc, bool is_cpm_env) {
-    std::cout << std::endl;
-    i8080 cpu = is_cpm_env ? init_i8080_emu_cpm() : init_i8080_emu_default();
-    emu_addr_t program_start_loc = is_cpm_env ? CPM_START_OF_TPA : DEFAULT_START_PA;
-    int success = run_generic_test(&cpu, bin_file_loc, program_start_loc);
-    i8080_destroy(&cpu);
-    std::cout << std::endl;
-    return success;
-}
-
-static int run_generic_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc) {
+int run_generic_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc) {
     if (memory_load(file_location.c_str(), MEMORY, program_load_loc) == 0) return 0;
     if (emu_runtime(cpu, NULL) == EMU_EXIT_CODE::EMU_EXIT_SUCCESS) return 1;
     else return 0;
 }
 
-static emu_word_t i8080_interrupt_handler(void) {
-    return 0xc7; // RST 0, this exits to WBOOT in the CP/M environment
-}
-
-static int run_interrupted_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc, int ms_to_interrupt) {
+int run_interrupted_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc, int ms_to_interrupt) {
     // Enable hardware interrupts
     cpu->interrupt_acknowledge = i8080_interrupt_handler;
     if (memory_load(file_location.c_str(), MEMORY, program_load_loc) == 0) return 0;
