@@ -99,8 +99,35 @@ i8080 init_i8080_emu_cpm() {
     return cpu;
 }
 
-int run_generic_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc);
-int run_interrupted_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc, int ms_to_interrupt);
+int run_generic_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc) {
+    // Load emulated memory with the file contents, then start the emulator
+    if (memory_load(file_location.c_str(), MEMORY, program_load_loc) == 0) return 0;
+    if (emu_runtime(cpu, NULL) == EMU_EXIT_CODE::EMU_EXIT_SUCCESS) return 1;
+    else return 0;
+}
+
+int run_interrupted_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc, int ms_to_interrupt) {
+    // Enable hardware interrupts
+    cpu->interrupt_acknowledge = i8080_interrupt_handler;
+    if (memory_load(file_location.c_str(), MEMORY, program_load_loc) == 0) return 0;
+
+    std::atomic<emu_exit_code_t> on_emu_exit;
+
+    // Begin the emulator and send an interrupt after a period of time
+    std::thread emu_runtime_thread([&] {
+        on_emu_exit = emu_runtime(cpu, NULL);
+    });
+    std::thread intgen_thread([&] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(ms_to_interrupt));
+        i8080_interrupt(cpu);
+    });
+
+    emu_runtime_thread.join();
+    intgen_thread.join();
+
+    if (on_emu_exit == EMU_EXIT_CODE::EMU_EXIT_SUCCESS) return 1;
+    else return 0;
+}
 
 int run_all_tests() {
     // test locations
@@ -144,33 +171,4 @@ int run_all_tests() {
     i8080_destroy(&cpu);
 
     return (num_tests_passed == 3) ? 1 : 0;
-}
-
-int run_generic_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc) {
-    if (memory_load(file_location.c_str(), MEMORY, program_load_loc) == 0) return 0;
-    if (emu_runtime(cpu, NULL) == EMU_EXIT_CODE::EMU_EXIT_SUCCESS) return 1;
-    else return 0;
-}
-
-int run_interrupted_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc, int ms_to_interrupt) {
-    // Enable hardware interrupts
-    cpu->interrupt_acknowledge = i8080_interrupt_handler;
-    if (memory_load(file_location.c_str(), MEMORY, program_load_loc) == 0) return 0;
-
-    std::atomic<emu_exit_code_t> on_emu_exit;
-
-    // Begin the emulator and send an interrupt after a period of time
-    std::thread emu_runtime_thread([&] {
-        on_emu_exit = emu_runtime(cpu, NULL);
-    });
-    std::thread intgen_thread([&] {
-        std::this_thread::sleep_for(std::chrono::milliseconds(ms_to_interrupt));
-        i8080_interrupt(cpu);
-    });
-
-    emu_runtime_thread.join();
-    intgen_thread.join();
-
-    if (on_emu_exit == EMU_EXIT_CODE::EMU_EXIT_SUCCESS) return 1;
-    else return 0;
 }

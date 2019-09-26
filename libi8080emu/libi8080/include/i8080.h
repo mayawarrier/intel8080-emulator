@@ -91,7 +91,7 @@ I8080_CDECL int i8080_next(i8080 * const cpu);
 I8080_CDECL int i8080_exec(i8080 * const cpu, emu_word_t opcode);
 
 /* Sends an interrupt to the i8080. This is thread-safe, and it will be serviced when the i8080 is ready.
- * If your compiler/environment does not support mutexes, this may not work correctly. See i8080.c for implementation.
+ * If your compiler/environment does not support mutexes, this may not work correctly. See i8080_sync.c for implementation.
  *
  * When ready, the i8080 will call interrupt_acknowledge() which should return the vector to be executed.
  * Interrupts are disabled every time an interrupt is serviced, so they must be enabled again before the next interrupt. */

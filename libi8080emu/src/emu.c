@@ -70,7 +70,7 @@ static int i8080_cpm_zero_page(void * const udata) {
     
     i8080 * const cpu = (i8080 * const)udata;
 
-	// The console port address duplicated across 16-bit address bus for use with port out
+    // The console port address duplicated across 16-bit address bus for use with port out
     const emu_addr_t CONSOLE_ADDR_FULL = ((emu_addr_t)(CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
     // The return address on the stack
     const emu_addr_t ret_addr = (emu_addr_t)(cpu->read_memory(cpu->sp + (emu_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
@@ -101,7 +101,7 @@ static int i8080_cpm_zero_page(void * const udata) {
             // Addresses of command proc messages
             const emu_addr_t ERROR_ADDR_PTR = 0xe410;                   // "\nInvalid address."
             const emu_addr_t ERROR_CMD_PTR = ERROR_ADDR_PTR + 0x11;     // "\nInvalid command."
-            const emu_addr_t HELP_MSG_PTR = ERROR_CMD_PTR + 0x11;		// Message shown on HELP
+            const emu_addr_t HELP_MSG_PTR = ERROR_CMD_PTR + 0x11;       // Message shown on HELP
             const emu_addr_t CMD_PROMPT_PTR = HELP_MSG_PTR + 0x76;      // "> "
             
             // Max length, excluding trailing null
@@ -205,7 +205,7 @@ static const emu_addr_t INTERRUPT_TABLE[] = {
 	0x38  // RST 7
 };
 
-void emu_set_cpm_env_load_bios(i8080 * const cpu) {
+static void emu_set_cpm_env_load_bios(i8080 * const cpu) {
 
     // i8080_EMU_EXT_CALL is used to emulate calls to CP/M BDOS and WBOOT.
 
@@ -254,8 +254,8 @@ void emu_set_cpm_env_load_bios(i8080 * const cpu) {
 
 static void emu_reset_cpm_env(i8080 * const cpu) {
     // Enable/disable WBOOT command processor
-        // 2 -> enable cmd proc
-        // 1 -> disable cmd proc
+    // 2 -> enable cmd proc
+    // 1 -> disable cmd proc
     if (EMU_STATE.enable_cmd_proc) {
         cpu->write_memory(0x03, 0x02);
     } else {
