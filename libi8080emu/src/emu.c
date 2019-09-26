@@ -2,11 +2,11 @@
  * Implement emu.h
  */
 
-#include "emu.h"
-#include "emu_consts.h"
-#include "emu_debug.h"
-#include "i8080/internal/i8080_opcodes.h"
-#include "i8080/internal/i8080_consts.h"
+#include "../include/emu.h"
+#include "../include/emu_consts.h"
+#include "../include/emu_debug.h"
+#include "../libi8080/include/i8080_opcodes.h"
+#include "../libi8080/include/i8080_consts.h"
 #include <stdint.h>
 
 enum emu_env {

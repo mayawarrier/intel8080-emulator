@@ -1,6 +1,6 @@
 
-#include "src/emu.h"
-#include "src/i8080/internal/i8080_consts.h"
+#include "libi8080emu/include/emu.h"
+#include "libi8080emu/libi8080/include/i8080_consts.h"
 #include <cstdlib>
 
 #include <iostream>

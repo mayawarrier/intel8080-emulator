@@ -10,8 +10,8 @@
 #ifndef I_8080_H
 #define I_8080_H
 
-#include "internal/i8080_types.h"
-#include "internal/i8080_predef.h"
+#include "i8080_types.h"
+#include "i8080_predef.h"
 
 I8080_CDECL typedef struct i8080 {
     // Registers
@@ -97,6 +97,6 @@ I8080_CDECL int i8080_exec(i8080 * const cpu, emu_word_t opcode);
  * Interrupts are disabled every time an interrupt is serviced, so they must be enabled again before the next interrupt. */
 I8080_CDECL void i8080_interrupt(i8080 * const cpu);
 
-#include "internal/i8080_predef_undef.h"
+#include "i8080_predef_undef.h"
 
 #endif /* I_8080_H */

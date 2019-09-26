@@ -2,10 +2,10 @@
  * Implement i8080.h
  */
 
-#include "i8080.h"
-#include "internal/i8080_opcodes.h"
-#include "internal/i8080_consts.h"
-#include "internal/i8080_sync.h"
+#include "../include/i8080.h"
+#include "../include/i8080_opcodes.h"
+#include "../include/i8080_consts.h"
+#include "../include/i8080_sync.h"
 
  // For internal use
 static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1;

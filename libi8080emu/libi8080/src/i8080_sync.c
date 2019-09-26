@@ -2,8 +2,8 @@
  * Implement i8080_sync.h
  */
 
-#include "i8080_sync.h"
-#include "i8080_predef.h"
+#include "../include/i8080_sync.h"
+#include "../include/i8080_predef.h"
 #ifdef I8080_WINDOWS_MIN_VER
 
     inline void i8080_mutex_init(i8080_mutex_t * handle) {
@@ -91,4 +91,4 @@
     }
 
 #endif
-#include "i8080_predef_undef.h"
+#include "../include/i8080_predef_undef.h"

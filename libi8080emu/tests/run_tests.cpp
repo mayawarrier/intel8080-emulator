@@ -1,6 +1,6 @@
-#include "src/emu.h"
-#include "src/emu_consts.h"
-#include "src/i8080/internal/i8080_consts.h"
+#include "../include/emu.h"
+#include "../include/emu_consts.h"
+#include "../libi8080/include/i8080_consts.h"
 
 #include <cstdio> // for easy formatted printing
 #include <cstring> // memset
