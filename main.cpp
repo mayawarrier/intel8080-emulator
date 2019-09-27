@@ -127,13 +127,15 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
 
     std::vector<std::string> CMDLINE_ARGS;
     CMDLINE_ARGS.reserve(3);
+    auto args_itr = CMDLINE_ARGS.begin();
+
     // if the last command exec was successful
     int exec_success = 0;
 
     if (argc < 2) {
         // not enough args, print help message and exit
         cmd_state.is_args_valid = false;
-        return cmd_print_help_msg_and_exit(cmd_state, CMDLINE_ARGS.begin());
+        return cmd_print_help_msg_and_exit(cmd_state, args_itr);
     } else {
         cmd_state.is_args_valid = true;
 
@@ -146,7 +148,6 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
         cmd_callback_fn cmd_callback;
         bool cmd_has_args;
 
-        auto args_itr = CMDLINE_ARGS.begin();
         while (args_itr != CMDLINE_ARGS.end()) {
             cmd_callback = nullptr;
             cmd_has_args = false;
