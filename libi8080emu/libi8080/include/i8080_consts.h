@@ -22,10 +22,10 @@
 #define WORD_T_MAX UINT8_MAX
 #define ADDR_T_MAX UINT16_MAX
 
-#define WORD_T_SCN_FORMAT "0x%"SCNx8
-#define ADDR_T_SCN_FORMAT "0x%"SCNx16
-#define WORD_T_PRT_FORMAT "0x%02"PRIx8
-#define ADDR_T_PRT_FORMAT "0x%04"PRIx16
+#define WORD_T_SCN_FORMAT "0x%" SCNx8
+#define ADDR_T_SCN_FORMAT "0x%" SCNx16
+#define WORD_T_PRT_FORMAT "0x%02" PRIx8
+#define ADDR_T_PRT_FORMAT "0x%04" PRIx16
 #define WORD_T_ASCII_FORMAT "%c"
 
 #endif /* I8080_CONSTS_H */
