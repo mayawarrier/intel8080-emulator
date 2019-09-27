@@ -2,12 +2,13 @@
  * Implement emu.h
  */
 
-#include "../include/emu.h"
-#include "../include/emu_consts.h"
-#include "../include/emu_debug.h"
-#include "../libi8080/include/i8080_opcodes.h"
-#include "../libi8080/include/i8080_consts.h"
+#include "emu.h"
+#include "emu_consts.h"
+#include "emu_debug.h"
+#include "i8080_opcodes.h"
+#include "i8080_consts.h"
 #include <stdint.h>
+#include <string.h>
 
 enum emu_env {
     CPM,
@@ -18,7 +19,7 @@ enum emu_env {
 static struct {
     enum emu_env env;
     int enable_cmd_proc;
-} EMU_STATE = { .env = (enum emu_env)DEFAULT,.enable_cmd_proc = 1 };
+} EMU_STATE = { .env = DEFAULT,.enable_cmd_proc = 1 };
 
 size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc) {
     
@@ -106,9 +107,9 @@ static int i8080_cpm_zero_page(void * const udata) {
             
             // Max length, excluding trailing null
             #define LEN_INPUT_BUF 127
-            emu_word_t input_buf[LEN_INPUT_BUF + 1];
+            char input_buf[LEN_INPUT_BUF + 1];
             size_t buf_loc = 0;
-            emu_word_t buf_ch;
+            char buf_ch;
             
             // Address from RUN command
             emu_addr_t run_addr;
@@ -267,7 +268,7 @@ int emu_set_cpm_env(i8080 * const cpu, int enable_cmd_proc) {
     int success = 0;
     if (cpu->write_memory != NULL) {
         EMU_STATE.enable_cmd_proc = enable_cmd_proc;
-        EMU_STATE.env = (enum emu_env)CPM;
+        EMU_STATE.env = CPM;
         // load command processor and BDOS
         emu_set_cpm_env_load_bios(cpu);
         // reset cmd processor
@@ -293,7 +294,7 @@ int emu_set_default_env(i8080 * const cpu) {
         cpu->write_memory(0x0001, DEFAULT_START_PA);
         cpu->write_memory(0x0002, 0x00);
 
-        EMU_STATE.env = (enum emu_env)DEFAULT;
+        EMU_STATE.env = DEFAULT;
         success = 1;
     }
 
@@ -350,7 +351,7 @@ emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args * d_args) {
     }
     
     // If previous environment was CPM, reset WBOOT cmd proc
-    if (EMU_STATE.env == (enum enum_env)CPM) emu_reset_cpm_env(cpu);
+    if (EMU_STATE.env == CPM) emu_reset_cpm_env(cpu);
 
     // Execute all instructions until failure/quit
     while(1) {

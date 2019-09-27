@@ -2,10 +2,10 @@
  * Implement i8080.h
  */
 
-#include "../include/i8080.h"
-#include "../include/i8080_opcodes.h"
-#include "../include/i8080_consts.h"
-#include "../include/i8080_sync.h"
+#include "i8080.h"
+#include "i8080_opcodes.h"
+#include "i8080_consts.h"
+#include "i8080_sync.h"
 
  // For internal use
 static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1;
@@ -70,7 +70,7 @@ static inline emu_word_t word_hi_bits(emu_word_t word) {
 }
 // Picks the word bits from the hi part of buf_t.
 static inline emu_word_t buf_hi_word(emu_buf_t buf) {
-    return ((buf & BUF_HI_WORD_MAX) >> (2 * HALF_WORD_SIZE));
+    return (emu_word_t)((buf & BUF_HI_WORD_MAX) >> (2 * HALF_WORD_SIZE));
 }
 // Performs 2's complement on the lower half of the word.
 static inline emu_word_t twos_comp_lo_word(emu_word_t word) {
@@ -350,7 +350,7 @@ static void i8080_cmp(i8080 * const cpu, emu_word_t word) {
     emu_buf_t acc_buf = (emu_buf_t)cpu->a + twos_comp_word(word);
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
     cpu->cy = !get_carry_bit(acc_buf);
-    update_ZSP(cpu, acc_buf);
+    update_ZSP(cpu, (emu_word_t)acc_buf);
 }
 
 // Increments and updates flags, and returns the incremented word.

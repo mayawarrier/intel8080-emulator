@@ -7,7 +7,7 @@
 
 #include "emu.h"
 #include <stdio.h>
-#include "../libi8080/include/i8080_predef.h"
+#include "i8080_predef.h"
 
 /* Dumps the contents of memory from start_addr to end_addr to a stream, formatting each word as format.
  * mem_dump_newline_after is the number of words after which an newline should be inserted each time. */
@@ -23,6 +23,6 @@ I8080_CDECL void set_debug_next_options(emu_debug_args * args);
  * - Dump of the main memory, formatted as mem_dump_format. A newline is inserted every mem_dump_newline_after words. */
 I8080_CDECL int i8080_debug_next(i8080 * const cpu);
 
-#include "../libi8080/include/i8080_predef_undef.h"
+#include "i8080_predef_undef.h"
 
 #endif /* EMU_DEBUG_H */

@@ -2,11 +2,11 @@
  * Implement emu_debug.h
  */
 
-#include "../libi8080/include/i8080_types.h"
-#include "../libi8080/include/i8080_opcodes.h"
-#include "../libi8080/include/i8080_consts.h"
-#include "../libi8080/include/i8080_sync.h"
-#include "../include/emu_debug.h"
+#include "i8080_types.h"
+#include "i8080_opcodes.h"
+#include "i8080_consts.h"
+#include "i8080_sync.h"
+#include "emu_debug.h"
 #include <stddef.h>
 #include <string.h>
 

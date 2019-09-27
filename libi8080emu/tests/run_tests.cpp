@@ -3,9 +3,9 @@
  * This shows many examples on how to use libi8080emu, and some documentation on setup.
  */
 
-#include "../include/emu.h"
-#include "../include/emu_consts.h"
-#include "../libi8080/include/i8080_consts.h"
+#include "emu.h"
+#include "emu_consts.h"
+#include "i8080_consts.h"
 
 #include <cstdio> // for easy formatted printing
 #include <cstring> // memset

@@ -11,10 +11,10 @@
 #ifndef EMU_H
 #define EMU_H
 
-#include "../libi8080/include/i8080.h"
+#include "i8080.h"
 #include <stdio.h>
 
-#include "../libi8080/include/i8080_predef.h"
+#include "i8080_predef.h"
 
 I8080_CDECL typedef enum EMU_EXIT_CODE {
     EMU_ERR_MEM_STREAMS,        // A memory stream function (cpu->read_memory, cpu->write_memory) is not initialized.
@@ -72,6 +72,6 @@ I8080_CDECL int emu_set_default_env(i8080 * const cpu);
  * See emu_debug_args to set options on how the output is presented. */
 I8080_CDECL emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args * debug_args);
 
-#include "../libi8080/include/i8080_predef_undef.h"
+#include "i8080_predef_undef.h"
 
 #endif /* EMU_H */
