@@ -201,8 +201,8 @@ static inline emu_word_t i8080_advance_read_word(i8080 * const cpu) {
 }
 
 /* Reads address (a double word) and advances PC by 2.
-/* Address is read backwards, since the assembler inverts the words upon assembly:
-/* https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 84 */
+ * Address is read backwards, since the assembler inverts the words upon assembly:
+ * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 84 */
 static inline emu_addr_t i8080_advance_read_addr(i8080 * const cpu) {
     emu_word_t lo_addr = i8080_advance_read_word(cpu);
     emu_word_t hi_addr = i8080_advance_read_word(cpu);
@@ -528,7 +528,7 @@ static inline void i8080_xchg(i8080 * const cpu) {
 // Returns 0 if the external call has indicated the i8080 to be stopped.
 static int emu_ext_call(i8080 * const cpu) {
     int should_continue = 1;
-    if (emu_ext_call != NULL) {
+    if (cpu->emu_ext_call != NULL) {
         i8080_push(cpu, (emu_buf_t)cpu->pc);
         // Quit the emulator if indicated
         should_continue = cpu->emu_ext_call(cpu);

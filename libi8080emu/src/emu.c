@@ -45,7 +45,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t 
     if (words_read != file_size) words_read = 0;
     
     end:
-    fclose(f_ptr);
+    if (f_ptr != NULL) fclose(f_ptr);
     return words_read;
 }
 
