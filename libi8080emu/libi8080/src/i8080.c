@@ -7,6 +7,9 @@
 #include "i8080_consts.h"
 #include "i8080_sync.h"
 
+/* This enables compilation on C89 */
+#include "i8080_predef.h"
+
  /* For internal use */
 static const emu_word_t WORD_LO_F = ((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1;
 static const emu_word_t WORD_HI_F = (((emu_word_t)1 << HALF_WORD_SIZE) - (emu_word_t)1) << HALF_WORD_SIZE;
@@ -91,7 +94,8 @@ static inline int parity(emu_word_t word) {
     int p = 0;
     /* XOR each bit together */
     int word_size = HALF_WORD_SIZE * 2;
-    for (int i = 0; i < word_size; ++i) {
+    int i;
+    for (i = 0; i < word_size; ++i) {
         p ^= get_word_bit(word, i);
     }
     /* invert for even number of ones */

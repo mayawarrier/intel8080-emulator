@@ -14,8 +14,8 @@
   * https://github.com/superzazu/8080/blob/master/i8080.c
   * Modifications made: Changed all "ill" to "undocumented", replaced 0x38 with "Emulator external call" */
 
-  // Pretty print disassembly, indexed by opcode
-  // e.g. DEBUG_DISASSEMBLY_TABLE[RST_7]
+  /* Pretty print disassembly, indexed by opcode
+   * e.g. DEBUG_DISASSEMBLY_TABLE[RST_7] */
 static const char * const DEBUG_DISASSEMBLY_TABLE[] = {
     "nop", "lxi b,#", "stax b", "inx b", "inr b", "dcr b", "mvi b,#", "rlc",
     "undocumented", "dad b", "ldax b", "dcx b", "inr c", "dcr c", "mvi c,#", "rrc",
@@ -53,18 +53,19 @@ static const char * const DEBUG_DISASSEMBLY_TABLE[] = {
     "rst 6", "rm", "sphl", "jm $", "ei", "cm $", "undocumented", "cpi #", "rst 7"
 };
 
-// Checks if format spec has a max of 128 chars, and can be applied to an emu_word_t.
+/* Checks if format spec has a max of 128 chars, and can be applied to an emu_word_t. */
 static int is_valid_format_spec(const char * f) {
-    // Check if f is a valid string and format specifier
+    /* Check if f is a valid string and format specifier */
     int is_valid_str = 0;
-    // Maximum size is 128, including trailing null
-    for (size_t i = 0; i < 128; ++i) {
+    /* Maximum size is 128, including trailing null */
+    size_t i;
+    for (i = 0; i < 128; ++i) {
         if (f[i] == '\0') {
             is_valid_str = 1;
             break;
         }
     }
-    // check if this format can actually be applied to a word
+    /* check if this format can actually be applied to a word */
     emu_word_t out_word;
     int is_valid_format = (sscanf("0x38", f, &out_word) == 1);
 
@@ -87,12 +88,13 @@ static inline int is_valid_args(const emu_debug_args * args) {
         (args->should_dump_stats == 1 || args->should_dump_stats == 0));
 }
 
-// Dump memory without validation checks
+/* Dump memory without validation checks */
 static void dump_memory_raw(i8080 * const cpu, const emu_debug_args * args) {
     fprintf(args->debug_out, "**** Memory dump: ****\n");
-    for (emu_addr_t i = args->mem_dump_start_addr; i <= args->mem_dump_end_addr; ++i) {
+    emu_addr_t i;
+    for (i = args->mem_dump_start_addr; i <= args->mem_dump_end_addr; ++i) {
         fprintf(args->debug_out, args->mem_dump_format, cpu->read_memory(i));
-        // End-line every newline_after words
+        /* End-line every newline_after words */
         if ((i + 1) % args->mem_dump_newline_after == 0) {
             fprintf(args->debug_out, "\n");
         }
@@ -124,7 +126,7 @@ void dump_cpu_stats(i8080 * const cpu, FILE * const stream) {
     }
 }
 
-// Debug args to be used with debug next
+/* Debug args to be used with debug next */
 static emu_debug_args * DEBUG_ARGS;
 
 /* i8080_debug_next() is expected to have the signature int (*)(i8080 * const),
@@ -148,18 +150,18 @@ int i8080_debug_next(i8080 * const cpu) {
     }
     i8080_mutex_unlock(&cpu->i_mutex);
 
-    // Execute opcode
+    /* Execute opcode */
     int success = 0;
     if (!cpu->is_halted) {
         success = i8080_exec(cpu, opcode);
-        // Print disassembly
+        /* Print disassembly */
         printf("%s\n", DEBUG_DISASSEMBLY_TABLE[opcode]);
-        // Dump cpu stats and main memory
+        /* Dump cpu stats and main memory */
         if (DEBUG_ARGS->should_dump_stats) dump_cpu_stats(cpu, DEBUG_ARGS->debug_out);
         if (DEBUG_ARGS->should_dump_memory) dump_memory_raw(cpu, DEBUG_ARGS);
     }
     else {
-        // indicate success but stay halted
+        /* indicate success but stay halted */
         success = 1;
     }
     return success;

@@ -58,4 +58,10 @@
     #define I8080_CDECL
 #endif
 
+/* ANSIC/C89 does not support inline or volatile keywords */
+#if defined (__STDC__)
+    #define inline
+    #define volatile
+#endif
+
 #endif /* I8080_PREDEF_H */

@@ -7,7 +7,7 @@
  * Set this environment with emu_set_cpm_env(). */
 #define CPM_START_OF_TPA (0x0100)
 
-// Port address that CP/M will use to read/write characters from/to a console
+/* Port address that CP/M will use to read/write characters from/to a console */
 #define CPM_CONSOLE_ADDR (0x00)
 
 /* The first valid location to load a program with the default
