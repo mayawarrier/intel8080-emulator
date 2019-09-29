@@ -127,7 +127,7 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
 
     std::vector<std::string> CMDLINE_ARGS;
     CMDLINE_ARGS.reserve(3);
-    auto args_itr = CMDLINE_ARGS.begin();
+    std::vector<std::string>::iterator args_itr;
 
     // if the last command exec was successful
     int exec_success = 0;
@@ -148,6 +148,7 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
         cmd_callback_fn cmd_callback;
         bool cmd_has_args;
 
+        args_itr = CMDLINE_ARGS.begin();
         while (args_itr != CMDLINE_ARGS.end()) {
             cmd_callback = nullptr;
             cmd_has_args = false;
@@ -215,8 +216,8 @@ int run_i8080_bin(const std::string & bin_file_loc, bool is_cpm_env) {
 
 int main(int argc, char ** argv) {
     int exit_success = EXIT_FAILURE;
-    //if (EMU_ENV == (enum emu_env)CPM) printf("\nCP/M Warm Boot. Type HELP for a list of commands.");
     emu_cmd_state EMU_CMD_STATE;
+
     int cmd_success = process_cmdline(argc, argv, EMU_CMD_STATE);
 
     if (cmd_success && EMU_CMD_STATE.is_runnable) {
