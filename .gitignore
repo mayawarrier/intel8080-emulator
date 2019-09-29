@@ -1,7 +1,7 @@
 # Project files
 *.vs/
+intel8080-emulator/
 windows-build/
-nbproject/
 *.dep.inc
 *.mk
 
