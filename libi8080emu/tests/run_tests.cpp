@@ -9,6 +9,10 @@
 
 #include <cstdio> // for easy formatted printing
 #include <cstring> // memset
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h> // check if folder exists
+
 #include <iostream>
 #include <atomic>
 #include <thread>
@@ -134,11 +138,31 @@ int run_interrupted_test(i8080 * const cpu, const std::string & file_location, e
     else return 0;
 }
 
+// Returns if directory path exists on system, and prints errno.
+static bool directory_exists(const std::string & pathname) {
+    // Check status
+    struct stat path_stat;
+    int stat_code = stat(pathname.c_str(), &path_stat);
+    // If stat failed, check error code
+    if (stat_code != 0) {
+        std::cout << "File system returned error code " << errno << "." << std::endl;
+        return false;
+    }
+    // check if path is directory
+    return (path_stat.st_mode & S_IFDIR);
+}
+
 int run_all_tests() {
     // test locations
     const std::string interrupts_test_fileloc = "tests/test_interrupts.COM";
     const std::string tst8080_test_fileloc = "tests/TST8080.COM";
     const std::string cputest_test_fileloc = "tests/CPUTEST.COM";
+
+    // Check for existence of tests folder
+    if (!directory_exists("tests")) {
+        std::cout << "Cannot run tests. Make sure tests/ is accessible from current directory. Abort." << std::endl;
+        return 0;
+    }
 
     // All tests are run in CP/M env
     i8080 cpu = init_i8080_emu_cpm();
