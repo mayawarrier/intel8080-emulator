@@ -32,7 +32,9 @@
 // Detect minimum supported version for POSIX.
 #ifdef I8080_UNIX
     // Defining this forces features from 199506 to be defined, if available
-    #define _POSIX_C_SOURCE 199506L
+    #ifndef _POSIX_C_SOURCE 
+        #define _POSIX_C_SOURCE 199506L
+    #endif
     #include <unistd.h>
     // Pthreads first appeared in the POSIX standard in IEEE 1003.1c-1995, published in 06/1995:
     // https://standards.ieee.org/standard/1003_1c-1995.html
