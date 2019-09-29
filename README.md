@@ -15,8 +15,8 @@ I've tried my best to make this as portable and accurate as possible! I'd apprec
 - More tests to be added!
 ### libi8080emu, libi8080
 This project consists of two libraries: libi8080emu, and libi8080emu/libi8080. 
-- libi8080 is the standalone core i8080 emulation library.
-- libi8080emu wraps around libi8080 to provide debugging functionality and emulation for CP/M 2.2.
+- libi8080 is the core emulation library and can be used standalone to emulate an i8080.
+- libi8080emu wraps around libi8080 to provide debugging functionality and CP/M 2.2 BIOS emulation.
 
 ### Command line tool:
 Frontend to libi8080emu, to run tests or other ROMs from the command line.
