@@ -10,3 +10,8 @@
 #undef I8080_UNIDENTIFIED
 #undef I8080_CDECL
 #undef I8080_PREDEF_H
+
+#ifdef __STDC__
+    #undef inline
+    #undef volatile
+#endif

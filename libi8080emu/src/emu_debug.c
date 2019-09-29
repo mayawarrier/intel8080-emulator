@@ -10,6 +10,9 @@
 #include <stddef.h>
 #include <string.h>
 
+/* Enable compilation on C89 */
+#include "i8080_predef.h"
+
  /* This disassembly table sourced from (suitably modified):
   * https://github.com/superzazu/8080/blob/master/i8080.c
   * Modifications made: Changed all "ill" to "undocumented", replaced 0x38 with "Emulator external call" */

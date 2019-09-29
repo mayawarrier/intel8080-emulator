@@ -7,6 +7,10 @@
 #include "emu_debug.h"
 #include "i8080_opcodes.h"
 #include "i8080_consts.h"
+
+/* Enable compilation on C89 */
+#include "i8080_predef.h"
+
 #include <stdint.h>
 #include <string.h>
 
