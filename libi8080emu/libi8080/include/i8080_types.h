@@ -9,7 +9,7 @@
 
 #include "i8080_predef.h"
 
-// Suppress MSVC deprecation errors. These must be defined before including Windows.h.
+/* Suppress MSVC deprecation errors. These must be defined before including Windows.h. */
 #ifdef I8080_WINDOWS_MIN_VER
     #ifndef _CRT_SECURE_NO_WARNINGS
         #define _CRT_SECURE_NO_WARNINGS
@@ -22,22 +22,22 @@
     #endif
 #endif
 
-// Determine i8080_mutex_t for different environments.
+/* Determine i8080_mutex_t for different environments. */
 #ifdef I8080_WINDOWS_MIN_VER
-    // Critical sections have better performance than standard
-    // Windows mutexes and appear to be compatible with std::thread.
+    /* Critical sections have better performance than standard
+     * Windows mutexes and appear to be compatible with std::thread. */
     #include <Windows.h>
     I8080_CDECL typedef CRITICAL_SECTION i8080_mutex_t;
 #elif defined I8080_POSIX_MIN_VER
-    // Use pthreads, since they are available
+    /* Use pthreads, since they are available */
     #include <pthread.h>
     I8080_CDECL typedef pthread_mutex_t i8080_mutex_t;
 #elif defined I8080_GNUC_MIN_VER
-    // Simulate a mutex using acquire - release semantics on a char.
+    /* Simulate a mutex using acquire - release semantics on a char. */
     I8080_CDECL typedef char i8080_mutex_t;
 #else
-    // A volatile char ~should~provide the best chance at proper sync, 
-    // if nothing else is available.
+    /* A volatile char ~should~provide the best chance at proper sync, 
+     * if nothing else is available. */
     I8080_CDECL typedef volatile char i8080_mutex_t;
 #endif
 

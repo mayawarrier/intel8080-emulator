@@ -83,7 +83,7 @@
 #define i8080_MVI_A 0x3e        /*      2                    A <- byte 2                          7    */
 #define i8080_CMC 0x3f          /*      1       CY           CY = !CY                             4    */
 
-// --- 8-bit load/store/move -----
+/* --- 8-bit load/store/move ----- */
 #define i8080_MOV_B_B 0x40      /*      1                    B <- B                               5    */
 #define i8080_MOV_B_C 0x41      /*      1                    B <- C                               5    */
 #define i8080_MOV_B_D 0x42      /*      1                    B <- D                               5    */
@@ -150,7 +150,7 @@
 #define i8080_MOV_A_M 0x7e      /*      1                    A <- [HL]                            7    */
 #define i8080_MOV_A_A 0x7f      /*      1                    A <- A                               5    */
 
-// ------- Arithmetic ----------
+/* ------- Arithmetic ---------- */
 #define i8080_ADD_B 0x80        /*      1       Z,S,P,CY,AC  A <- A + B                           4    */
 #define i8080_ADD_C 0x81        /*      1       Z,S,P,CY,AC  A <- A + C                           4    */
 #define i8080_ADD_D 0x82        /*      1       Z,S,P,CY,AC  A <- A + D                           4    */
@@ -187,7 +187,7 @@
 #define i8080_SBB_M 0x9e        /*      1       Z,S,P,CY,AC  A <- A - [HL] - CY                   7    */
 #define i8080_SBB_A 0x9f        /*      1       Z,S,P,CY,AC  A <- A - A - CY                      4    */
 
-// ------- Logical ----------
+/* ------- Logical ---------- */
 #define i8080_ANA_B 0xa0        /*      1       Z,S,P,CY,AC  A <- A & B                           4    */
 #define i8080_ANA_C 0xa1        /*      1       Z,S,P,CY,AC  A <- A & C                           4    */
 #define i8080_ANA_D 0xa2        /*      1       Z,S,P,CY,AC  A <- A & D                           4    */
@@ -224,7 +224,7 @@
 #define i8080_CMP_M 0xbe        /*      1       Z,S,P,CY,AC  A - [HL]                             7    */
 #define i8080_CMP_A 0xbf        /*      1       Z,S,P,CY,AC  A - A                                4    */
 
-// --- Subroutines, stack, conditionals, I/O, misc -----
+/* --- Subroutines, stack, conditionals, I/O, misc ----- */
 #define i8080_RNZ 0xc0          /*      1                    if NZ, perform RET                   11/5 */
 #define i8080_POP_B 0xc1        /*      1                    BC = {[SP + 1], [SP]}, SP <- SP + 2  10   */
 #define i8080_JNZ 0xc2          /*      3                    if NZ, PC <- adr                     10   */

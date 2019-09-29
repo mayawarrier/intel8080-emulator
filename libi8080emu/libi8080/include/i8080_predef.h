@@ -19,25 +19,25 @@
     #define I8080_UNIDENTIFIED
 #endif
 
- // Detect minimum supported version for Windows.
+ /* Detect minimum supported version for Windows. */
 #ifdef I8080_WINDOWS
     #include <sdkddkver.h>
     /* Versions from Windows XP and above support critical sections with spin counts:
-    /* https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-initializecriticalsectionandspincount */
+     * https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-initializecriticalsectionandspincount */
     #if (WINVER >= 0x0403) || (_WIN32_WINNT >= 0x0403)
         #define I8080_WINDOWS_MIN_VER
     #endif
 #endif
 
-// Detect minimum supported version for POSIX.
+/* Detect minimum supported version for POSIX. */
 #ifdef I8080_UNIX
-    // Defining this forces features from 199506 to be defined, if available
+    /* Defining this forces features from 199506 to be defined, if available */
     #ifndef _POSIX_C_SOURCE 
         #define _POSIX_C_SOURCE 199506L
     #endif
     #include <unistd.h>
-    // Pthreads first appeared in the POSIX standard in IEEE 1003.1c-1995, published in 06/1995:
-    // https://standards.ieee.org/standard/1003_1c-1995.html
+    /* Pthreads first appeared in the POSIX standard in IEEE 1003.1c-1995, published in 06/1995:
+     * https://standards.ieee.org/standard/1003_1c-1995.html */
     #if defined(_POSIX_VERSION) && (_POSIX_VERSION >= 199506L)
         #define I8080_POSIX_MIN_VER
     #endif
@@ -49,12 +49,12 @@
     #define I8080_GNUC_MIN_VER
 #endif
 
- // Allow C++ compilers to link to C headers
+ /* Allow C++ compilers to link to C headers */
 #ifdef __cplusplus
-    // if compiled with C++, extern as C
+    /* if compiled with C++, extern as C */
     #define I8080_CDECL extern "C"
 #else
-    // if compiled with C, no extern required
+    /* if compiled with C, no extern required */
     #define I8080_CDECL
 #endif
 

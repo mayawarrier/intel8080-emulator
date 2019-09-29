@@ -16,29 +16,29 @@
 #include "i8080_predef.h"
 
 I8080_CDECL typedef struct i8080 {
-    // Registers
+    /* Registers */
     emu_word_t a, b, c, d, e, h, l;
-    // Stack pointer, program counter
+    /* Stack pointer, program counter */
     emu_addr_t sp, pc;
 
-    // Flags: sign, zero, auxiliary carry,
-    // carry, parity, interrupt enable
+    /* Flags: sign, zero, auxiliary carry,
+     * carry, parity, interrupt enable */
     int s, z, acy, cy, p, ie;
 
-    // True if in HALT state. Only interrupts
-    // and RESET can bring i8080 out of this state. 
+    /* True if in HALT state. Only interrupts
+     * and RESET can bring i8080 out of this state. */
     int is_halted;
 
-    // provide your own read/write streams
+    /* provide your own read/write streams */
 
-    // Read from a memory stream
+    /* Read from a memory stream */
     emu_read_word_fp read_memory;
-    // Write to a memory stream
+    /* Write to a memory stream */
     emu_write_word_fp write_memory;
 
-    // I/O stream in
+    /* I/O stream in */
     emu_read_word_fp port_in;
-    // I/O stream out
+    /* I/O stream out */
     emu_write_word_fp port_out;
 
     /* This is called on opcode 0x38. 0x38
@@ -49,8 +49,8 @@ I8080_CDECL typedef struct i8080 {
      * Return true if i8080 should continue
      * execution after this call. */
     int(*emu_ext_call)(void * const);
-    // Records the last instruction executed.
-    // Can be used to debug upon emu_ext_call.
+    /* Records the last instruction executed.
+     * Can be used to debug upon emu_ext_call. */
     emu_word_t last_instr_exec;
 
     /* When an interrupt is issued, this
@@ -59,7 +59,7 @@ I8080_CDECL typedef struct i8080 {
      * the vector has been executed, interrupts
      * are disabled again. */
     emu_word_t(*interrupt_acknowledge)(void);
-    // Whether there is a pending interrupt request to service.
+    /* Whether there is a pending interrupt request to service. */
     int pending_interrupt_req;
 
     /* When an interrupt comes on another thread,
@@ -69,7 +69,7 @@ I8080_CDECL typedef struct i8080 {
      * or missed by the i8080. */
     i8080_mutex_t i_mutex;
     
-    // Cycles taken for last emu_runtime
+    /* Cycles taken for last emu_runtime */
     emu_large_t cycles_taken;
 
 } i8080;
