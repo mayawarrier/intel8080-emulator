@@ -191,7 +191,7 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
 }
 
 /* The following are externed from run.cpp.
-   See run.cpp for examples on how to use libi8080emu,
+   See run_tests.cpp for examples on how to use libi8080emu,
    and how to configure the emulator before it is ready to run. */
 
 // Shows example usage of libi8080emu.
