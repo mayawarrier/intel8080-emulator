@@ -1,11 +1,18 @@
 cmake_minimum_required(VERSION 3.1.0)
 project(i8080emu)
+set(EXE_NAME i8080emu)
 
+# ISO C90 is identical to ANSI C89
 set(CMAKE_C_STANDARD 90)
 set(CMAKE_CXX_STANDARD 11)
-set(i8080_DEBUG_FLAGS -g -O0 -Wall -Wextra -Werror -fno-exceptions)
-set(i8080_RELEASE_FLAGS -O3 -Wall -Wextra -Werror -fno-exceptions)
-set(EXE_NAME i8080emu)
+
+if (MSVC)
+    set(i8080_DEBUG_FLAGS /W4 /WX /DEBUG:FASTLINK /Od /EHa)
+    set(i8080_RELEASE_FLAGS /W4 /WX /O2 /EHsc)
+else()
+    set(i8080_DEBUG_FLAGS -g -O0 -Wall -Wextra -Werror)
+    set(i8080_RELEASE_FLAGS -O3 -Wall -Wextra -Werror -fno-exceptions)
+endif()
 
 # make static libaries of libi8080 and libi8080emu
 include_directories(libi8080emu/libi8080/include)
@@ -22,10 +29,9 @@ find_package(Threads REQUIRED)
 add_executable(${EXE_NAME} main.cpp run_tests.cpp)
 target_link_libraries(${EXE_NAME} i8080-wrapper)
 target_link_libraries(${EXE_NAME} Threads::Threads)
-# set debug and release target flags
-target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:DEBUG>:${i8080_DEBUG_FLAGS}>")
-target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:RELEASE>:${i8080_RELEASE_FLAGS}>")
+# append to the debug and release flags
+target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:DEBUG>:${CMAKE_CXX_FLAGS_DEBUG}${i8080_DEBUG_FLAGS}>")
+target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:RELEASE>:${CMAKE_CXX_FLAGS_RELEASE}${i8080_RELEASE_FLAGS}>")
 
 # copy test files to the build folder
 file(COPY libi8080emu/tests DESTINATION ${CMAKE_BINARY_DIR})
-
