@@ -30,8 +30,8 @@ add_executable(${EXE_NAME} main.cpp run_tests.cpp)
 target_link_libraries(${EXE_NAME} i8080-wrapper)
 target_link_libraries(${EXE_NAME} Threads::Threads)
 # append to the debug and release flags
-target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:DEBUG>:${CMAKE_CXX_FLAGS_DEBUG}${i8080_DEBUG_FLAGS}>")
-target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:RELEASE>:${CMAKE_CXX_FLAGS_RELEASE}${i8080_RELEASE_FLAGS}>")
+target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:DEBUG>:${i8080_DEBUG_FLAGS}>")
+target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:RELEASE>:${i8080_RELEASE_FLAGS}>")
 
 # copy test files to the build folder
 file(COPY libi8080emu/tests DESTINATION ${CMAKE_BINARY_DIR})
