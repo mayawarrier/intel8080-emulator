@@ -1,7 +1,6 @@
 # Project files
 *.vs/
-intel8080-emulator/
-windows-build/
+CMakeSettings.json
 *.dep.inc
 *.mk
 
