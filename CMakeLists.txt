@@ -8,19 +8,27 @@ option(FORCE_INSTALL_DEP "Force installation of dependencies if not available." 
 if (FORCE_INSTALL_DEP)
     if (WIN32)
         message(STATUS "Installing dependencies Chocolatey and git-lfs if not available...")
-        message(STATUS "Looking for Chocolatey (this may take a while)")
         execute_process(
             COMMAND runas powershell.exe -ExecutionPolicy Bypass -NoProfile
                                -command "iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex"
         )
-        message(STATUS "Chocolatey successfully installed! Installing git-lfs...")
         execute_process(COMMAND runas powershell.exe -command "choco install git-lfs" RESULT_VARIABLE DEP_SUCCESS)
     elseif (UNIX)
         message(STATUS "Installing dependency git-lfs if not available...")
+        # Search for packages beginning with git-lfs
         execute_process(
-            COMMAND sudo apt-get --yes install git-lfs
-            RESULT_VARIABLE DEP_SUCCESS
+            COMMAND sudo apt-cache search --names-only '^git-lfs-.*'
+            OUTPUT_VARIABLE GIT_LFS_APT_SEARCH
         )
+        # If not found, attempt to install
+        if (GIT_LFS_APT_SEARCH STREQUAL "")
+            execute_process(
+                COMMAND sudo apt-get --yes install git-lfs
+                RESULT_VARIABLE DEP_SUCCESS
+            )
+        else()
+            set(DEP_SUCCESS 1)
+        endif()
     else()
         message(FATAL_ERROR "Unrecognized build environment. Install dependencies yourself before running cmake.")
     endif()
