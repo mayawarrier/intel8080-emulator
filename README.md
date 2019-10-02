@@ -32,10 +32,9 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=ON; cmake --b
 **DFORCE_INSTALL_DEP=ON** will try to auto-install git-lfs if it is unavailable.
 - On Linux this is installed through apt-get.
 - On Windows, this will first install and configure the Chocolatey package manager, then install git-lfs through Chocolatey.
+- If you'd rather not install git-lfs, you can download and replace the libi8080emu/tests folder instead, and run cmake with **DFORCE_INSTALL_DEP=OFF**.
 
-If you'd rather not install git-lfs, you can download and replace the libi8080emu/tests folder instead, and run cmake with **DFORCE_INSTALL_DEP=OFF**.
-
-This will create the build/i8080emu executable, which can be called from the command line.
+CMake will then create the build/i8080emu executable, which can be called from the command line.
 
 ### Command line tool:
 Frontend to libi8080emu, to run tests or other ROMs from the command line.
@@ -50,7 +49,7 @@ Options:
    -f   --file FILE             Execute the file as i8080 binary.
    --run-all-tests              Run all the test files under tests/.
 ```
---run-all-tests:
+**Output of --run-all-tests:**
 ```
 
 -------------------------- Test 1: TST8080.COM --------------------------
