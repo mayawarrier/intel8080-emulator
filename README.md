@@ -35,6 +35,8 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=ON; cmake --b
 
 If you'd rather not install git-lfs, you can download and replace the libi8080emu/tests folder instead, and run cmake with **DFORCE_INSTALL_DEP=OFF**.
 
+This will create the build/i8080emu executable, which can be called from the command line.
+
 ### Command line tool:
 Frontend to libi8080emu, to run tests or other ROMs from the command line.
 ```
