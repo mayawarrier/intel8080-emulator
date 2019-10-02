@@ -84,7 +84,7 @@ CPU TESTS OK
 
 3/3 tests passed.
 ```
-### Helpful resources:
+## Helpful resources:
 - [superzazu's 8080 emulator](https://github.com/superzazu/8080)
 - [Detecting OS types using compiler macros](http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system)
 - [Overview of the CP/M BIOS](https://www.seasip.info/Cpm/bios.html)
