@@ -18,6 +18,23 @@ This project consists of two libraries: libi8080emu, and libi8080emu/libi8080.
 - libi8080 is the core emulation library and can be used standalone to emulate an i8080.
 - libi8080emu wraps around libi8080 to provide debugging functionality and CP/M 2.2 BIOS emulation.
 
+## Building and running tests:
+This depends on git-lfs to pull the test files in libi8080emu/tests. It can be auto-installed from this project's CMakeLists.
+
+To build on Linux, install CMake and run this in the repo directory:
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=OFF && cmake --build build --target all
+```
+For Windows, install CMake through Visual Studio 2017/2019 with the Linux Development option checked. Then run this in the repo directory with PowerShell as administrator:
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=ON; cmake --build build
+```
+**DFORCE_INSTALL_DEP=ON** will try to auto-install git-lfs if it is unavailable.
+- On Linux this is installed through apt-get.
+- On Windows, this will first install and configure the Chocolatey package manager, then install git-lfs through Chocolatey.
+
+If you'd rather not install git-lfs, you can download and replace the libi8080emu/tests folder instead, and run cmake with **DFORCE_INSTALL_DEP=OFF**.
+
 ### Command line tool:
 Frontend to libi8080emu, to run tests or other ROMs from the command line.
 ```
