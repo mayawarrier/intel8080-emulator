@@ -8,24 +8,25 @@ I've tried my best to make this as portable and accurate as possible! I'd apprec
 
 ### Portability:
 - Written in C89/ANSI C, taking advantage of C99 features if available.
-- Tested with gcc 6.3.0 -std=c89 and WebAssembly/emcc on Debian 9, and with MSVC on Windows 8.
+- Tested with gcc 6.3.0 -std=c89 on Debian 9, WebAssembly/emcc on Debian 10 through WSL, and with MSVC on Windows 8.
 - Attempt made to support async interrupts on as many environments as possible **(see i8080_predef.h and i8080_sync.c)**. This is untested, but should work on Windows versions >= XP, POSIX environments >= 199506, and GNUC compilers >= version 4.7.0.
 ### Accuracy:
 - Passes test roms TST8080.COM and CPUTEST.COM from Microcosm Associates (Kelly Smith test) and Supersoft Associates 1980-1981.
+- Passes test_interrupts.COM, which tests if async interrupts are synchronized and serviced correctly.
 - More tests to be added!
 ### libi8080emu, libi8080
-This project consists of two libraries: libi8080emu, and libi8080emu/libi8080. 
+Broken up into two libraries: libi8080emu, and libi8080emu/libi8080. 
 - libi8080 is the core emulation library and can be used standalone to emulate an i8080.
 - libi8080emu wraps around libi8080 to provide debugging functionality and CP/M 2.2 BIOS emulation.
 
 ## Building and running tests:
-This depends on git-lfs to pull the test files in libi8080emu/tests. It can be auto-installed from this project's CMakeLists.
+This requires git-lfs to pull the test files in libi8080emu/tests. It can be auto-installed from this project's CMakeLists.
 
 To build on Linux, install CMake and run this in the repo directory:
 ```
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=OFF && cmake --build build --target all
 ```
-For Windows, install CMake through Visual Studio 2017/2019 with the Linux Development option checked. Then run this in the repo directory with PowerShell as administrator:
+To build on Windows, install CMake through Visual Studio 2017/2019 with the Linux Development option checked. Then run this in the repo directory with PowerShell as administrator:
 ```
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=ON; cmake --build build
 ```
@@ -34,7 +35,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=ON; cmake --b
 - On Windows, this will first install and configure the Chocolatey package manager, then install git-lfs through Chocolatey.
 - If you'd rather not install git-lfs, you can download and replace the libi8080emu/tests folder instead, and run cmake with **DFORCE_INSTALL_DEP=OFF**.
 
-CMake will then create the build/i8080emu executable, which can be called from the command line.
+If successful, the built executable is build/i8080emu, which features a command line to test libi8080emu.
 
 ### Command line tool:
 Frontend to libi8080emu, to run tests or other ROMs from the command line.
@@ -49,7 +50,7 @@ Options:
    -f   --file FILE             Execute the file as i8080 binary.
    --run-all-tests              Run all the test files under tests/.
 ```
-**Output of --run-all-tests:**
+--run-all-tests:
 ```
 
 -------------------------- Test 1: TST8080.COM --------------------------
