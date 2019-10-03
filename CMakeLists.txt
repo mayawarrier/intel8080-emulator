@@ -16,16 +16,10 @@ if (FORCE_INSTALL_DEP)
     elseif (UNIX)
         message(STATUS "Installing dependency git-lfs if not available...")
         # Search for packages beginning with git-lfs
-        execute_process(
-            COMMAND sudo apt-cache search --names-only "^git-lfs.*"
-            OUTPUT_VARIABLE GIT_LFS_APT_SEARCH
-        )
+        execute_process(COMMAND sudo apt-cache search --names-only "^git-lfs.*" OUTPUT_VARIABLE GIT_LFS_APT_SEARCH)
         # If not found, attempt to install
         if (GIT_LFS_APT_SEARCH MATCHES "^$")
-            execute_process(
-                COMMAND sudo apt-get --yes install git-lfs
-                RESULT_VARIABLE DEP_SUCCESS
-            )
+            execute_process(COMMAND sudo apt-get --yes install git-lfs RESULT_VARIABLE DEP_SUCCESS)
         else()
             set(DEP_SUCCESS 1)
         endif()
