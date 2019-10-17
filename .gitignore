@@ -1,8 +1,17 @@
-# Project files
+# VS Project files
 *.vs/
 CMakeSettings.json
 *.dep.inc
 *.mk
+
+# CMake
+cmake_install.cmake
+CMakeFiles/
+CMakeCache.txt
+Makefile
+
+# custom clean script
+clean_build
 
 # Prerequisites
 *.d
