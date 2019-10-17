@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.1.0)
 project(i8080emu)
-set(EXE_NAME i8080emu)
+set(EXE_NAME i8080-emu)
 
 option(FIRST_TIME_SETUP "Force installation of dependencies if not available, and pull test files with git lfs." OFF)
+option(LIBS_ONLY "Compile the libi8080emu and libi8080 libraries only." OFF)
 
 # Search for dependencies and auto-install them if possible
 if (FIRST_TIME_SETUP)
@@ -82,17 +83,18 @@ endif()
 include_directories(libi8080emu/libi8080/include)
 add_library(i8080 STATIC libi8080emu/libi8080/src/i8080.c libi8080emu/libi8080/src/i8080_sync.c)
 include_directories(libi8080emu/include)
-add_library(i8080-wrapper STATIC libi8080emu/src/emu.c libi8080emu/src/emu_debug.c)
+add_library(i8080emu STATIC libi8080emu/src/emu.c libi8080emu/src/emu_debug.c)
 # link libi8080emu to libi8080
-target_link_libraries(i8080-wrapper PUBLIC i8080)
+target_link_libraries(i8080emu PUBLIC i8080)
 
 # copy test files to the build folder
 file(COPY libi8080emu/tests DESTINATION ${CMAKE_BINARY_DIR})
 
-# Generate build system
-add_executable(${EXE_NAME} main.cpp run_tests.cpp)
-target_link_libraries(${EXE_NAME} i8080-wrapper)
-target_link_libraries(${EXE_NAME} Threads::Threads)
-target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:DEBUG>:${i8080_DEBUG_FLAGS}>")
-target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:RELEASE>:${i8080_RELEASE_FLAGS}>")
-
+if (NOT LIBS_ONLY)
+    # Generate build system
+    add_executable(${EXE_NAME} main.cpp run_tests.cpp)
+    target_link_libraries(${EXE_NAME} i8080emu)
+    target_link_libraries(${EXE_NAME} Threads::Threads)
+    target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:DEBUG>:${i8080_DEBUG_FLAGS}>")
+    target_compile_options(${EXE_NAME} PUBLIC "$<$<CONFIG:RELEASE>:${i8080_RELEASE_FLAGS}>")
+endif()
