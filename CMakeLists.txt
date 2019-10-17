@@ -8,40 +8,61 @@ option(FIRST_TIME_SETUP "Force installation of dependencies if not available, an
 if (FIRST_TIME_SETUP)
 
     set(GIT_LFS_INSTALL_AND_PULL cd ${CMAKE_SOURCE_DIR} && git lfs install && git lfs pull)
+    set(WIN_CHOCO_GIT_LFS_INSTALL runas powershell.exe -command "choco install -y git-lfs; refreshenv")
 
     if (WIN32)
         message(STATUS "Installing dependencies Chocolatey and git-lfs if not available...")
-        execute_process(
-            COMMAND runas powershell.exe -ExecutionPolicy Bypass -NoProfile
-                               -command "iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex"
-        )
-        execute_process(COMMAND runas powershell.exe -command "choco install git-lfs" RESULT_VARIABLE DEP_SUCCESS)
+        execute_process(COMMAND runas powershell.exe
+                                -command "Get-PackageProvider "Chocolatey"
+                        RESULT_VARIABLE CHOCO_AVAILABLE)
+        if (NOT CHOCO_AVAILABLE)
+            # If chocolatey is not available, install it and git-lfs
+            execute_process(COMMAND runas powershell.exe -ExecutionPolicy Bypass -NoProfile
+                                    -command "iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex"
+                            RESULT_VARIABLE DEP_SUCCESS)
+            if (DEP_SUCCESS)
+                execute_process(COMMAND ${WIN_CHOCO_GIT_LFS_INSTALL}
+                                RESULT_VARIABLE DEP_SUCCESS)
+            endif()
+        else()
+            # Check if git-lfs is already installed through choco
+            execute_process(COMMAND runas -powershell.exe
+                                    -command "choco list -lo | Select-String -Pattern '^git-lfs*'"
+                            RESULT_VARIABLE DEP_SUCCESS)
+            if (NOT DEP_SUCCESS)
+                execute_process(COMMAND ${WIN_CHOCO_GIT_LFS_INSTALL}
+                                RESULT_VARIABLE DEP_SUCCESS)
+            endif()
+        endif()
+
     elseif (UNIX)
         message(STATUS "Installing dependency git-lfs if not available...")
         # Search for packages beginning with git-lfs
-        execute_process(COMMAND sudo apt-cache search --names-only "^git-lfs.*" OUTPUT_VARIABLE GIT_LFS_APT_SEARCH)
+        execute_process(COMMAND sudo apt-cache search --names-only "^git-lfs.*"
+                        OUTPUT_VARIABLE GIT_LFS_APT_SEARCH)
         # If not found, attempt to install
         if (GIT_LFS_APT_SEARCH MATCHES "^$")
-            execute_process(COMMAND sudo apt-get --yes install git-lfs RESULT_VARIABLE DEP_SUCCESS)
+            execute_process(COMMAND sudo apt-get --yes install git-lfs
+                            RESULT_VARIABLE DEP_SUCCESS)
         else()
             set(DEP_SUCCESS 1)
         endif()
     else()
         message(FATAL_ERROR "Unrecognized build environment. Install dependencies yourself before running cmake.")
     endif()
-    if (NOT DEP_SUCCESS)
-        message(SEND_ERROR "Installation of dependencies failed.")
-    else()
-        message(STATUS "Installation/verification of dependencies complete.")
-    endif()
 
     # Get test files from git lfs
-    message(STATUS "Initializing git-lfs and pulling test files...")
-    execute_process(COMMAND ${GIT_LFS_INSTALL_AND_PULL} RESULT_VARIABLE GIT_LFS_SUCCESS)
-    if (NOT GIT_LFS_SUCCESS)
-        message(FATAL_ERROR "Unable to pull test files. Download the files manually to libi8080emu/tests. Abort.")
+    if (DEP_SUCCESS)
+        message(STATUS "Initializing git-lfs and pulling test files...")
+        execute_process(COMMAND ${GIT_LFS_INSTALL_AND_PULL}
+                        RESULT_VARIABLE GIT_LFS_SUCCESS)
+        if (NOT GIT_LFS_SUCCESS)
+            message(FATAL_ERROR "Unable to pull test files. Download the files manually to libi8080emu/tests. Abort.")
+        else()
+            message(STATUS "libi8080emu test files pulled successfully.")
+        endif()
     else()
-        message(STATUS "libi8080emu test files pulled successfully.")
+        message(SEND_ERROR "Installation of dependencies failed.")
     endif()
 endif(FIRST_TIME_SETUP)
 
