@@ -242,21 +242,21 @@ static void i8080_mov_get_reg_pair(i8080 * const cpu, emu_word_t opcode, emu_wor
 
     switch (hi_opcode) {
         case 0x40:
-            if (lo_opcode >= 0x00 && lo_opcode <= 0x07) {
+            if (lo_opcode <= 0x07) {
                 *left = &cpu->b;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
                 *left = &cpu->c;
             }
             break;
         case 0x50:
-            if (lo_opcode >= 0x00 && lo_opcode <= 0x07) {
+            if (lo_opcode <= 0x07) {
                 *left = &cpu->d;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
                 *left = &cpu->e;
             }
             break;
         case 0x60:
-            if (lo_opcode >= 0x00 && lo_opcode <= 0x07) {
+            if (lo_opcode <= 0x07) {
                 *left = &cpu->h;
             } else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
                 *left = &cpu->l;
