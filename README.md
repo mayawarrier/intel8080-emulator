@@ -1,4 +1,6 @@
 
+
+
 # intel8080-emulator
 
 An emulator for the Intel 8080 microprocessor, written in C89/ANSI C. 
@@ -8,34 +10,37 @@ I've tried my best to make this as portable and accurate as possible! I'd apprec
 
 ### Portability:
 - Written in C89/ANSI C, taking advantage of C99 features if available.
-- Tested with gcc 6.3.0 -std=c89 on Debian 9, WebAssembly/emcc on Debian 10 through WSL, and with MSVC on Windows 8.
+- Tested with **gcc** 6.3.0 on Debian 9, WebAssembly/**emcc** on Debian 10 through WSL with a WebAssembly-thread compatible browser (Chrome 60.0+, with the feature turned on), and with **MSVC** on Windows 8.
 - Attempt made to support async interrupts on as many environments as possible **(see i8080_predef.h and i8080_sync.c)**. This is untested, but should work on Windows versions >= XP, POSIX environments >= 199506, and GNUC compilers >= version 4.7.0.
 ### Accuracy:
-- Passes test roms TST8080.COM and CPUTEST.COM from Microcosm Associates (Kelly Smith test) and Supersoft Associates 1980-1981.
+- Passes test ROMs TST8080.COM (Kelly Smith test) from Microcosm Associates 1980 and CPUTEST.COM from Supersoft Associates 1981.
 - Passes test_interrupts.COM, which tests if async interrupts are synchronized and serviced correctly.
 - More tests to be added!
 ### libi8080emu, libi8080
-Broken up into two libraries: libi8080emu, and libi8080emu/libi8080. 
 - libi8080 is the core emulation library and can be used standalone to emulate an i8080.
 - libi8080emu wraps around libi8080 to provide debugging functionality and CP/M 2.2 BIOS emulation.
 
 ## Building and running tests:
-This requires git-lfs to pull the test files in libi8080emu/tests. It can be auto-installed from this project's CMakeLists.
 
-To build on Linux, install CMake and run this in the repo directory:
+**Dependencies:** git-lfs, cmake
+
+**Setup:** Install git-lfs and run `git-lfs install && git-lfs pull` in the repo directory (or use the project's CMakeLists.txt to automatically install dependencies and perform setup).
+
+**Steps to build only the libi8080 and libi8080emu libraries:**
+
+Build only the C89-compliant libraries with:
 ```
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=OFF && cmake --build build --target all
+cmake . -DCMAKE_BUILD_TYPE=Release -DLIBS_ONLY=ON
+cmake --build .
 ```
-To build on Windows, install CMake through Visual Studio 2017/2019 with the Linux Development option checked. Then run this in the repo directory with PowerShell as administrator:
+**Steps to build with the command line frontend (written in C++11):**
 ```
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFORCE_INSTALL_DEP=ON; cmake --build build
+cmake . -DCMAKE_BUILD_TYPE=Release -DFIRST_TIME_SETUP=OFF
+cmake --build .
 ```
-**DFORCE_INSTALL_DEP=ON** will try to auto-install git-lfs if it is unavailable.
-- On Linux this is installed through apt-get.
+**DFIRST_TIME_SETUP=ON** 
+- Will try to auto-install git-lfs if it is unavailable (this requires admin privileges).
 - On Windows, this will first install and configure the Chocolatey package manager, then install git-lfs through Chocolatey.
-- If you'd rather not install git-lfs, you can download and replace the libi8080emu/tests folder instead, and run cmake with **DFORCE_INSTALL_DEP=OFF**.
-
-If successful, the built executable is build/i8080emu, which features a command line to test libi8080emu.
 
 ### Command line tool:
 Frontend to libi8080emu, to run tests or other ROMs from the command line.
