@@ -135,7 +135,7 @@ static int i8080_cpm_zero_page(void * const udata) {
 
                 /* Process commands */
                 if (strncmp(input_buf, "RUN ", 4) == 0) {
-                    if (sscanf(&input_buf[4], ADDR_T_SCN_FORMAT, &run_addr) == 1 && run_addr >= 0 && run_addr <= 0xffff) {
+                    if (sscanf(&input_buf[4], ADDR_T_SCN_FORMAT, &run_addr) == 1) {
                         /* address is in correct format and within bounds */
                         #undef LEN_INPUT_BUF
                         goto command_run;
