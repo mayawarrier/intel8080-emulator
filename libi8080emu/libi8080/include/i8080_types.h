@@ -36,13 +36,13 @@
     /* Simulate a mutex using acquire - release semantics on a char. */
     I8080_CDECL typedef char i8080_mutex_t;
 #else
-    /* A volatile char ~should~provide the best chance at proper sync, 
+    /* A volatile char ~should~ provide the best chance at proper sync, 
      * if nothing else is available. */
     I8080_CDECL typedef volatile char i8080_mutex_t;
 #endif
 
-/* Below are the i8080 emulator base types.
- * These can be modified to emulate architectures close to the i8080.
+/* i8080-emu base types follow.
+ * These can be modified for the desired host/virtual machine.
  *
  * emu_word_t: An unsigned type with a bit width equal to the virtual machine's word size.
  * emu_addr_t: An unsigned type with a bit width equal to the virtual machine's address size.
@@ -51,12 +51,67 @@
  *             the emulator will still run properly, but cycles_taken might overflow.
  */
 
-#include <stdint.h>
+#if (defined(__STDC_VERSION__) || defined(__cplusplus) || (defined(I8080_WINDOWS) && _MSC_VER > 0000)) /* TODO: Placeholder, add real version check for MSVC! */
+    /* If stdint is available, we may get some fixed width types from there */
+    #include <stdint.h>
+#else
+    /* If CHAR_BIT is 8, we can construct types from a uchar */
+    #include <limits.h>
+    #if (CHAR_BIT == 8)
+        typedef unsigned char __i8080_byte_t__;
+    #else
+        #error "CHAR_BIT is not 8! Provide your own byte-sized type."
+    #endif
+#endif
 
-I8080_CDECL typedef uint8_t emu_word_t;
-I8080_CDECL typedef uint16_t emu_addr_t;
-I8080_CDECL typedef uint32_t emu_buf_t;
-I8080_CDECL typedef uintmax_t emu_large_t;
+#ifdef UINT8_MAX
+    typedef uint8_t __i8080_uint8_t__;
+#else
+    typedef __i8080_byte_t__ __i8080_uint8_t__;
+#endif
+
+#ifdef UINT16_MAX
+    typedef uint16_t __i8080_uint16_t__;
+#else
+    typedef struct {
+        __i8080_byte_t__ b0;
+        __i8080_byte_t__ b1;
+    } __i8080_uint16_t__;
+#endif
+
+#ifdef UINT32_MAX
+    typedef uint32_t __i8080_uint32_t__;
+#else
+    typedef struct {
+        __i8080_byte_t__ b0;
+        __i8080_byte_t__ b1;
+        __i8080_byte_t__ b2;
+        __i8080_byte_t__ b3;
+    } __i8080_uint32_t__;
+#endif
+
+#ifdef UINT64_MAX
+    typedef uint64_t __i8080_uint64_t__;
+#else
+    typedef struct {
+        __i8080_byte_t__ b0;
+        __i8080_byte_t__ b1;
+        __i8080_byte_t__ b2;
+        __i8080_byte_t__ b3;
+        __i8080_byte_t__ b4;
+        __i8080_byte_t__ b5;
+        __i8080_byte_t__ b6;
+        __i8080_byte_t__ b7;
+    } __i8080_uint64_t__;
+#endif
+
+/* Construct base types from safe types above */
+I8080_CDECL typedef __i8080_uint8_t__ emu_word_t;
+I8080_CDECL typedef __i8080_uint16_t__ emu_addr_t;
+I8080_CDECL typedef __i8080_uint32_t__ emu_buf_t;
+I8080_CDECL typedef __i8080_uint64_t__ emu_large_t;
+
+/* */
 
 I8080_CDECL typedef emu_word_t(*emu_read_word_fp)(emu_addr_t);
 I8080_CDECL typedef void(*emu_write_word_fp)(emu_addr_t, emu_word_t);
