@@ -19,37 +19,37 @@
 #include <chrono>
 
 // 64KB of emulated memory
-static emu_word_t MEMORY[ADDR_T_MAX + 1];
+static i8080_word_t MEMORY[ADDR_T_MAX + 1];
 
 // Default memory read/write streams
-static emu_word_t rw_from_memory(emu_addr_t addr) {
+static i8080_word_t rw_from_memory(i8080_addr_t addr) {
     return MEMORY[addr];
 }
-static void ww_to_memory(emu_addr_t addr, emu_word_t word) {
+static void ww_to_memory(i8080_addr_t addr, i8080_word_t word) {
     MEMORY[addr] = word;
 }
 
 // CPU port out for the CP/M environment.
-static void cpm_env_port_out(emu_addr_t addr, emu_word_t word) {
+static void cpm_env_port_out(i8080_addr_t addr, i8080_word_t word) {
     // Address is duplicated, pick lower 8 bits
-    emu_word_t port_addr = (emu_word_t)(addr & WORD_T_MAX);
+    i8080_word_t port_addr = (i8080_word_t)(addr & WORD_T_MAX);
     if (port_addr == CPM_CONSOLE_ADDR) {
         printf(WORD_T_ASCII_FORMAT, word);
     }
 }
 
 // CPU port in for the CP/M environment.
-static emu_word_t cpm_env_port_in(emu_addr_t addr) {
-    emu_word_t rw = 0x00;
+static i8080_word_t cpm_env_port_in(i8080_addr_t addr) {
+    i8080_word_t rw = 0x00;
     // Address is duplicated, pick lower 8 bits
-    emu_word_t port_addr = (emu_word_t)(addr & WORD_T_MAX);
+    i8080_word_t port_addr = (i8080_word_t)(addr & WORD_T_MAX);
     if (port_addr == CPM_CONSOLE_ADDR) {
         scanf(WORD_T_ASCII_FORMAT, &rw);
     }
     return rw;
 }
 
-static emu_word_t i8080_interrupt_handler(void) {
+static i8080_word_t i8080_interrupt_handler(void) {
     return 0xc7; // RST 0, this exits to WBOOT in the CP/M environment
 }
 
@@ -68,14 +68,14 @@ i8080 init_i8080_emu_default() {
     cpu.write_memory = ww_to_memory;
     /*
        I/O stream fns can also be assigned:
-       cpu.port_in = <i8080.h/emu_read_word_fp>;
-       cpu.port_out = <i8080.h/emu_write_word_fp>;
+       cpu.port_in = <i8080.h/i8080_read_word_fp>;
+       cpu.port_out = <i8080.h/i8080_write_word_fp>;
        Assigning these are not necessary but I/O
        requests will cause the emulator to quit.
 
        Hardware interrupts can also be enabled,
        if the build environment supports mutexes (see i8080_sync.h):
-       cpu.interrupt_acknowledge = <emu_word_t(*)(void)>;
+       cpu.interrupt_acknowledge = <i8080_word_t(*)(void)>;
        interrupt_acknowledge() should return the word to be executed on interrupt.
        If not assigned, calls to i8080_interrupt() will be ignored.
     */
@@ -108,14 +108,14 @@ i8080 init_i8080_emu_cpm() {
     return cpu;
 }
 
-int run_generic_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc) {
+int run_generic_test(i8080 * const cpu, const std::string & file_location, i8080_addr_t program_load_loc) {
     // Load emulated memory with the file contents, then start the emulator
     if (memory_load(file_location.c_str(), MEMORY, program_load_loc) == 0) return 0;
     if (emu_runtime(cpu, NULL) == EMU_EXIT_CODE::EMU_EXIT_SUCCESS) return 1;
     else return 0;
 }
 
-int run_interrupted_test(i8080 * const cpu, const std::string & file_location, emu_addr_t program_load_loc, int ms_to_interrupt) {
+int run_interrupted_test(i8080 * const cpu, const std::string & file_location, i8080_addr_t program_load_loc, int ms_to_interrupt) {
     // Enable hardware interrupts
     cpu->interrupt_acknowledge = i8080_interrupt_handler;
     if (memory_load(file_location.c_str(), MEMORY, program_load_loc) == 0) return 0;

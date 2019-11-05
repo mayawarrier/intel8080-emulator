@@ -56,7 +56,7 @@ static const char * const DEBUG_DISASSEMBLY_TABLE[] = {
     "rst 6", "rm", "sphl", "jm $", "ei", "cm $", "undocumented", "cpi #", "rst 7"
 };
 
-/* Checks if format spec has a max of 128 chars, and can be applied to an emu_word_t. */
+/* Checks if format spec has a max of 128 chars, and can be applied to an i8080_word_t. */
 static int is_valid_format_spec(const char * f) {
     /* Check if f is a valid string and format specifier */
     int is_valid_str = 0;
@@ -69,7 +69,7 @@ static int is_valid_format_spec(const char * f) {
         }
     }
     /* check if this format can actually be applied to a word */
-    emu_word_t out_word;
+    i8080_word_t out_word;
     int is_valid_format = (sscanf("0x38", f, &out_word) == 1);
 
     return is_valid_str && is_valid_format;
@@ -94,7 +94,7 @@ static inline int is_valid_args(const emu_debug_args * args) {
 /* Dump memory without validation checks */
 static void dump_memory_raw(i8080 * const cpu, const emu_debug_args * args) {
     fprintf(args->debug_out, "**** Memory dump: ****\n");
-    emu_addr_t i;
+    i8080_addr_t i;
     for (i = args->mem_dump_start_addr; i <= args->mem_dump_end_addr; ++i) {
         fprintf(args->debug_out, args->mem_dump_format, cpu->read_memory(i));
         /* End-line every newline_after words */
@@ -141,7 +141,7 @@ void set_debug_next_options(emu_debug_args * args) {
 
 int i8080_debug_next(i8080 * const cpu) {
     i8080_mutex_lock(&cpu->i_mutex);
-    emu_word_t opcode = 0;
+    i8080_word_t opcode = 0;
     if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
         opcode = cpu->interrupt_acknowledge();
         cpu->ie = 0;

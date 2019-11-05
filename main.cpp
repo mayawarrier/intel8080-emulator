@@ -197,7 +197,7 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
 // Shows example usage of libi8080emu.
 extern int run_all_tests(); 
 // Loads memory and calls emu_runtime.
-extern int run_generic_test(i8080 * const cpu, const std::string & file_loc, emu_addr_t prog_start_loc);
+extern int run_generic_test(i8080 * const cpu, const std::string & file_loc, i8080_addr_t prog_start_loc);
 // Initializes the CP/M 2.2 environment to run tests in.
 extern i8080 init_i8080_emu_cpm();
 // Initializes the default environment to run tests in.
@@ -207,7 +207,7 @@ extern i8080 init_i8080_emu_default();
 int run_i8080_bin(const std::string & bin_file_loc, bool is_cpm_env) {
     std::cout << std::endl;
     i8080 cpu = is_cpm_env ? init_i8080_emu_cpm() : init_i8080_emu_default();
-    emu_addr_t program_start_loc = is_cpm_env ? CPM_START_OF_TPA : DEFAULT_START_PA;
+    i8080_addr_t program_start_loc = is_cpm_env ? CPM_START_OF_TPA : DEFAULT_START_PA;
     int success = run_generic_test(&cpu, bin_file_loc, program_start_loc);
     i8080_destroy(&cpu);
     std::cout << std::endl;

@@ -25,7 +25,7 @@ static struct {
     int enable_cmd_proc;
 } EMU_STATE = { .env = DEFAULT,.enable_cmd_proc = 1 };
 
-size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc) {
+size_t memory_load(const char * file_loc, i8080_word_t * memory, const i8080_addr_t start_loc) {
     
     size_t file_size = 0;
     size_t words_read = 0;
@@ -43,7 +43,7 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t 
     if (file_size + start_loc > ADDR_T_MAX + (size_t)1) goto end;
     
     /* Attempt to read the entire file */
-    words_read = fread(&memory[start_loc], sizeof(emu_word_t), file_size, f_ptr);
+    words_read = fread(&memory[start_loc], sizeof(i8080_word_t), file_size, f_ptr);
     
     /* Error: file read failure */
     if (words_read != file_size) words_read = 0;
@@ -54,9 +54,9 @@ size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t 
 }
 
 /* Prints the string at str_addr to CPM console, terminated by '$' */
-static void cpm_print_str(const emu_addr_t console_addr, emu_addr_t str_addr, i8080 * const cpu) {
+static void cpm_print_str(const i8080_addr_t console_addr, i8080_addr_t str_addr, i8080 * const cpu) {
     /* Print each character until we hit a '$' */
-    emu_word_t str_char;
+    i8080_word_t str_char;
     while (1) {
         str_char = cpu->read_memory(str_addr);
         if (str_char == '$') {
@@ -76,20 +76,20 @@ static int i8080_cpm_zero_page(void * const udata) {
     i8080 * const cpu = (i8080 * const)udata;
 
     /* The console port address duplicated across 16-bit address bus for use with port out */
-    const emu_addr_t CONSOLE_ADDR_FULL = ((emu_addr_t)(CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
+    const i8080_addr_t CONSOLE_ADDR_FULL = ((i8080_addr_t)(CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
     /* The return address on the stack */
-    const emu_addr_t ret_addr = (emu_addr_t)(cpu->read_memory(cpu->sp + (emu_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
+    const i8080_addr_t ret_addr = (i8080_addr_t)(cpu->read_memory(cpu->sp + (i8080_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
     
     switch(ret_addr) {
         
         case 0xe401:
         {
             /* Enable/disable WBOOT command processor as required */
-            emu_word_t wboot_cmd_code = cpu->read_memory(0x0003);
+            i8080_word_t wboot_cmd_code = cpu->read_memory(0x0003);
             if (wboot_cmd_code == 0x01) {
                 /* WBOOT command proc is disabled, first run
                  * Overwrite the return address */
-                cpu->write_memory(cpu->sp + (emu_addr_t)1, 0x01);
+                cpu->write_memory(cpu->sp + (i8080_addr_t)1, 0x01);
                 cpu->write_memory(cpu->sp, 0x00);
                 cpu->write_memory(0x0003, 0x00);
                 return 1;
@@ -104,10 +104,10 @@ static int i8080_cpm_zero_page(void * const udata) {
              * QUIT quits the emulator. */
             
             /* Addresses of command proc messages */
-            const emu_addr_t ERROR_ADDR_PTR = 0xe410;                   /* "\nInvalid address." */
-            const emu_addr_t ERROR_CMD_PTR = ERROR_ADDR_PTR + 0x11;     /* "\nInvalid command." */
-            const emu_addr_t HELP_MSG_PTR = ERROR_CMD_PTR + 0x11;       /* Message shown on HELP */
-            const emu_addr_t CMD_PROMPT_PTR = HELP_MSG_PTR + 0x76;      /* "> " */
+            const i8080_addr_t ERROR_ADDR_PTR = 0xe410;                   /* "\nInvalid address." */
+            const i8080_addr_t ERROR_CMD_PTR = ERROR_ADDR_PTR + 0x11;     /* "\nInvalid command." */
+            const i8080_addr_t HELP_MSG_PTR = ERROR_CMD_PTR + 0x11;       /* Message shown on HELP */
+            const i8080_addr_t CMD_PROMPT_PTR = HELP_MSG_PTR + 0x76;      /* "> " */
             
             /* Max length, excluding trailing null */
             #define LEN_INPUT_BUF 127
@@ -116,7 +116,7 @@ static int i8080_cpm_zero_page(void * const udata) {
             char buf_ch;
             
             /* Address from RUN command */
-            emu_addr_t run_addr;
+            i8080_addr_t run_addr;
             
             /* Keep getting input from the console until a valid command is entered */
             while(1) {
@@ -158,8 +158,8 @@ static int i8080_cpm_zero_page(void * const udata) {
             
             command_run: {
                 /* Write JMP addr to the bytes immediately after */
-                const emu_word_t lo_addr = (emu_word_t)(run_addr & WORD_T_MAX);
-                const emu_word_t hi_addr = (emu_word_t)((emu_addr_t)(run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
+                const i8080_word_t lo_addr = (i8080_word_t)(run_addr & WORD_T_MAX);
+                const i8080_word_t hi_addr = (i8080_word_t)((i8080_addr_t)(run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
                 cpu->write_memory(0xe401, i8080_JMP);
                 cpu->write_memory(0xe402, lo_addr);
                 cpu->write_memory(0xe403, hi_addr);
@@ -178,7 +178,7 @@ static int i8080_cpm_zero_page(void * const udata) {
                 {
                     /* Writes an output string terminated by '$'
                      * Address of string is {DE} */
-                    const emu_addr_t str_addr = ((emu_addr_t)(cpu->d << HALF_ADDR_SIZE) | cpu->e);
+                    const i8080_addr_t str_addr = ((i8080_addr_t)(cpu->d << HALF_ADDR_SIZE) | cpu->e);
                     cpm_print_str(CONSOLE_ADDR_FULL, str_addr, cpu);
                     break;
                 }
@@ -199,7 +199,7 @@ static int i8080_cpm_zero_page(void * const udata) {
 }
 
 /* Reserved locations for interrupt vector table */
-static const emu_addr_t INTERRUPT_TABLE[] = {
+static const i8080_addr_t INTERRUPT_TABLE[] = {
 	0x00, /* RESET, RST 0 */
 	0x08, /* RST 1 */
 	0x10, /* RST 2 */
@@ -239,7 +239,7 @@ static void emu_set_cpm_env_load_bios(i8080 * const cpu) {
     size_t i, j;
 
     /* Store messages from 0xe410 */
-    emu_addr_t msgs_loc = 0xe410;
+    i8080_addr_t msgs_loc = 0xe410;
     const char * msg; size_t msg_len;
     for (i = 0; i < 4; ++i) {
         msg = CMD_MSGS[i];
@@ -317,21 +317,21 @@ void emu_init_i8080(i8080 * const cpu) {
 
 /* Writes test_word to all locations, then reads test_word from all locations.
  * Returns 0 if a read failed to return test_word, and stores the failed location in cpu->pc. */
-static int memory_write_read_pass(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr, const emu_word_t test_word) {
+static int memory_write_read_pass(i8080 * const cpu, const i8080_addr_t start_addr, const i8080_addr_t end_addr, const i8080_word_t test_word) {
     size_t i = 0;
     for (i = start_addr; i <= end_addr; ++i) {
-        cpu->write_memory((emu_addr_t)i, test_word);
+        cpu->write_memory((i8080_addr_t)i, test_word);
     }
     for (i = start_addr; i <= end_addr; ++i) {
-        if (cpu->read_memory((emu_addr_t)i) != test_word) {
-            cpu->pc = (emu_addr_t)i;
+        if (cpu->read_memory((i8080_addr_t)i) != test_word) {
+            cpu->pc = (i8080_addr_t)i;
             return 0;
         }
     }
     return 1;
 }
 
-int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr) {
+int memory_check_errors(i8080 * const cpu, const i8080_addr_t start_addr, const i8080_addr_t end_addr) {
     /* Pass 1 */
     if (!memory_write_read_pass(cpu, start_addr, end_addr, 0x55)) return 0;
     /* Pass 2, check alternate bits */

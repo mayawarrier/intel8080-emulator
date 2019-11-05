@@ -17,9 +17,9 @@
 
 I8080_CDECL typedef struct i8080 {
     /* Registers */
-    emu_word_t a, b, c, d, e, h, l;
+    i8080_word_t a, b, c, d, e, h, l;
     /* Stack pointer, program counter */
-    emu_addr_t sp, pc;
+    i8080_addr_t sp, pc;
 
     /* Flags: sign, zero, auxiliary carry,
      * carry, parity, interrupt enable */
@@ -32,14 +32,14 @@ I8080_CDECL typedef struct i8080 {
     /* provide your own read/write streams */
 
     /* Read from a memory stream */
-    emu_read_word_fp read_memory;
+    i8080_read_word_fp read_memory;
     /* Write to a memory stream */
-    emu_write_word_fp write_memory;
+    i8080_write_word_fp write_memory;
 
     /* I/O stream in */
-    emu_read_word_fp port_in;
+    i8080_read_word_fp port_in;
     /* I/O stream out */
-    emu_write_word_fp port_out;
+    i8080_write_word_fp port_out;
 
     /* This is called on opcode 0x38. 0x38
      * is actually an undocumented NOP, but is
@@ -51,14 +51,14 @@ I8080_CDECL typedef struct i8080 {
     int(*emu_ext_call)(void * const);
     /* Records the last instruction executed.
      * Can be used to debug upon emu_ext_call. */
-    emu_word_t last_instr_exec;
+    i8080_word_t last_instr_exec;
 
     /* When an interrupt is issued, this
      * is called back when the i8080 is ready
      * to receive the interrupt vector. After
      * the vector has been executed, interrupts
      * are disabled again. */
-    emu_word_t(*interrupt_acknowledge)(void);
+    i8080_word_t(*interrupt_acknowledge)(void);
     /* Whether there is a pending interrupt request to service. */
     int pending_interrupt_req;
 
@@ -70,7 +70,7 @@ I8080_CDECL typedef struct i8080 {
     i8080_mutex_t i_mutex;
     
     /* Cycles taken for last emu_runtime */
-    emu_large_t cycles_taken;
+    i8080_uintmax_t cycles_taken;
 
 } i8080;
 
@@ -90,7 +90,7 @@ I8080_CDECL int i8080_next(i8080 * const cpu);
 
 /* Executes the opcode on cpu, updating its cycle count, registers and flags.
  * Returns 0 if it isn't safe to continue execution. */
-I8080_CDECL int i8080_exec(i8080 * const cpu, emu_word_t opcode);
+I8080_CDECL int i8080_exec(i8080 * const cpu, i8080_word_t opcode);
 
 /* Sends an interrupt to the i8080. This is thread-safe, and it will be serviced when the i8080 is ready.
  * If your compiler/environment does not support mutexes, this may not work correctly. See i8080_sync.c for implementation.
