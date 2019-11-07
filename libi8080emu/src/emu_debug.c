@@ -139,7 +139,7 @@ void set_debug_next_options(emu_debug_args * args) {
     else printf("Error: Bad mem_dump_format.\n");
 }
 
-int i8080_debug_next(i8080 * const cpu) {
+unsigned i8080_debug_next(i8080 * const cpu) {
     i8080_mutex_lock(&cpu->i_mutex);
     i8080_word_t opcode = 0;
     if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
@@ -154,7 +154,7 @@ int i8080_debug_next(i8080 * const cpu) {
     i8080_mutex_unlock(&cpu->i_mutex);
 
     /* Execute opcode */
-    int success = 0;
+    unsigned success = 0;
     if (!cpu->is_halted) {
         success = i8080_exec(cpu, opcode);
         /* Print disassembly */

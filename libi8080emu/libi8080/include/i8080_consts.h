@@ -16,10 +16,8 @@
  * ADDR_T_SCN_FORMAT : hexadecimal format specifier for emu_addr_t
  * WORD_T_PRT_FORMAT : format specifier to print word as ASCII */
 
-#define HALF_WORD_SIZE (4)
 #define WORD_SIZE (8)
 #define ADDR_SIZE (16)
-#define HALF_ADDR_SIZE (8)
 #define WORD_T_MAX (255)
 #define ADDR_T_MAX (65535)
 

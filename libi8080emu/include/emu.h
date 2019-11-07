@@ -29,15 +29,15 @@ I8080_CDECL typedef struct {
     int should_dump_memory;                 /* Whether or not to dump contents of the memory after each instruction. */
     const char * mem_dump_format;           /* The format specifier applied to each word in the memory dump. Max length is 127 chars. */
     int mem_dump_newline_after;             /* The number of words after which a newline is inserted in the memory dump. */
-    emu_addr_t mem_dump_start_addr;         /* The start address from which to dump memory. */
-    emu_addr_t mem_dump_end_addr;           /* The end address until which to dump memory. */
+    i8080_addr_t mem_dump_start_addr;         /* The start address from which to dump memory. */
+    i8080_addr_t mem_dump_end_addr;           /* The end address until which to dump memory. */
 } emu_debug_args;
 
 /* Loads a file into memory. Returns number of words read. */
-I8080_CDECL size_t memory_load(const char * file_loc, emu_word_t * memory, const emu_addr_t start_loc);
+I8080_CDECL size_t memory_load(const char * file_loc, i8080_word_t * memory, const i8080_addr_t start_loc);
 /* Checks all locations from start_addr to end_addr for read/write errors, using cpu.read_memory() and cpu.write_memory().
  * Returns if failure occured, with location stored in cpu->pc. */
-I8080_CDECL int memory_check_errors(i8080 * const cpu, const emu_addr_t start_addr, const emu_addr_t end_addr);
+I8080_CDECL int memory_check_errors(i8080 * const cpu, const i8080_addr_t start_addr, const i8080_addr_t end_addr);
 
 /* Initialize an i8080 */
 I8080_CDECL void emu_init_i8080(i8080 * const cpu);

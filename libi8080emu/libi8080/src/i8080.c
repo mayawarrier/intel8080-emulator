@@ -77,9 +77,9 @@ if ((val)) { \
 /* Performs 2's complement on the lower nibble of a word. */
 #define twos_comp_lo_word(word) ((i8080_word_t)(((word) ^ WORD_LO_F) + (i8080_word_t)1))
 /* Perform 2's complement on the entire word.
- * Calling fn should check if the result value is 0, since this inverts the carry flag:
+ * Upscales to i8080_dbl_word_t to hold a produced carry, for eg when CPI 0:
  * https://retrocomputing.stackexchange.com/questions/6407/intel-8080-behaviour-of-the-carry-bit-when-comparing-a-value-with-0 */
-#define twos_comp_word(word) ((i8080_word_t)((word) ^ WORD_T_MAX + (i8080_word_t)1))
+#define twos_comp_word(word) (((word) ^ (i8080_word_t)WORD_T_MAX) + (i8080_word_t)1)
  /* Gets the auxiliary carry resulting from adding two words. */
 #define aux_carry(word1, word2) ((unsigned)(get_bit(word_lo_bits(word1) + word_lo_bits(word2), WORD_SIZE / 2)))
 
@@ -89,10 +89,10 @@ if ((val)) { \
 /* ----- Utility macros/vars ---- */
 
 /* Calculates parity of a word. */
-static inline int parity(i8080_word_t word) {
-    int p = 0;
+static inline unsigned parity(i8080_word_t word) {
+    unsigned p = 0;
     /* XOR each bit together */
-    unsigned int i;
+    unsigned i;
     for (i = 0; i < WORD_SIZE; ++i) {
         p ^= get_bit(word, i);
     }
@@ -283,9 +283,8 @@ static inline void i8080_adc(i8080 * const cpu, i8080_word_t word) {
 static void i8080_sub(i8080 * const cpu, i8080_word_t word) {
     i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + twos_comp_word(word);
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
-    /* Carry is the borrow flag for SUB, SBB etc, invert carry.
-     * If word is 0 that means the twos complement overflowed and inverted the carry bit. */
-    cpu->cy = (word == 0) ? 0 : !get_bit(acc_buf, WORD_SIZE);
+    /* Carry is the borrow flag for SUB, SBB etc, invert carry. */
+    cpu->cy = !get_bit(acc_buf, WORD_SIZE);
     cpu->a = dbl_word_lower(acc_buf);
     update_ZSP(cpu, cpu->a);
 }
@@ -335,7 +334,7 @@ static void i8080_cmp(i8080 * const cpu, i8080_word_t word) {
     /* This is almost identical to i8080_sub, with the exception that the accumulator is not affected */
     i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + twos_comp_word(word);
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
-    cpu->cy = (word == 0) ? 0 : !get_bit(acc_buf, WORD_SIZE);
+    cpu->cy = !get_bit(acc_buf, WORD_SIZE);
     update_ZSP(cpu, dbl_word_lower(acc_buf));
 }
 
@@ -493,8 +492,8 @@ static inline void i8080_xthl(i8080 * const cpu) {
     /* Exchange HL with the top two words on the stack */
     cpu->write_memory(cpu->sp--, cpu->h);
     cpu->write_memory(cpu->sp, cpu->l);
-    cpu->h = prev_lower_word;
-    cpu->l = prev_upper_word;
+    cpu->h = prev_upper_word;
+    cpu->l = prev_lower_word;
 }
 
 /* Exchanges the contents of BC and HL. */
@@ -506,7 +505,7 @@ static inline void i8080_xchg(i8080 * const cpu) {
 
 /* Makes a call to an external function provided by the user, if it exists.
  * Returns 0 if the external call has indicated the i8080 to be stopped. */
-static int emu_ext_call(i8080 * const cpu) {
+static unsigned emu_ext_call(i8080 * const cpu) {
     unsigned should_continue = 1;
     if (cpu->emu_ext_call != NULL) {
         i8080_push(cpu, (i8080_dbl_word_t)cpu->pc);
@@ -551,7 +550,7 @@ void i8080_interrupt(i8080 * const cpu) {
     i8080_mutex_unlock(&cpu->i_mutex);
 }
 
-int i8080_next(i8080 * const cpu) {
+unsigned i8080_next(i8080 * const cpu) {
     i8080_mutex_lock(&cpu->i_mutex);
     /* The next opcode to be executed */
     i8080_word_t opcode = 0;
@@ -568,7 +567,7 @@ int i8080_next(i8080 * const cpu) {
     i8080_mutex_unlock(&cpu->i_mutex);
 
     /* Execute opcode */
-    int success;
+    unsigned success;
     if (!cpu->is_halted) {
         /* Execute the opcode */
         success = i8080_exec(cpu, opcode);
@@ -579,7 +578,7 @@ int i8080_next(i8080 * const cpu) {
     return success;
 }
 
-int i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
+unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
 
     cpu->cycles_taken += OPCODES_CYCLES[opcode];
     /* If the emulator should continue after executing this instruction */

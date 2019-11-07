@@ -71,14 +71,14 @@ static void cpm_print_str(const i8080_addr_t console_addr, i8080_addr_t str_addr
 
 /* Provides limited emulation of CP/M BDOS and zero page. At the moment, this only works with BDOS op 2 and 9, and WBOOT.
  * WBOOT launches into a simple command processor so programs can be run and the emulator can quit. */
-static int i8080_cpm_zero_page(void * const udata) {
+static unsigned i8080_cpm_zero_page(void * const udata) {
     
     i8080 * const cpu = (i8080 * const)udata;
 
     /* The console port address duplicated across 16-bit address bus for use with port out */
-    const i8080_addr_t CONSOLE_ADDR_FULL = ((i8080_addr_t)(CPM_CONSOLE_ADDR << HALF_ADDR_SIZE) | CPM_CONSOLE_ADDR);
+    const i8080_addr_t CONSOLE_ADDR_FULL = ((i8080_addr_t)(CPM_CONSOLE_ADDR << (ADDR_SIZE / 2)) | CPM_CONSOLE_ADDR);
     /* The return address on the stack */
-    const i8080_addr_t ret_addr = (i8080_addr_t)(cpu->read_memory(cpu->sp + (i8080_addr_t)1) << HALF_ADDR_SIZE) | cpu->read_memory(cpu->sp);
+    const i8080_addr_t ret_addr = (i8080_addr_t)(cpu->read_memory(cpu->sp + (i8080_addr_t)1) << (ADDR_SIZE / 2)) | cpu->read_memory(cpu->sp);
     
     switch(ret_addr) {
         
@@ -159,7 +159,7 @@ static int i8080_cpm_zero_page(void * const udata) {
             command_run: {
                 /* Write JMP addr to the bytes immediately after */
                 const i8080_word_t lo_addr = (i8080_word_t)(run_addr & WORD_T_MAX);
-                const i8080_word_t hi_addr = (i8080_word_t)((i8080_addr_t)(run_addr >> HALF_ADDR_SIZE) & WORD_T_MAX);
+                const i8080_word_t hi_addr = (i8080_word_t)((i8080_addr_t)(run_addr >> (ADDR_SIZE / 2)) & WORD_T_MAX);
                 cpu->write_memory(0xe401, i8080_JMP);
                 cpu->write_memory(0xe402, lo_addr);
                 cpu->write_memory(0xe403, hi_addr);
@@ -178,7 +178,7 @@ static int i8080_cpm_zero_page(void * const udata) {
                 {
                     /* Writes an output string terminated by '$'
                      * Address of string is {DE} */
-                    const i8080_addr_t str_addr = ((i8080_addr_t)(cpu->d << HALF_ADDR_SIZE) | cpu->e);
+                    const i8080_addr_t str_addr = ((i8080_addr_t)(cpu->d << (ADDR_SIZE / 2)) | cpu->e);
                     cpm_print_str(CONSOLE_ADDR_FULL, str_addr, cpu);
                     break;
                 }
@@ -346,7 +346,7 @@ emu_exit_code_t emu_runtime(i8080 * const cpu, emu_debug_args * d_args) {
     }
     
     /* If in debug mode, this is overridden by i8080_debug_next */
-    int (* i8080_next_ovrd)(i8080 * const) = i8080_next;
+    unsigned (* i8080_next_ovrd)(i8080 * const) = i8080_next;
     
     if(d_args != NULL) {
         /* In debug mode, override i8080_next() */
