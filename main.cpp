@@ -48,11 +48,11 @@ const std::string cmdline_help_msg =
 "   --run-all-tests\t\tRun all the test files under tests/.\n";
 
 // Prints the help message and returns EXIT failure
-int cmd_print_help_msg_and_exit(cmd_state & cmd_state, std::vector<std::string>::iterator &) {
-    emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
+int cmd_print_help_msg_and_exit(cmd_state * cmd_state, std::vector<std::string>::iterator &) {
+    emu_cmd_state * emu_cmd_state = static_cast<struct emu_cmd_state *>(cmd_state);
     // if args were valid, return normally i.e. came here from --help/-h
-    if (emu_cmd_state.is_args_valid) {
-        emu_cmd_state.is_showing_help = true;
+    if (emu_cmd_state->is_args_valid) {
+        emu_cmd_state->is_showing_help = true;
         std::cout << cmdline_help_msg.c_str();
         return 1;
     } else {
@@ -61,13 +61,13 @@ int cmd_print_help_msg_and_exit(cmd_state & cmd_state, std::vector<std::string>:
     }
 }
 
-int cmd_set_emu_env(cmd_state & cmd_state, std::vector<std::string>::iterator & opt_args_itr) {
+int cmd_set_emu_env(cmd_state * cmd_state, std::vector<std::string>::iterator & opt_args_itr) {
     int success = 1;
-    emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
+    emu_cmd_state * emu_cmd_state = static_cast<struct emu_cmd_state *>(cmd_state);
     if (*opt_args_itr == "0" || *opt_args_itr == "DEFAULT" || *opt_args_itr == "default") {
-        emu_cmd_state.is_cpm_env = false;
+        emu_cmd_state->is_cpm_env = false;
     } else if (*opt_args_itr == "1" || *opt_args_itr == "CPM" || *opt_args_itr == "cpm") {
-        emu_cmd_state.is_cpm_env = true;
+        emu_cmd_state->is_cpm_env = true;
     } else {
         std::cout << "--env value invalid. Try --env cpm or --env default." << std::endl;
         success = 0;
@@ -75,9 +75,9 @@ int cmd_set_emu_env(cmd_state & cmd_state, std::vector<std::string>::iterator & 
     return success;
 }
 
-int cmd_set_bin_file(cmd_state & cmd_state, std::vector<std::string>::iterator & opt_args_itr) {
+int cmd_set_bin_file(cmd_state * cmd_state, std::vector<std::string>::iterator & opt_args_itr) {
     int success = 0;
-    emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
+    emu_cmd_state * emu_cmd_state = static_cast<struct emu_cmd_state *>(cmd_state);
     std::string & filename = *opt_args_itr;
     // Check if file exists and if it is at most 64KB in size
     std::ifstream bin_fstream(filename, std::ios::in | std::ios::binary);
@@ -91,8 +91,8 @@ int cmd_set_bin_file(cmd_state & cmd_state, std::vector<std::string>::iterator &
                 std::cout << "File too large." << std::endl;
             } else {
                 // success, file is readable and within size limits
-                emu_cmd_state.bin_file = filename;
-                emu_cmd_state.is_runnable = true;
+                emu_cmd_state->bin_file = filename;
+                emu_cmd_state->is_runnable = true;
                 success = 1;
             }
         } else {
@@ -105,14 +105,14 @@ int cmd_set_bin_file(cmd_state & cmd_state, std::vector<std::string>::iterator &
     return success;
 }
 
-int cmd_set_test_run(cmd_state & cmd_state, std::vector<std::string>::iterator &) {
-    emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
-    emu_cmd_state.is_runnable = true;
-    emu_cmd_state.is_testing = true;
+int cmd_set_test_run(cmd_state * cmd_state, std::vector<std::string>::iterator &) {
+    emu_cmd_state * emu_cmd_state = static_cast<struct emu_cmd_state *>(cmd_state);
+    emu_cmd_state->is_runnable = true;
+    emu_cmd_state->is_testing = true;
     return 1;
 }
 
-using cmd_callback_fn = std::function<int(cmd_state & cmd_state, std::vector<std::string>::iterator & cmdline_args)>;
+using cmd_callback_fn = std::function<int(cmd_state * cmd_state, std::vector<std::string>::iterator & cmdline_args)>;
 using cmd_handle = std::tuple<std::string, std::string, bool, cmd_callback_fn>;
 
 // {<fullname>, <alias>, <has_args>, <callback>}
@@ -135,7 +135,7 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
     if (argc < 2) {
         // not enough args, print help message and exit
         cmd_state.is_args_valid = false;
-        return cmd_print_help_msg_and_exit(cmd_state, args_itr);
+        return cmd_print_help_msg_and_exit(&cmd_state, args_itr);
     } else {
         cmd_state.is_args_valid = true;
 
@@ -173,7 +173,7 @@ int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
                     std::cout << arg.c_str() << ": Missing arguments. See \"--help\" for usage." << std::endl;
                     exec_success = 0;
                 } else {
-                    exec_success = cmd_callback(cmd_state, args_itr);
+                    exec_success = cmd_callback(&cmd_state, args_itr);
                     // if the cmd had args, move past its last arg
                     if (cmd_has_args) args_itr++;
                 }
