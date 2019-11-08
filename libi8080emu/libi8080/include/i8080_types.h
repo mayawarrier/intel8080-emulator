@@ -41,20 +41,26 @@
     I8080_CDECL typedef volatile char i8080_mutex_t;
 #endif
 
-/* Use stdint fixed width types if available */
-#if (defined(__STDC_VERSION__) || defined(__cplusplus) || defined(I8080_WINDOWS_MIN_VER)) /* TODO: Use libgit2's stdint.h for bad msvc configs */
+/* Determine safe base types __i8080_size_t__, __i8080_dbl_size_t__ and __i8080_uintmax_t__.
+ * C89 guarantees uchar and uint to be 8 bits and 16 bits at least respectively.
+ * __i8080_uintmax_t__ uses the largest portable type in C89 if alternatives are not available. */
+typedef unsigned char __i8080_size_t__;
+typedef unsigned int __i8080_dbl_size_t__;
+#if defined(__STDC_VERSION__) || defined (__cplusplus)
     #include <stdint.h>
+    #ifdef UINTMAX_MAX
+        typedef uintmax_t __i8080_uintmax_t__;
+    #else
+        #define I8080_UINTMAX_FALLBACK
+    #endif
+#elif defined(_MSC_VER)
+    /* Synonym for unsigned long long */
+    typedef unsigned __int64 __i8080_uintmax_t__;
 #endif
-
-/* Determine safe base types __i8080_size_t__ and __i8080_dbl_size_t__ 
- * These are guaranteed to hold at least 8 and 16 bits respectively */
-#if defined(UINT8_MAX) && defined(UINT16_MAX)
-    typedef uint8_t __i8080_size_t__;
-    typedef uint16_t __i8080_dbl_size_t__;
-#else
-    /* C89 guarantees uchar and uint to be 8 bits and 16 bits at least */
-    typedef unsigned char __i8080_size_t__;
-    typedef unsigned int __i8080_dbl_size_t__;
+#if defined(__STDC__) || defined(I8080_UINTMAX_FALLBACK)
+    #undef I8080_UINTMAX_FALLBACK
+    /* Largest portable type in C89 */
+    typedef unsigned long int __i8080_uintmax_t__;
 #endif
 
 /* i8080-emu base types
@@ -67,12 +73,7 @@
 I8080_CDECL typedef __i8080_size_t__ i8080_word_t;
 I8080_CDECL typedef __i8080_dbl_size_t__ i8080_addr_t;
 I8080_CDECL typedef __i8080_dbl_size_t__ i8080_dbl_word_t;
-#ifdef UINTMAX_MAX
-    I8080_CDECL typedef uintmax_t i8080_uintmax_t;
-#else
-    /* Largest portable type in C89 */
-    I8080_CDECL typedef unsigned long int i8080_uintmax_t;
-#endif
+I8080_CDECL typedef __i8080_uintmax_t__ i8080_uintmax_t;
 
 /* Read/write streams for the i8080 */
 I8080_CDECL typedef i8080_word_t(*i8080_read_word_fp)(i8080_addr_t);
