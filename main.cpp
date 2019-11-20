@@ -10,6 +10,7 @@
 #include <iostream>
 #include <fstream>
 #include <functional>
+#include <string>
 #include <vector>
 #include <tuple>
 #include <limits>
@@ -87,7 +88,7 @@ int cmd_set_bin_file(cmd_state * cmd_state, std::vector<std::string>::iterator &
         // check file read failure or too large
         if (!bin_fstream.fail() && bin_fstream.eof()) {
             std::streamsize length = bin_fstream.gcount();
-            if (length > ADDR_T_MAX + 1) {
+            if (length > ADDR_MAX + 1) {
                 std::cout << "File too large." << std::endl;
             } else {
                 // success, file is readable and within size limits

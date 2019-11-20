@@ -14,12 +14,13 @@
 #include <sys/stat.h> // check if folder exists
 
 #include <iostream>
+#include <string>
 #include <atomic>
 #include <thread>
 #include <chrono>
 
 // 64KB of emulated memory
-static i8080_word_t MEMORY[ADDR_T_MAX + 1];
+static i8080_word_t MEMORY[ADDR_MAX + 1];
 
 // Default memory read/write streams
 static i8080_word_t rw_from_memory(i8080_addr_t addr) {
@@ -32,9 +33,9 @@ static void ww_to_memory(i8080_addr_t addr, i8080_word_t word) {
 // CPU port out for the CP/M environment.
 static void cpm_env_port_out(i8080_addr_t addr, i8080_word_t word) {
     // Address is duplicated, pick lower 8 bits
-    i8080_word_t port_addr = (i8080_word_t)(addr & WORD_T_MAX);
+    i8080_word_t port_addr = (i8080_word_t)(addr & WORD_MAX);
     if (port_addr == CPM_CONSOLE_ADDR) {
-        printf(WORD_T_ASCII_FORMAT, word);
+        printf(WORD_CONSOLE_FORMAT, word);
     }
 }
 
@@ -42,9 +43,9 @@ static void cpm_env_port_out(i8080_addr_t addr, i8080_word_t word) {
 static i8080_word_t cpm_env_port_in(i8080_addr_t addr) {
     i8080_word_t rw = 0x00;
     // Address is duplicated, pick lower 8 bits
-    i8080_word_t port_addr = (i8080_word_t)(addr & WORD_T_MAX);
+    i8080_word_t port_addr = (i8080_word_t)(addr & WORD_MAX);
     if (port_addr == CPM_CONSOLE_ADDR) {
-        scanf(WORD_T_ASCII_FORMAT, &rw);
+        scanf(WORD_CONSOLE_FORMAT, &rw);
     }
     return rw;
 }

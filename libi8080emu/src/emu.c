@@ -40,7 +40,7 @@ size_t memory_load(const char * file_loc, i8080_word_t * memory, const i8080_add
     rewind(f_ptr);
     
     /* Error: file cannot fit into memory */
-    if (file_size + start_loc > ADDR_T_MAX + (size_t)1) goto end;
+    if (file_size + start_loc > ADDR_MAX + (size_t)1) goto end;
     
     /* Attempt to read the entire file */
     words_read = fread(&memory[start_loc], sizeof(i8080_word_t), file_size, f_ptr);
@@ -135,7 +135,7 @@ static unsigned i8080_cpm_zero_page(void * const udata) {
 
                 /* Process commands */
                 if (strncmp(input_buf, "RUN ", 4) == 0) {
-                    if (sscanf(&input_buf[4], ADDR_T_SCN_FORMAT, &run_addr) == 1) {
+                    if (sscanf(&input_buf[4], ADDR_SCN_FORMAT, &run_addr) == 1) {
                         /* address is in correct format and within bounds */
                         #undef LEN_INPUT_BUF
                         goto command_run;
@@ -158,8 +158,8 @@ static unsigned i8080_cpm_zero_page(void * const udata) {
             
             command_run: {
                 /* Write JMP addr to the bytes immediately after */
-                const i8080_word_t lo_addr = (i8080_word_t)(run_addr & WORD_T_MAX);
-                const i8080_word_t hi_addr = (i8080_word_t)((i8080_addr_t)(run_addr >> (ADDR_SIZE / 2)) & WORD_T_MAX);
+                const i8080_word_t lo_addr = (i8080_word_t)(run_addr & WORD_MAX);
+                const i8080_word_t hi_addr = (i8080_word_t)((i8080_addr_t)(run_addr >> (ADDR_SIZE / 2)) & WORD_MAX);
                 cpu->write_memory(0xe401, i8080_JMP);
                 cpu->write_memory(0xe402, lo_addr);
                 cpu->write_memory(0xe403, hi_addr);
@@ -178,7 +178,7 @@ static unsigned i8080_cpm_zero_page(void * const udata) {
                 {
                     /* Writes an output string terminated by '$'
                      * Address of string is {DE} */
-                    const i8080_addr_t str_addr = ((i8080_addr_t)(cpu->d << (ADDR_SIZE / 2)) | cpu->e);
+                    const i8080_addr_t str_addr = ((i8080_addr_t)cpu->d << (ADDR_SIZE / 2)) | cpu->e;
                     cpm_print_str(CONSOLE_ADDR_FULL, str_addr, cpu);
                     break;
                 }

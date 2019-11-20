@@ -51,7 +51,7 @@ enum i8080_flags {
 
 static const i8080_word_t WORD_LO_F = ((i8080_word_t)1 << (WORD_SIZE / 2)) - (i8080_word_t)1;
 static const i8080_word_t WORD_HI_F = (((i8080_word_t)1 << (WORD_SIZE / 2)) - (i8080_word_t)1) << (WORD_SIZE / 2);
-static const i8080_dbl_word_t DBL_WORD_UPPER_MAX = (i8080_dbl_word_t)WORD_T_MAX << WORD_SIZE;
+static const i8080_dbl_word_t DBL_WORD_UPPER_MAX = (i8080_dbl_word_t)WORD_MAX << WORD_SIZE;
 
 /* Concatenates two words and returns a double word. */
 #define concatenate(word1, word2) ((i8080_dbl_word_t)(word1) << WORD_SIZE | (word2))
@@ -60,10 +60,10 @@ static const i8080_dbl_word_t DBL_WORD_UPPER_MAX = (i8080_dbl_word_t)WORD_T_MAX 
 #define word_lo_bits(word) ((i8080_word_t)(word) & WORD_LO_F)
 #define word_hi_bits(word) ((i8080_word_t)(word) & WORD_HI_F)
 /* Trims an i8080_dbl_word_t to only the address bits. */
-#define addr_bits(dbl_word) ((i8080_dbl_word_t)(dbl_word) & ADDR_T_MAX)
+#define addr_bits(dbl_word) ((i8080_dbl_word_t)(dbl_word) & ADDR_MAX)
 /* Gets the upper word in a double word buffer. */
 #define dbl_word_upper(dbl_word) ((i8080_word_t)(((i8080_dbl_word_t)(dbl_word) & DBL_WORD_UPPER_MAX) >> WORD_SIZE))
-#define dbl_word_lower(dbl_word) ((i8080_word_t)((i8080_dbl_word_t)(dbl_word) & WORD_T_MAX))
+#define dbl_word_lower(dbl_word) ((i8080_word_t)((i8080_dbl_word_t)(dbl_word) & WORD_MAX))
 
 /* Get or set a bit in a bit buffer. Casts everything to unsigned. */
 #define get_bit(buf, bit) ((unsigned)((((buf) >> (bit)) & (unsigned)1)))
@@ -79,7 +79,7 @@ if ((val)) { \
 /* Perform 2's complement on the entire word.
  * Upscales to i8080_dbl_word_t to hold a produced carry, for eg when CPI 0:
  * https://retrocomputing.stackexchange.com/questions/6407/intel-8080-behaviour-of-the-carry-bit-when-comparing-a-value-with-0 */
-#define twos_comp_word(word) (((word) ^ (i8080_word_t)WORD_T_MAX) + (i8080_word_t)1)
+#define twos_comp_word(word) (((word) ^ (i8080_word_t)WORD_MAX) + (i8080_word_t)1)
  /* Gets the auxiliary carry resulting from adding two words. */
 #define aux_carry(word1, word2) ((unsigned)(get_bit(word_lo_bits(word1) + word_lo_bits(word2), WORD_SIZE / 2)))
 

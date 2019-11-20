@@ -83,10 +83,10 @@ static inline int in_range(size_t num, size_t lt_bound, size_t rt_bound, int inc
 static inline int is_valid_args(const emu_debug_args * args) {
     return (args->debug_out != NULL &&
         is_valid_format_spec(args->mem_dump_format) &&
-        in_range(args->mem_dump_start_addr, 0, ADDR_T_MAX, 1) &&
-        in_range(args->mem_dump_end_addr, 0, ADDR_T_MAX, 1) &&
+        in_range(args->mem_dump_start_addr, 0, ADDR_MAX, 1) &&
+        in_range(args->mem_dump_end_addr, 0, ADDR_MAX, 1) &&
         args->mem_dump_end_addr >= args->mem_dump_start_addr &&
-        in_range(args->mem_dump_newline_after, 1, ADDR_T_MAX, 1) &&
+        in_range(args->mem_dump_newline_after, 1, ADDR_MAX, 1) &&
         (args->should_dump_memory == 1 || args->should_dump_memory == 0) &&
         (args->should_dump_stats == 1 || args->should_dump_stats == 0));
 }
@@ -111,15 +111,15 @@ void dump_memory(i8080 * const cpu, const emu_debug_args * args) {
 void dump_cpu_stats(i8080 * const cpu, FILE * const stream) {
     if (stream != NULL) {
         fprintf(stream, "**** CPU status: ****\n");
-        fprintf(stream, "A: " WORD_T_PRT_FORMAT ", ", cpu->a);
-        fprintf(stream, "B: " WORD_T_PRT_FORMAT ", ", cpu->b);
-        fprintf(stream, "C: " WORD_T_PRT_FORMAT ",\n", cpu->c);
-        fprintf(stream, "D: " WORD_T_PRT_FORMAT ", ", cpu->d);
-        fprintf(stream, "E: " WORD_T_PRT_FORMAT ", ", cpu->e);
-        fprintf(stream, "H: " WORD_T_PRT_FORMAT ", ", cpu->h);
-        fprintf(stream, "L: " WORD_T_PRT_FORMAT ",\n", cpu->l);
-        fprintf(stream, "PC: " ADDR_T_PRT_FORMAT ", ", cpu->pc);
-        fprintf(stream, "SP: " ADDR_T_PRT_FORMAT "\n", cpu->sp);
+        fprintf(stream, "A: " WORD_PRT_FORMAT ", ", cpu->a);
+        fprintf(stream, "B: " WORD_PRT_FORMAT ", ", cpu->b);
+        fprintf(stream, "C: " WORD_PRT_FORMAT ",\n", cpu->c);
+        fprintf(stream, "D: " WORD_PRT_FORMAT ", ", cpu->d);
+        fprintf(stream, "E: " WORD_PRT_FORMAT ", ", cpu->e);
+        fprintf(stream, "H: " WORD_PRT_FORMAT ", ", cpu->h);
+        fprintf(stream, "L: " WORD_PRT_FORMAT ",\n", cpu->l);
+        fprintf(stream, "PC: " ADDR_PRT_FORMAT ", ", cpu->pc);
+        fprintf(stream, "SP: " ADDR_PRT_FORMAT "\n", cpu->sp);
         fprintf(stream, "Zero: %d, ", cpu->z);
         fprintf(stream, "Sign: %d, ", cpu->s);
         fprintf(stream, "Parity: %d,\n", cpu->p);
