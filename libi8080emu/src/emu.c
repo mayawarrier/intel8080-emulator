@@ -11,8 +11,7 @@
 /* Enable compilation on C89 */
 #include "i8080_predef.h"
 
-#include <stdint.h>
-#include <string.h>
+#include <string.h> // memset
 
 enum emu_env {
     CPM,
@@ -25,10 +24,10 @@ static struct {
     int enable_cmd_proc;
 } EMU_STATE = { .env = DEFAULT,.enable_cmd_proc = 1 };
 
-size_t memory_load(const char * file_loc, i8080_word_t * memory, const i8080_addr_t start_loc) {
+i8080_uintmax_t memory_load(const char * file_loc, i8080_word_t * memory, const i8080_addr_t start_loc) {
     
-    size_t file_size = 0;
-    size_t words_read = 0;
+    i8080_uintmax_t file_size = 0;
+    i8080_uintmax_t words_read = 0;
     FILE * f_ptr = fopen(file_loc, "rb");
 
     /* Error: file cannot be opened */
@@ -40,10 +39,10 @@ size_t memory_load(const char * file_loc, i8080_word_t * memory, const i8080_add
     rewind(f_ptr);
     
     /* Error: file cannot fit into memory */
-    if (file_size + start_loc > ADDR_MAX + (size_t)1) goto end;
+    if (file_size + (i8080_uintmax_t)start_loc > ADDR_MAX + (i8080_uintmax_t)1) goto end;
     
     /* Attempt to read the entire file */
-    words_read = fread(&memory[start_loc], sizeof(i8080_word_t), file_size, f_ptr);
+    words_read = (i8080_uintmax_t)fread(&memory[start_loc], sizeof(i8080_word_t), file_size, f_ptr);
     
     /* Error: file read failure */
     if (words_read != file_size) words_read = 0;
@@ -112,7 +111,7 @@ static unsigned i8080_cpm_zero_page(void * const udata) {
             /* Max length, excluding trailing null */
             #define LEN_INPUT_BUF 127
             char input_buf[LEN_INPUT_BUF + 1];
-            size_t buf_loc = 0;
+            unsigned int buf_loc = 0;
             char buf_ch;
             
             /* Address from RUN command */
@@ -236,14 +235,14 @@ static void emu_set_cpm_env_load_bios(i8080 * const cpu) {
     };
 
     /* loop indices */
-    size_t i, j;
+    unsigned int i, j;
 
     /* Store messages from 0xe410 */
     i8080_addr_t msgs_loc = 0xe410;
-    const char * msg; size_t msg_len;
+    const char * msg; unsigned int msg_len;
     for (i = 0; i < 4; ++i) {
         msg = CMD_MSGS[i];
-        msg_len = strlen(msg);
+        msg_len = (unsigned int)strlen(msg);
         for (j = 0; j < msg_len; ++j) {
             cpu->write_memory(msgs_loc++, msg[j]);
         }
@@ -287,7 +286,7 @@ int emu_set_default_env(i8080 * const cpu) {
     if (cpu->write_memory != NULL) {
         /* Create the interrupt vector table
          * Do not write to RST 1 sequence, we'll put our bootloader there instead */
-        size_t i;
+        unsigned int i;
         for (i = 1; i < 8; ++i) {
             /* HLT for all interrupts */
             cpu->write_memory(INTERRUPT_TABLE[i], i8080_HLT);
@@ -318,7 +317,7 @@ void emu_init_i8080(i8080 * const cpu) {
 /* Writes test_word to all locations, then reads test_word from all locations.
  * Returns 0 if a read failed to return test_word, and stores the failed location in cpu->pc. */
 static int memory_write_read_pass(i8080 * const cpu, const i8080_addr_t start_addr, const i8080_addr_t end_addr, const i8080_word_t test_word) {
-    size_t i = 0;
+    unsigned int i = 0;
     for (i = start_addr; i <= end_addr; ++i) {
         cpu->write_memory((i8080_addr_t)i, test_word);
     }

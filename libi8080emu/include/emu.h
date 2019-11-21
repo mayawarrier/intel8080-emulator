@@ -34,7 +34,7 @@ I8080_CDECL typedef struct {
 } emu_debug_args;
 
 /* Loads a file into memory. Returns number of words read. */
-I8080_CDECL size_t memory_load(const char * file_loc, i8080_word_t * memory, const i8080_addr_t start_loc);
+I8080_CDECL i8080_uintmax_t memory_load(const char * file_loc, i8080_word_t * memory, const i8080_addr_t start_loc);
 /* Checks all locations from start_addr to end_addr for read/write errors, using cpu.read_memory() and cpu.write_memory().
  * Returns if failure occured, with location stored in cpu->pc. */
 I8080_CDECL int memory_check_errors(i8080 * const cpu, const i8080_addr_t start_addr, const i8080_addr_t end_addr);

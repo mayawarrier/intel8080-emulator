@@ -7,8 +7,6 @@
 #include "i8080_consts.h"
 #include "i8080_sync.h"
 #include "emu_debug.h"
-#include <stddef.h>
-#include <string.h>
 
 /* Enable compilation on C89 */
 #include "i8080_predef.h"
@@ -57,11 +55,11 @@ static const char * const DEBUG_DISASSEMBLY_TABLE[] = {
 };
 
 /* Checks if format spec has a max of 128 chars, and can be applied to an i8080_word_t. */
-static int is_valid_format_spec(const char * f) {
+static unsigned is_valid_format_spec(const char * f) {
     /* Check if f is a valid string and format specifier */
-    int is_valid_str = 0;
+    unsigned is_valid_str = 0;
     /* Maximum size is 128, including trailing null */
-    size_t i;
+    int i;
     for (i = 0; i < 128; ++i) {
         if (f[i] == '\0') {
             is_valid_str = 1;
@@ -70,12 +68,12 @@ static int is_valid_format_spec(const char * f) {
     }
     /* check if this format can actually be applied to a word */
     i8080_word_t out_word;
-    int is_valid_format = (sscanf("0x38", f, &out_word) == 1);
+    unsigned is_valid_format = (sscanf("0x38", f, &out_word) == 1);
 
     return is_valid_str && is_valid_format;
 }
 
-static inline int in_range(size_t num, size_t lt_bound, size_t rt_bound, int inclusive) {
+static inline unsigned in_range(int num, int lt_bound, int rt_bound, unsigned inclusive) {
     if (inclusive) return (num >= lt_bound && num <= rt_bound);
     else return (num > lt_bound && num < rt_bound);
 }
@@ -86,9 +84,7 @@ static inline int is_valid_args(const emu_debug_args * args) {
         in_range(args->mem_dump_start_addr, 0, ADDR_MAX, 1) &&
         in_range(args->mem_dump_end_addr, 0, ADDR_MAX, 1) &&
         args->mem_dump_end_addr >= args->mem_dump_start_addr &&
-        in_range(args->mem_dump_newline_after, 1, ADDR_MAX, 1) &&
-        (args->should_dump_memory == 1 || args->should_dump_memory == 0) &&
-        (args->should_dump_stats == 1 || args->should_dump_stats == 0));
+        in_range(args->mem_dump_newline_after, 1, ADDR_MAX, 1));
 }
 
 /* Dump memory without validation checks */

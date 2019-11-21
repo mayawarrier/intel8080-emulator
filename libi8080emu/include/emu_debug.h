@@ -17,7 +17,7 @@ I8080_CDECL void dump_cpu_stats(i8080 * const cpu, FILE * const stream);
 
 /* Set the options to be used with the next call to i8080_debug_next(). */
 I8080_CDECL void set_debug_next_options(emu_debug_args * args);
-/* Performs an i8080_next(), and prints debug information to the given stream:
+/* Performs an i8080_next(), returns 1 if successful, and prints debug information to the given stream:
  * - The instruction executed
  * - State of all registers and flags in the i8080
  * - Dump of the main memory, formatted as mem_dump_format. A newline is inserted every mem_dump_newline_after words. */
