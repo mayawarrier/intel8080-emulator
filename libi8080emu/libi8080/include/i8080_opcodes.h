@@ -73,7 +73,7 @@
 #define i8080_DCR_M 0x35        /*      1       Z,S,P,AC     [HL] <- [HL] - 1                     10   */
 #define i8080_MVI_M 0x36        /*      2                    [HL] <- byte 2                       10   */
 #define i8080_STC 0x37          /*      1       CY           CY = 1                               4    */
-#define i8080_EMU_EXT_CALL 0x38 /*      Calls emu_ext_call() with the cpu context.                     */
+#define i8080_ALT_NOP6 0x38
 
 #define i8080_DAD_SP 0x39       /*      1       CY           HL <- HL + SP                        10   */
 #define i8080_LDA 0x3a          /*      3                    A <- [adr]                           13   */

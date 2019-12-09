@@ -573,11 +573,8 @@ unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
 
         /* No operation + undocumented NOPs. Does nothing. */
         case i8080_NOP: case i8080_ALT_NOP0: case i8080_ALT_NOP1: case i8080_ALT_NOP2:
-        case i8080_ALT_NOP3: case i8080_ALT_NOP4: case i8080_ALT_NOP5:
+        case i8080_ALT_NOP3: case i8080_ALT_NOP4: case i8080_ALT_NOP5: case i8080_ALT_NOP6:
             break;
-
-        /* 0x38: External emulator call to inspect emulator state or provide out-of-i8080 functionality. */
-        case i8080_EMU_EXT_CALL: continue_runtime = emu_ext_call(cpu); break;
 
         /* Move between registers */
         case i8080_MOV_B_B: case i8080_MOV_B_C: case i8080_MOV_B_D: case i8080_MOV_B_E: case i8080_MOV_B_H: case i8080_MOV_B_L: case i8080_MOV_B_A:
@@ -882,7 +879,7 @@ unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
          * Can only be brought out by interrupt or RESET. */
         case i8080_HLT: cpu->is_halted = 1; break;
 
-        default: continue_runtime = 0; /* instruction was not identifiable */
+        default: continue_runtime = 0; /* unrecognized opcode */
     }
     cpu->last_instr = opcode;
 

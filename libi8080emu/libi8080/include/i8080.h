@@ -4,9 +4,6 @@
  * - Supports all instructions, documented and undocumented.
  * - Supports asynchronous interrupts (given that the build environment supports mutexes or 
  *   atomic synchronization, see i8080_sync.c)
- * - Instruction 0x38 (undocumented NOP) is repurposed to act as a debugging/inspection opcode. 
- *   Upon hitting 0x38, the PC is pushed to the stack, and i8080.emu_ext_call() is called with a
- *   pointer to the i8080 instance.
  */
 
 #ifndef I_8080_H
@@ -63,7 +60,7 @@ I8080_CDECL typedef struct i8080 {
 /* Resets the i8080, and performs first time initialization. */
 I8080_CDECL void i8080_init(i8080 * const cpu);
 
-/* Destroys any internal resources held by the OS for i8080.i_mutex. */
+/* Destroys any internal resources held by the OS for an interrupt_lock. */
 I8080_CDECL void i8080_destroy(i8080 * const cpu);
 
 /* Resets the i8080. PC is set to 0, i8080 exits halt state, and cycles taken is reset to 0.
