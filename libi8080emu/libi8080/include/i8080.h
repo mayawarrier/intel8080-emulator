@@ -48,13 +48,30 @@ I8080_CDECL typedef struct i8080 {
         i8080_mutex_t interrupt_lock;
     } hardware;
 
+    struct i8080_emulator_bridge {
+        /* User data to assign to this instance */
+        void * udata;
+        /* Defining a TPA for i8080 moves control
+         * to external code in the middle of
+         * i8080 runtime when a call is made to a
+         * region outside the TPA. This can be used
+         * to emulate a BIOS. */
+        /* Minimum PC value for regular programs. */
+        i8080_addr_t tpa_pc_min;
+        /* Minimum PC value for regular programs.  */
+        i8080_addr_t tpa_pc_max;
+        /* Called when an opcode sets PC to a value 
+         * past the transient program area. */
+        void(*special_region_handler)(struct i8080 *);
+        /* If an error occurs in the special region,
+         * set this to 1 to stop execution. */
+        unsigned special_region_error;
+    } emulator;
+
     /* Last instruction successfully executed. */
     i8080_word_t last_instr;
     /* Cycles taken for last emu_runtime */
     i8080_uintmax_t cycle_count;
-
-    /* User data */
-    void * udata;
 } i8080;
 
 /* Resets the i8080, and performs first time initialization. */
@@ -68,11 +85,11 @@ I8080_CDECL void i8080_destroy(i8080 * const cpu);
 I8080_CDECL void i8080_reset(i8080 * const cpu);
 
 /* Executes the next instruction. If an interrupt is pending, services it.
- * Returns 0 if it isn't safe to continue execution. */
+ * Returns 0 if execution fails. */
 I8080_CDECL unsigned i8080_next(i8080 * const cpu);
 
 /* Executes the opcode on cpu, updating its cycle count, registers and flags.
- * Returns 0 if it isn't safe to continue execution. */
+ * Returns 0 if execution fails. */
 I8080_CDECL unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode);
 
 /* Sends an interrupt to the i8080. This is thread-safe, and it will be serviced when the i8080 is ready.

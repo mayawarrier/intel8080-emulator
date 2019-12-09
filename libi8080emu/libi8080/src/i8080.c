@@ -448,16 +448,29 @@ static i8080_dbl_word_t i8080_pop(i8080 * const cpu) {
     return concatenate(upper_word, lower_word);
 }
 
+/* Jumps to immediate address after checking if addr is in a special region,
+ * and if so, triggers cpu->emulator.special_region_handler() instead.
+ * See more in i8080.h. This can be used to execute code during emu_runtime
+ * without writing i8080 assembly. */
+static inline void i8080_jmp_addr(i8080 * const cpu, i8080_addr_t addr) {
+    if (cpu->emulator.special_region_handler != NULL
+        &&(cpu->pc < cpu->emulator.tpa_pc_min || cpu->pc > cpu->emulator.tpa_pc_max)) {
+        cpu->emulator.special_region_handler(cpu);
+    } else {
+        cpu->pc = addr;
+    }
+}
+
 /* Pushes the current PC and jumps to addr. */
 static inline void i8080_call_addr(i8080 * const cpu, i8080_addr_t addr) {
     i8080_push(cpu, (i8080_dbl_word_t)cpu->pc);
-    cpu->pc = addr;
+    i8080_jmp_addr(cpu, addr);
 }
 
 /* Jumps to immediate address, given condition is satisfied. */
 static inline void i8080_jmp(i8080 * const cpu, unsigned condition) {
     if (condition) {
-        cpu->pc = i8080_advance_read_addr(cpu);
+        i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
     } else {
         /* advance to word after address */
         cpu->pc += 2;
@@ -480,7 +493,7 @@ static inline void i8080_call(i8080 * const cpu, unsigned condition) {
  * Conditional returns take 6 cycles longer if condition is satisfied. */
 static inline void i8080_ret(i8080 * const cpu, unsigned condition) {
     if (condition) {
-        cpu->pc = (i8080_addr_t)i8080_pop(cpu);
+        i8080_jmp_addr(cpu, (i8080_addr_t)i8080_pop(cpu));
         cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
     }
 }
@@ -505,8 +518,13 @@ static inline void i8080_xchg(i8080 * const cpu) {
 
 void i8080_init(i8080 * const cpu) {
     i8080_reset(cpu);
-    /* Initialize interrupt spinlock */
+    /* Initialize interrupts */
     i8080_mutex_init(&cpu->hardware.interrupt_lock);
+    cpu->hardware.interrupt_acknowledge = NULL;
+    /* See i8080.h for more details. */
+    cpu->emulator.tpa_pc_min = 0;
+    cpu->emulator.tpa_pc_max = ADDR_MAX;
+    cpu->emulator.special_region_handler = NULL;
 }
 
 void i8080_destroy(i8080 * const cpu) {
@@ -536,8 +554,12 @@ void i8080_interrupt(i8080 * const cpu) {
 }
 
 unsigned i8080_next(i8080 * const cpu) {
+    /* Quit if an error occurs in a special region call.
+     * See i8080.h for more details. */
+    if (cpu->emulator.special_region_error) return 0;
+
+    /* Get next opcode */
     i8080_mutex_lock(&cpu->hardware.interrupt_lock);
-    /* The next opcode to be executed */
     i8080_word_t opcode = 0;
     /* Service interrupt if pending request exists */
     if (cpu->ie && cpu->hardware.interrupt_pending && cpu->hardware.interrupt_acknowledge != NULL) {
@@ -566,8 +588,7 @@ unsigned i8080_next(i8080 * const cpu) {
 unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
 
     cpu->cycle_count += OPCODES_CYCLES[opcode];
-    /* If the emulator should continue after executing this instruction */
-    unsigned continue_runtime = 1;
+    unsigned exec_success = 1;
 
     switch (opcode) {
 
@@ -827,14 +848,14 @@ unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
         case i8080_JM: i8080_jmp(cpu, cpu->s); break;      /* JMP on S i.e. acc negative */
 
         /* Special instructions */
-        case i8080_DAA: i8080_daa(cpu); break;                             /* Decimal adjust acc (convert acc to BCD) */
-        case i8080_CMA: cpu->a = ~cpu->a; break;                           /* Complement accumulator */
-        case i8080_STC: cpu->cy = 1; break;                                /* Set carry */
-        case i8080_CMC: cpu->cy = !cpu->cy; break;                         /* Complement carry */
-        case i8080_PCHL: cpu->pc = (i8080_addr_t)i8080_get_hl(cpu); break; /* Move HL into PC */
-        case i8080_SPHL: cpu->sp = (i8080_addr_t)i8080_get_hl(cpu); break; /* Move HL into SP */
-        case i8080_XTHL: i8080_xthl(cpu); break;                           /* Exchange top of stack with H&L */
-        case i8080_XCHG: i8080_xchg(cpu); break;                           /* Exchanges the contents of BC and DE */
+        case i8080_DAA: i8080_daa(cpu); break;                                           /* Decimal adjust acc (convert acc to BCD) */
+        case i8080_CMA: cpu->a = ~cpu->a; break;                                         /* Complement accumulator */
+        case i8080_STC: cpu->cy = 1; break;                                              /* Set carry */
+        case i8080_CMC: cpu->cy = !cpu->cy; break;                                       /* Complement carry */
+        case i8080_PCHL: i8080_jmp_addr(cpu, (i8080_addr_t)i8080_get_hl(cpu)); break;    /* Move HL into PC */
+        case i8080_SPHL: cpu->sp = (i8080_addr_t)i8080_get_hl(cpu); break;               /* Move HL into SP */
+        case i8080_XTHL: i8080_xthl(cpu); break;                                         /* Exchange top of stack with H&L */
+        case i8080_XCHG: i8080_xchg(cpu); break;                                         /* Exchanges the contents of BC and DE */
 
         /* I/O, accumulator <-> word
          * In the 8080, the port address is duplicated across the 16-bit address bus:
@@ -846,7 +867,7 @@ unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
                 i8080_word_t port_addr = i8080_advance_read_word(cpu);
                 cpu->a = cpu->port_in((i8080_addr_t)concatenate(port_addr, port_addr));
             } else {
-                continue_runtime = 0;
+                exec_success = 0;
             }
             break;
         }
@@ -856,7 +877,7 @@ unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
                 i8080_word_t port_addr = i8080_advance_read_word(cpu);
                 cpu->port_out((i8080_addr_t)concatenate(port_addr, port_addr), cpu->a);
             } else {
-                continue_runtime = 0;
+                exec_success = 0;
             }
             break;
         }
@@ -879,9 +900,9 @@ unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
          * Can only be brought out by interrupt or RESET. */
         case i8080_HLT: cpu->is_halted = 1; break;
 
-        default: continue_runtime = 0; /* unrecognized opcode */
+        default: exec_success = 0; /* unrecognized opcode */
     }
     cpu->last_instr = opcode;
 
-    return continue_runtime;
+    return exec_success;
 }
