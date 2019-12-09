@@ -25,11 +25,9 @@ I8080_CDECL typedef struct i8080 {
      * carry, parity, interrupt enable */
     unsigned s, z, acy, cy, p, ie;
 
-    /* True if in HALT state. Only interrupts
-     * and RESET can bring i8080 out of this state. */
+    /* True if i8080 is HALTed. Only interrupts
+     * and RESET can bring it out of this state. */
     unsigned is_halted;
-
-    /* provide your own read/write streams */
 
     /* Read from a memory stream */
     i8080_read_word_fp read_memory;
@@ -41,37 +39,25 @@ I8080_CDECL typedef struct i8080 {
     /* I/O stream out */
     i8080_write_word_fp port_out;
 
-    /* This is called on opcode 0x38. 0x38
-     * is actually an undocumented NOP, but is
-     * re-purposed for this instead.
-     * It pushes the return address to the stack,
-     * and provides a reference to the i8080.
-     * Return true if i8080 should continue
-     * execution after this call. */
-    unsigned(*emu_ext_call)(void * const);
-    /* Records the last instruction executed.
-     * Can be used to debug upon emu_ext_call. */
-    i8080_word_t last_instr_exec;
+    struct i8080_hardware {
+        /* Called when the i8080 is ready to
+         * to service the interrupt. Should return
+         * the word to be executed next. */
+        i8080_word_t(*interrupt_acknowledge)(void);
+        /* If a pending interrupt request exists. */
+        unsigned interrupt_pending;
+        /* Spin-lock to synchronize access to
+         * interrupt critical variables. */
+        i8080_mutex_t interrupt_lock;
+    } hardware;
 
-    /* When an interrupt is issued, this
-     * is called back when the i8080 is ready
-     * to receive the interrupt vector. After
-     * the vector has been executed, interrupts
-     * are disabled again. */
-    i8080_word_t(*interrupt_acknowledge)(void);
-    /* Whether there is a pending interrupt request to service. */
-    unsigned pending_interrupt_req;
-
-    /* When an interrupt comes on another thread,
-     * this mutex is used to sync i8080 status
-     * with the interrupt generator, so the
-     * interrupt is not accidentally double-serviced
-     * or missed by the i8080. */
-    i8080_mutex_t i_mutex;
-    
+    /* Last instruction successfully executed. */
+    i8080_word_t last_instr;
     /* Cycles taken for last emu_runtime */
-    i8080_uintmax_t cycles_taken;
+    i8080_uintmax_t cycle_count;
 
+    /* User data */
+    void * udata;
 } i8080;
 
 /* Resets the i8080, and performs first time initialization. */

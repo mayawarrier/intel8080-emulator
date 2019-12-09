@@ -469,7 +469,7 @@ static inline void i8080_jmp(i8080 * const cpu, unsigned condition) {
 static inline void i8080_call(i8080 * const cpu, unsigned condition) {
     if (condition) {
         i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
-        cpu->cycles_taken += SUBROUTINE_CYCLES_OFFSET;
+        cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
     } else {
         /* advance to word after address */
         cpu->pc += 2;
@@ -481,7 +481,7 @@ static inline void i8080_call(i8080 * const cpu, unsigned condition) {
 static inline void i8080_ret(i8080 * const cpu, unsigned condition) {
     if (condition) {
         cpu->pc = (i8080_addr_t)i8080_pop(cpu);
-        cpu->cycles_taken += SUBROUTINE_CYCLES_OFFSET;
+        cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
     }
 }
 
@@ -503,38 +503,23 @@ static inline void i8080_xchg(i8080 * const cpu) {
     i8080_set_de(cpu, hl);
 }
 
-/* Makes a call to an external function provided by the user, if it exists.
- * Returns 0 if the external call has indicated the i8080 to be stopped. */
-static unsigned emu_ext_call(i8080 * const cpu) {
-    unsigned should_continue = 1;
-    if (cpu->emu_ext_call != NULL) {
-        i8080_push(cpu, (i8080_dbl_word_t)cpu->pc);
-        /* Quit the emulator if indicated */
-        should_continue = cpu->emu_ext_call(cpu);
-        cpu->pc = (i8080_addr_t)i8080_pop(cpu);
-        /* Subtract cycles added by this opcode since this is an external call */
-        cpu->cycles_taken -= OPCODES_CYCLES[i8080_EMU_EXT_CALL];
-    }
-    return should_continue;
-}
-
 void i8080_init(i8080 * const cpu) {
     i8080_reset(cpu);
-    /* Initialize interrupts synchronization mutex */
-    i8080_mutex_init(&cpu->i_mutex);
+    /* Initialize interrupt spinlock */
+    i8080_mutex_init(&cpu->hardware.interrupt_lock);
 }
 
 void i8080_destroy(i8080 * const cpu) {
-    /* release any internal OS resources for the mutex if they exist */
-    i8080_mutex_destroy(&cpu->i_mutex);
+    /* release any internal OS resources for spinlock */
+    i8080_mutex_destroy(&cpu->hardware.interrupt_lock);
 }
 
 void i8080_reset(i8080 * const cpu) {
     cpu->pc = 0;
     cpu->is_halted = 0;
     cpu->ie = 0;
-    cpu->pending_interrupt_req = 0;
-    cpu->cycles_taken = 0;
+    cpu->hardware.interrupt_pending = 0;
+    cpu->cycle_count = 0;
 }
 
 /* i8080_interrupt() and i8080_next() can be on different threads, so lock
@@ -542,29 +527,29 @@ void i8080_reset(i8080 * const cpu) {
  * completely synchronized. */
 
 void i8080_interrupt(i8080 * const cpu) {
-    i8080_mutex_lock(&cpu->i_mutex);
+    i8080_mutex_lock(&cpu->hardware.interrupt_lock);
     /* When serviced by the i8080, this will be toggled back */
-    if (cpu->ie && !cpu->pending_interrupt_req) {
-        cpu->pending_interrupt_req = 1;
+    if (cpu->ie && !cpu->hardware.interrupt_pending) {
+        cpu->hardware.interrupt_pending = 1;
     }
-    i8080_mutex_unlock(&cpu->i_mutex);
+    i8080_mutex_unlock(&cpu->hardware.interrupt_lock);
 }
 
 unsigned i8080_next(i8080 * const cpu) {
-    i8080_mutex_lock(&cpu->i_mutex);
+    i8080_mutex_lock(&cpu->hardware.interrupt_lock);
     /* The next opcode to be executed */
     i8080_word_t opcode = 0;
     /* Service interrupt if pending request exists */
-    if (cpu->ie && cpu->pending_interrupt_req && cpu->interrupt_acknowledge != NULL) {
-        opcode = cpu->interrupt_acknowledge();
+    if (cpu->ie && cpu->hardware.interrupt_pending && cpu->hardware.interrupt_acknowledge != NULL) {
+        opcode = cpu->hardware.interrupt_acknowledge();
         /* disable interrupts and bring out of halt */
         cpu->ie = 0;
-        cpu->pending_interrupt_req = 0;
+        cpu->hardware.interrupt_pending = 0;
         cpu->is_halted = 0;
     } else if (!cpu->is_halted) {
         opcode = i8080_advance_read_word(cpu);
     }
-    i8080_mutex_unlock(&cpu->i_mutex);
+    i8080_mutex_unlock(&cpu->hardware.interrupt_lock);
 
     /* Execute opcode */
     unsigned success;
@@ -580,7 +565,7 @@ unsigned i8080_next(i8080 * const cpu) {
 
 unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
 
-    cpu->cycles_taken += OPCODES_CYCLES[opcode];
+    cpu->cycle_count += OPCODES_CYCLES[opcode];
     /* If the emulator should continue after executing this instruction */
     unsigned continue_runtime = 1;
 
@@ -899,8 +884,7 @@ unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
 
         default: continue_runtime = 0; /* instruction was not identifiable */
     }
-
-    cpu->last_instr_exec = opcode;
+    cpu->last_instr = opcode;
 
     return continue_runtime;
 }
