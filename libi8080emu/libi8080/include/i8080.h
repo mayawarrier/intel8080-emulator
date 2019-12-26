@@ -2,7 +2,7 @@
  * Emulate an i8080.
  *
  * - Supports all instructions, documented and undocumented.
- * - Supports asynchronous interrupts (given that the build environment supports mutexes or 
+ * - Supports asynchronous interrupts (given that build environment supports mutexes or 
  *   atomic synchronization, see i8080_sync.c)
  */
 
@@ -49,7 +49,7 @@ I8080_CDECL typedef struct i8080 {
     } hardware;
 
     struct i8080_emulator_bridge {
-        /* User data to assign to this instance */
+        /* Emulator user data */
         void * udata;
         /* Defining a TPA for i8080 moves control
          * to external code in the middle of
