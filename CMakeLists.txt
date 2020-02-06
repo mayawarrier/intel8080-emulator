@@ -2,66 +2,7 @@ cmake_minimum_required(VERSION 3.1.0)
 project(i8080emu)
 set(EXE_NAME i8080-emu)
 
-option(FIRST_TIME_SETUP "Force installation of dependencies if not available, and pull test files with git lfs." OFF)
 option(LIBS_ONLY "Compile the libi8080emu and libi8080 libraries only." OFF)
-
-# Search for dependencies and auto-install them if possible
-if (FIRST_TIME_SETUP)
-
-    set(CHECK_IF_GIT_LFS_EXISTS git-lfs --version)
-    execute_process(COMMAND ${CHECK_IF_GIT_LFS_EXISTS}
-                        RESULT_VARIABLE DEP_SUCCESS)
-
-    # attempt to install if not available
-    if (NOT DEP_SUCCESS)
-        set(WIN_CHECK_IF_CHOCO_EXISTS choco --version)
-        set(WIN_CHOCO_INSTALL runas powershell.exe -ExecutionPolicy Bypass -NoProfile
-                                        -command "iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex")
-        set(WIN_CHOCO_GIT_LFS_INSTALL runas powershell.exe -command "choco install -y git-lfs; refreshenv")
-        set(UNIX_GIT_LFS_INSTALL sudo apt-get --yes git-lfs)
-        set(GIT_LFS_INIT_AND_PULL cd ${CMAKE_SOURCE_DIR} && git lfs install && git lfs pull)
-
-        if (WIN32)
-            message(STATUS "Installing dependencies Chocolatey and git-lfs if not available...")
-            execute_process(COMMAND ${WIN_CHECK_IF_CHOCO_EXISTS}
-                            RESULT_VARIABLE CHOCO_AVAILABLE)
-            if (NOT CHOCO_AVAILABLE)
-                # If chocolatey is not available, install it and git-lfs
-                execute_process(COMMAND ${WIN_CHOCO_INSTALL}
-                                RESULT_VARIABLE DEP_SUCCESS)
-                if (DEP_SUCCESS)
-                    execute_process(COMMAND ${WIN_CHOCO_GIT_LFS_INSTALL}
-                                    RESULT_VARIABLE DEP_SUCCESS)
-                endif()
-            else()
-                # install through choco
-                execute_process(COMMAND ${WIN_CHOCO_GIT_LFS_INSTALL}
-                                RESULT_VARIABLE DEP_SUCCESS)
-            endif()
-
-        elseif (UNIX)
-            message(STATUS "Installing dependency git-lfs if not available...")
-                execute_process(COMMAND ${UNIX_GIT_LFS_INSTALL}
-                                RESULT_VARIABLE DEP_SUCCESS)
-        else()
-            message(FATAL_ERROR "Unrecognized build environment. Install dependencies yourself before running cmake.")
-        endif()
-    endif()
-
-    # Get test files from git lfs
-    if (DEP_SUCCESS)
-        message(STATUS "Initializing git-lfs and pulling test files...")
-        execute_process(COMMAND ${GIT_LFS_INIT_AND_PULL}
-                        RESULT_VARIABLE GIT_LFS_SUCCESS)
-        if (GIT_LFS_SUCCESS)
-            message(STATUS "libi8080emu test files pulled successfully.")
-        else()
-            message(FATAL_ERROR "Unable to pull test files. Download the files manually to libi8080emu/tests. Abort.")
-        endif()
-    else()
-        message(SEND_ERROR "Installation of dependencies failed.")
-    endif()
-endif(FIRST_TIME_SETUP)
 
 # Find system threads library
 find_package(Threads REQUIRED)
