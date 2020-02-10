@@ -1,8 +1,10 @@
 /*
- * Provides definitions for all i8080 base types and function pointers,
- * and suppresses warnings & errors from MSVC. If including this in an MSVC project,
- * it should be included before any Windows header or before including <stdio.h>.
+ * Provides definitions for portable i8080 base types.
  *
+ * - This also searches for a mutex/synchronization primitive on the 
+ *   system (unless I8080_DISABLE_ASYNC_INTERRUPTS is defined). If found, the 
+ *   type is defined as i8080_mutex_t, and the macro I8080_MUTEX is defined.
+ * 
  * The following resources were helpful:
  *
  * Detecting POSIX versions, feature test macros, etc:
