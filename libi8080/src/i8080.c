@@ -6,18 +6,25 @@
 #include "i8080_opcodes.h"
 #include "i8080_consts.h"
 #include "i8080_sync.h"
-
-/* This enables compilation on C89 */
 #include "i8080_predef.h"
 
+/* define min to avoid including C stdlib */
 #ifndef min
     #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
-/* This cycles table sourced from:
+/* inline and volatile are not supported on C89 */
+#ifdef __STDC__
+    #define inline
+    #define volatile
+#endif
+
+/* 
+ * This cycles table was sourced from:
  * https://github.com/superzazu/8080/blob/master/i8080.c
  * Correction made: Corrected cycle count of XCHG (0xeb) to 5.
- * For conditional RETs and CALLs, add 6 to the cycles if the condition is true. */
+ * For conditional RETs and CALLs, add 6 to the cycles if the condition is true. 
+ */
 static const i8080_word_t OPCODES_CYCLES[] = {
 /*  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F */
     4,  10, 7,  5,  5,  5,  7,  4,  4,  10, 7,  5,  5,  5,  7,  4,  /* 0 */
@@ -47,7 +54,7 @@ enum i8080_flags {
     SIGN_BIT = 7
 };
 
-/* ----- Utility macros/vars ---- */
+/* --------- Utilities --------- */
 
 static const i8080_word_t WORD_LO_F = ((i8080_word_t)1 << (WORD_SIZE / 2)) - (i8080_word_t)1;
 static const i8080_word_t WORD_HI_F = (((i8080_word_t)1 << (WORD_SIZE / 2)) - (i8080_word_t)1) << (WORD_SIZE / 2);
@@ -59,40 +66,55 @@ static const i8080_dbl_word_t DBL_WORD_UPPER_MAX = (i8080_dbl_word_t)WORD_MAX <<
 /* Gets the lo and hi nibbles of a word respectively. */
 #define word_lo_bits(word) ((i8080_word_t)(word) & WORD_LO_F)
 #define word_hi_bits(word) ((i8080_word_t)(word) & WORD_HI_F)
+
 /* Trims an i8080_dbl_word_t to only the address bits. */
 #define addr_bits(dbl_word) ((i8080_dbl_word_t)(dbl_word) & ADDR_MAX)
+
 /* Gets the upper word in a double word buffer. */
 #define dbl_word_upper(dbl_word) ((i8080_word_t)(((i8080_dbl_word_t)(dbl_word) & DBL_WORD_UPPER_MAX) >> WORD_SIZE))
 #define dbl_word_lower(dbl_word) ((i8080_word_t)((i8080_dbl_word_t)(dbl_word) & WORD_MAX))
 
-/* Get or set a bit in a bit buffer. Casts everything to unsigned. */
-#define get_bit(buf, bit) ((unsigned)((((buf) >> (bit)) & (unsigned)1)))
-#define set_bit(buf_ptr, bit, val)\
-if ((val)) { \
-    *(buf_ptr) |= ((unsigned)1 << (bit)); \
-} else { \
-    *(buf_ptr) &= ~((unsigned)1 << (bit)); \
-}
+/* Get a bit from a bit buffer. */
+#define get_bit(buf, bit) ((int)(((buf) >> (bit)) & (unsigned)1))
 
-/* Performs 2's complement on the lower nibble of a word. */
-#define twos_comp_lo_word(word) ((i8080_word_t)(((word) ^ WORD_LO_F) + (i8080_word_t)1))
-/* Perform 2's complement on the entire word.
- * Upscales to i8080_dbl_word_t to hold a produced carry, for eg when CPI 0:
- * https://retrocomputing.stackexchange.com/questions/6407/intel-8080-behaviour-of-the-carry-bit-when-comparing-a-value-with-0 */
-#define twos_comp_word(word) (((word) ^ (i8080_word_t)WORD_MAX) + (i8080_word_t)1)
- /* Gets the auxiliary carry resulting from adding two words. */
-#define aux_carry(word1, word2) ((unsigned)(get_bit(word_lo_bits(word1) + word_lo_bits(word2), WORD_SIZE / 2)))
+/* Set a bit in a word. */
+static inline void set_word_bit(i8080_word_t * word_ptr, int bit, int val) {
+    if (val) {
+        *word_ptr |= ((i8080_word_t)1 << bit);
+    } else {
+        *word_ptr &= ~((i8080_word_t)1 << bit);
+    }
+}
 
 /* Conditional RETs and CALLs (subroutine ops) take 6 cycles longer if the condition is true. */
 #define SUBROUTINE_CYCLES_OFFSET (6)
 
-/* ----- Utility macros/vars ---- */
+/* Performs 2's complement on the lower nibble of a word. */
+static inline i8080_word_t twos_comp_lo_word(i8080_word_t word) {
+    return (word ^ WORD_LO_F) + (i8080_word_t)1;
+}
+
+/* 
+ * Perform 2's complement on the word.
+ * Returns a larger type to hold a produced carry, for eg when CPI 0:
+ * https://retrocomputing.stackexchange.com/questions/6407/intel-8080-behaviour-of-the-carry-bit-when-comparing-a-value-with-0 
+ */
+static inline i8080_dbl_word_t twos_comp_word(i8080_word_t word) {
+    return (word ^ (i8080_word_t)WORD_MAX) + (i8080_word_t)1;
+}
+
+/* Gets the auxiliary carry resulting from adding two words. */
+static inline int aux_carry(i8080_word_t word1, i8080_word_t word2) {
+    return get_bit(word_lo_bits(word1) + word_lo_bits(word2), WORD_SIZE / 2);
+}
+
+/* --------- Utilities --------- */
 
 /* Calculates parity of a word. */
-static inline unsigned parity(i8080_word_t word) {
-    unsigned p = 0;
+static inline int parity(i8080_word_t word) {
+    int p = 0;
     /* XOR each bit together */
-    unsigned i;
+    int i;
     for (i = 0; i < WORD_SIZE; ++i) {
         p ^= get_bit(word, i);
     }
@@ -112,24 +134,24 @@ static inline void update_ZSP(i8080 * const cpu, i8080_word_t word) {
 /* Gets the flags register from the internal emulator bool values. */
 static i8080_word_t i8080_get_flags_reg(i8080 * const cpu) {
     i8080_word_t flags = 0;
-    set_bit(&flags, (unsigned)CARRY_BIT, cpu->cy);
-    set_bit(&flags, (unsigned)PARITY_BIT, cpu->p);
-    set_bit(&flags, (unsigned)AUX_CARRY_BIT, cpu->acy);
-    set_bit(&flags, (unsigned)ZERO_BIT, cpu->z);
-    set_bit(&flags, (unsigned)SIGN_BIT, cpu->s);
+    set_word_bit(&flags, (int)CARRY_BIT, cpu->cy);
+    set_word_bit(&flags, (int)PARITY_BIT, cpu->p);
+    set_word_bit(&flags, (int)AUX_CARRY_BIT, cpu->acy);
+    set_word_bit(&flags, (int)ZERO_BIT, cpu->z);
+    set_word_bit(&flags, (int)SIGN_BIT, cpu->s);
     /* Bit 1 is always 1:
      * http://pastraiser.com/cpu/i8080/i8080_opcodes.html */
-    set_bit(&flags, 1, 1);
+    set_word_bit(&flags, 1, 1);
     return flags;
 }
 
 /* Sets the internal emulator bool values from a flags register. */
 static void i8080_set_flags_reg(i8080 * const cpu, i8080_word_t flags_reg) {
-    cpu->cy = get_bit(flags_reg, (unsigned)CARRY_BIT);
-    cpu->p = get_bit(flags_reg, (unsigned)PARITY_BIT);
-    cpu->acy = get_bit(flags_reg, (unsigned)AUX_CARRY_BIT);
-    cpu->z = get_bit(flags_reg, (unsigned)ZERO_BIT);
-    cpu->s = get_bit(flags_reg, (unsigned)SIGN_BIT);
+    cpu->cy = get_bit(flags_reg, (int)CARRY_BIT);
+    cpu->p = get_bit(flags_reg, (int)PARITY_BIT);
+    cpu->acy = get_bit(flags_reg, (int)AUX_CARRY_BIT);
+    cpu->z = get_bit(flags_reg, (int)ZERO_BIT);
+    cpu->s = get_bit(flags_reg, (int)SIGN_BIT);
 }
 
 /* Get address represented by {BC} */
@@ -366,44 +388,44 @@ static void i8080_dad(i8080 * const cpu, i8080_dbl_word_t reg_pair) {
 
 /* Rotates accumulator left and sets carry to acc MSB. */
 static void i8080_rlc(i8080 * const cpu) {
-    unsigned msb = get_bit(cpu->a, WORD_SIZE - 1);
+    int msb = get_bit(cpu->a, WORD_SIZE - 1);
     /* shift left */
     cpu->a <<= 1;
     /* set lsb to msb */
-    set_bit(&cpu->a, 0, msb);
+    set_word_bit(&cpu->a, 0, msb);
     cpu->cy = msb;
 }
 
 /* Rotates accumulator right and sets carry to acc LSB. */
 static void i8080_rrc(i8080 * const cpu) {
-    unsigned lsb = get_bit(cpu->a, 0);
+    int lsb = get_bit(cpu->a, 0);
     /* shift right */
     cpu->a >>= 1;
     /* set msb to lsb */
-    set_bit(&cpu->a, WORD_SIZE - 1, lsb);
+    set_word_bit(&cpu->a, WORD_SIZE - 1, lsb);
     cpu->cy = lsb;
 }
 
 /* Rotates accumulator left through carry. */
 static void i8080_ral(i8080 * const cpu) {
     /* Save previous cy to become new lsb */
-    unsigned prev_cy = cpu->cy;
+    int prev_cy = cpu->cy;
     /* save previous msb to become new carry */
-    unsigned msb = get_bit(cpu->a, WORD_SIZE - 1);
+    int msb = get_bit(cpu->a, WORD_SIZE - 1);
     cpu->a <<= 1;
     cpu->cy = msb;
-    set_bit(&cpu->a, 0, prev_cy);
+    set_word_bit(&cpu->a, 0, prev_cy);
 }
 
 /* Rotates accumulator right through carry. */
 static void i8080_rar(i8080 * const cpu) {
-    unsigned prev_cy = cpu->cy;
-    unsigned lsb = get_bit(cpu->a, 0);
+    int prev_cy = cpu->cy;
+    int lsb = get_bit(cpu->a, 0);
     cpu->a >>= 1;
     /* set carry to previous lsb */
     cpu->cy = lsb;
     /* set MSB to previous carry */
-    set_bit(&cpu->a, WORD_SIZE - 1, prev_cy);
+    set_word_bit(&cpu->a, WORD_SIZE - 1, prev_cy);
 }
 
 /* Performs a decimal adjust on the accumulator (converts to BCD) and updates flags. */
@@ -411,7 +433,7 @@ static void i8080_daa(i8080 * const cpu) {
     i8080_word_t lo_acc = word_lo_bits(cpu->a);
     /* If the lower bits are adjusted, we will end up
      * modifying the carry, which we don't want */
-    unsigned prev_cy = cpu->cy;
+    int prev_cy = cpu->cy;
     /* if lo bits are greater than 9 or 15, add 6 to accumulator */
     if ((lo_acc > (i8080_word_t)9) || cpu->acy) {
         i8080_add(cpu, 6); /* this is lo 6 */
@@ -421,7 +443,7 @@ static void i8080_daa(i8080 * const cpu) {
     /* We want to preserve the original auxiliary carry
      * from here because DAA adds 6 only to the hi bits,
      * and the auxiliary carry is not affected. */
-    unsigned prev_acy = cpu->acy;
+    int prev_acy = cpu->acy;
     /* if hi bits are greater than 9 or 15, add 6 to hi bits */
     i8080_word_t hi_acc = word_hi_bits(cpu->a) >> (WORD_SIZE / 2);
     if ((hi_acc > (i8080_word_t)9) || cpu->cy) {
@@ -468,7 +490,7 @@ static inline void i8080_call_addr(i8080 * const cpu, i8080_addr_t addr) {
 }
 
 /* Jumps to immediate address, given condition is satisfied. */
-static inline void i8080_jmp(i8080 * const cpu, unsigned condition) {
+static inline void i8080_jmp(i8080 * const cpu, int condition) {
     if (condition) {
         i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
     } else {
@@ -479,7 +501,7 @@ static inline void i8080_jmp(i8080 * const cpu, unsigned condition) {
 
 /* Pushes the current PC and jumps to immediate address, given condition is satisfied.
  * Conditional calls take 6 cycles longer if condition is satisfied. */
-static inline void i8080_call(i8080 * const cpu, unsigned condition) {
+static inline void i8080_call(i8080 * const cpu, int condition) {
     if (condition) {
         i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
         cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
@@ -491,7 +513,7 @@ static inline void i8080_call(i8080 * const cpu, unsigned condition) {
 
 /* Pops the last PC and jumps to it, given condition is satisfied.
  * Conditional returns take 6 cycles longer if condition is satisfied. */
-static inline void i8080_ret(i8080 * const cpu, unsigned condition) {
+static inline void i8080_ret(i8080 * const cpu, int condition) {
     if (condition) {
         i8080_jmp_addr(cpu, (i8080_addr_t)i8080_pop(cpu));
         cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
@@ -553,7 +575,7 @@ void i8080_interrupt(i8080 * const cpu) {
     i8080_mutex_unlock(&cpu->hardware.interrupt_lock);
 }
 
-unsigned i8080_next(i8080 * const cpu) {
+int i8080_next(i8080 * const cpu) {
     /* Quit if an error occurs in a special region call.
      * See i8080.h for more details. */
     if (cpu->emulator.special_region_error) return 0;
@@ -574,7 +596,7 @@ unsigned i8080_next(i8080 * const cpu) {
     i8080_mutex_unlock(&cpu->hardware.interrupt_lock);
 
     /* Execute opcode */
-    unsigned success;
+    int success;
     if (!cpu->is_halted) {
         /* Execute the opcode */
         success = i8080_exec(cpu, opcode);
@@ -585,10 +607,10 @@ unsigned i8080_next(i8080 * const cpu) {
     return success;
 }
 
-unsigned i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
+int i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
 
     cpu->cycle_count += OPCODES_CYCLES[opcode];
-    unsigned exec_success = 1;
+    int exec_success = 1;
 
     switch (opcode) {
 
