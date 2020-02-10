@@ -5,8 +5,6 @@
 #include "i8080.h"
 #include "i8080_opcodes.h"
 #include "i8080_consts.h"
-#include "i8080_sync.h"
-#include "i8080_predef.h"
 
 /* define min to avoid including C stdlib */
 #ifndef min
@@ -123,7 +121,7 @@ static inline int parity(i8080_word_t word) {
 }
 
 /* Updates the Z, S, P flags based on the word provided. */
-static inline void update_ZSP(i8080 * const cpu, i8080_word_t word) {
+static inline void update_ZSP(struct i8080 * const cpu, i8080_word_t word) {
     cpu->z = (word == 0);
     /* Bit 7 of the accumulator is used for signing, so the 8080
      * can only deal with -127 to 127 if using signed numbers */
@@ -132,7 +130,7 @@ static inline void update_ZSP(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Gets the flags register from the internal emulator bool values. */
-static i8080_word_t i8080_get_flags_reg(i8080 * const cpu) {
+static i8080_word_t i8080_get_flags_reg(struct i8080 * const cpu) {
     i8080_word_t flags = 0;
     set_word_bit(&flags, (int)CARRY_BIT, cpu->cy);
     set_word_bit(&flags, (int)PARITY_BIT, cpu->p);
@@ -146,7 +144,7 @@ static i8080_word_t i8080_get_flags_reg(i8080 * const cpu) {
 }
 
 /* Sets the internal emulator bool values from a flags register. */
-static void i8080_set_flags_reg(i8080 * const cpu, i8080_word_t flags_reg) {
+static void i8080_set_flags_reg(struct i8080 * const cpu, i8080_word_t flags_reg) {
     cpu->cy = get_bit(flags_reg, (int)CARRY_BIT);
     cpu->p = get_bit(flags_reg, (int)PARITY_BIT);
     cpu->acy = get_bit(flags_reg, (int)AUX_CARRY_BIT);
@@ -155,69 +153,69 @@ static void i8080_set_flags_reg(i8080 * const cpu, i8080_word_t flags_reg) {
 }
 
 /* Get address represented by {BC} */
-static inline i8080_dbl_word_t i8080_get_bc(i8080 * const cpu) {
+static inline i8080_dbl_word_t i8080_get_bc(struct i8080 * const cpu) {
     return concatenate(cpu->b, cpu->c);
 }
 /* Get address represented by {DE} */
-static inline i8080_dbl_word_t i8080_get_de(i8080 * const cpu) {
+static inline i8080_dbl_word_t i8080_get_de(struct i8080 * const cpu) {
     return concatenate(cpu->d, cpu->e);
 }
 /* Get address represented by {HL} */
-static inline i8080_dbl_word_t i8080_get_hl(i8080 * const cpu) {
+static inline i8080_dbl_word_t i8080_get_hl(struct i8080 * const cpu) {
     return concatenate(cpu->h, cpu->l);
 }
 /* Gets the program status word {A, flags} */
-static inline i8080_dbl_word_t i8080_get_psw(i8080 * const cpu) {
+static inline i8080_dbl_word_t i8080_get_psw(struct i8080 * const cpu) {
     return concatenate(cpu->a, i8080_get_flags_reg(cpu));
 }
 
 /* Sets B to hi dbl_word, and C to lo dbl_word */
-static inline void i8080_set_bc(i8080 * const cpu, i8080_dbl_word_t dbl_word) {
+static inline void i8080_set_bc(struct i8080 * const cpu, i8080_dbl_word_t dbl_word) {
     cpu->b = dbl_word_upper(dbl_word);
     cpu->c = dbl_word_lower(dbl_word);
 }
 /* Sets D to hi dbl_word, and E to lo dbl_word */
-static inline void i8080_set_de(i8080 * const cpu, i8080_dbl_word_t dbl_word) {
+static inline void i8080_set_de(struct i8080 * const cpu, i8080_dbl_word_t dbl_word) {
     cpu->d = dbl_word_upper(dbl_word);
     cpu->e = dbl_word_lower(dbl_word);
 }
 /* Sets H to hi dbl_word, and L to lo dbl_word */
-static inline void i8080_set_hl(i8080 * const cpu, i8080_dbl_word_t dbl_word) {
+static inline void i8080_set_hl(struct i8080 * const cpu, i8080_dbl_word_t dbl_word) {
     cpu->h = dbl_word_upper(dbl_word);
     cpu->l = dbl_word_lower(dbl_word);
 }
 /* Sets the accumulator and flags register from the program status word. */
-static inline void i8080_set_psw(i8080 * const cpu, i8080_dbl_word_t dbl_word) {
+static inline void i8080_set_psw(struct i8080 * const cpu, i8080_dbl_word_t dbl_word) {
     cpu->a = dbl_word_upper(dbl_word);
     i8080_set_flags_reg(cpu, dbl_word_lower(dbl_word));
 }
 
 /* Reads a word from [HL] */
-static inline i8080_word_t i8080_read_memory(i8080 * const cpu) {
+static inline i8080_word_t i8080_read_memory(struct i8080 * const cpu) {
     return cpu->read_memory((i8080_addr_t)i8080_get_hl(cpu));
 }
 
 /* Writes a word to [HL] */
-static inline void i8080_write_memory(i8080 * const cpu, i8080_word_t word) {
+static inline void i8080_write_memory(struct i8080 * const cpu, i8080_word_t word) {
     cpu->write_memory((i8080_addr_t)i8080_get_hl(cpu), word);
 }
 
 /* Reads a word and advances PC by 1. */
-static inline i8080_word_t i8080_advance_read_word(i8080 * const cpu) {
+static inline i8080_word_t i8080_advance_read_word(struct i8080 * const cpu) {
     return cpu->read_memory(cpu->pc++);
 }
 
 /* Reads address (a double word) and advances PC by 2.
  * Address is read backwards, since the assembler inverts the words upon assembly:
  * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 84 */
-static inline i8080_addr_t i8080_advance_read_addr(i8080 * const cpu) {
+static inline i8080_addr_t i8080_advance_read_addr(struct i8080 * const cpu) {
     i8080_word_t lo_addr = i8080_advance_read_word(cpu);
     i8080_word_t hi_addr = i8080_advance_read_word(cpu);
     return (i8080_addr_t)concatenate(hi_addr, lo_addr);
 }
 
 /* Returns pointers to the left and right registers for a mov operation. */
-static void i8080_mov_get_reg_pair(i8080 * const cpu, i8080_word_t opcode, i8080_word_t ** left, i8080_word_t ** right) {
+static void i8080_mov_get_reg_pair(struct i8080 * const cpu, i8080_word_t opcode, i8080_word_t ** left, i8080_word_t ** right) {
 
     *left = NULL; *right = NULL;
 
@@ -276,7 +274,7 @@ static void i8080_mov_get_reg_pair(i8080 * const cpu, i8080_word_t opcode, i8080
 }
 
 /* Performs a move operation from register to register. */
-static void i8080_mov_reg(i8080 * const cpu, i8080_word_t opcode) {
+static void i8080_mov_reg(struct i8080 * const cpu, i8080_word_t opcode) {
     /* get the register pair from this opcode */
     i8080_word_t * left_pptr[1], *right_pptr[1];
     i8080_mov_get_reg_pair(cpu, opcode, left_pptr, right_pptr);
@@ -285,7 +283,7 @@ static void i8080_mov_reg(i8080 * const cpu, i8080_word_t opcode) {
 }
 
 /* Performs an add to accumulator and updates flags. */
-static void i8080_add(i8080 * const cpu, i8080_word_t word) {
+static void i8080_add(struct i8080 * const cpu, i8080_word_t word) {
     /* Do the addition in a larger type to preserve carry */
     i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + word;
     cpu->acy = aux_carry(cpu->a, word);
@@ -297,12 +295,12 @@ static void i8080_add(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Performs an add with carry to accumulator and updates flags. */
-static inline void i8080_adc(i8080 * const cpu, i8080_word_t word) {
+static inline void i8080_adc(struct i8080 * const cpu, i8080_word_t word) {
     i8080_add(cpu, word + (i8080_word_t)cpu->cy);
 }
 
 /* Performs a subtract from accumulator and updates flags */
-static void i8080_sub(i8080 * const cpu, i8080_word_t word) {
+static void i8080_sub(struct i8080 * const cpu, i8080_word_t word) {
     i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + twos_comp_word(word);
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
     /* Carry is the borrow flag for SUB, SBB etc, invert carry. */
@@ -312,12 +310,12 @@ static void i8080_sub(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Perform a subtract with carry borrow from the accumulator, and updates flags. */
-static inline void i8080_sbb(i8080 * const cpu, i8080_word_t word) {
+static inline void i8080_sbb(struct i8080 * const cpu, i8080_word_t word) {
     i8080_sub(cpu, word + (i8080_word_t)cpu->cy);
 }
 
 /* Perform bitwise AND with accumulator, and update flags. */
-static void i8080_ana(i8080 * const cpu, i8080_word_t word) {
+static void i8080_ana(struct i8080 * const cpu, i8080_word_t word) {
     /* In the 8080, AND logical instructions always set auxiliary carry to the logical OR of bit 3 of the values involved:
      * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 24 */
     cpu->acy = get_bit(cpu->a, (WORD_SIZE / 2) - 1) | get_bit(word, (WORD_SIZE / 2) - 1);
@@ -330,7 +328,7 @@ static void i8080_ana(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Performs bitwise exclusive OR with accumulator, and updates flags. */
-static void i8080_xra(i8080 * const cpu, i8080_word_t word) {
+static void i8080_xra(struct i8080 * const cpu, i8080_word_t word) {
     /* Perform XRA */
     cpu->a ^= word;
     update_ZSP(cpu, cpu->a);
@@ -341,7 +339,7 @@ static void i8080_xra(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Performs bitwise inclusive OR with accumulator, and updates flags. */
-static void i8080_ora(i8080 * const cpu, i8080_word_t word) {
+static void i8080_ora(struct i8080 * const cpu, i8080_word_t word) {
     /* Perform ORA */
     cpu->a |= word;
     update_ZSP(cpu, cpu->a);
@@ -352,7 +350,7 @@ static void i8080_ora(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Updates flags after subtraction from accumulator, without modifying it. */
-static void i8080_cmp(i8080 * const cpu, i8080_word_t word) {
+static void i8080_cmp(struct i8080 * const cpu, i8080_word_t word) {
     /* This is almost identical to i8080_sub, with the exception that the accumulator is not affected */
     i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + twos_comp_word(word);
     cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
@@ -361,7 +359,7 @@ static void i8080_cmp(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Increments and updates flags, and returns the incremented word. */
-static i8080_word_t i8080_inr(i8080 * const cpu, i8080_word_t word) {
+static i8080_word_t i8080_inr(struct i8080 * const cpu, i8080_word_t word) {
     cpu->acy = aux_carry(word, 1);
     word++;
     update_ZSP(cpu, word);
@@ -369,7 +367,7 @@ static i8080_word_t i8080_inr(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Decrements and updates flags, and returns the decremented word. */
-static i8080_word_t i8080_dcr(i8080 * const cpu, i8080_word_t word) {
+static i8080_word_t i8080_dcr(struct i8080 * const cpu, i8080_word_t word) {
     cpu->acy = aux_carry(word, twos_comp_lo_word(1));
     word--;
     update_ZSP(cpu, word);
@@ -377,7 +375,7 @@ static i8080_word_t i8080_dcr(i8080 * const cpu, i8080_word_t word) {
 }
 
 /* Adds the reg_pair to HL and updates flags. */
-static void i8080_dad(i8080 * const cpu, i8080_dbl_word_t reg_pair) {
+static void i8080_dad(struct i8080 * const cpu, i8080_dbl_word_t reg_pair) {
     /* Adds reg_pair to hl, generating carry on overflow */
     i8080_dbl_word_t hl = i8080_get_hl(cpu);
     i8080_dbl_word_t hl_new = addr_bits(hl + reg_pair);
@@ -387,7 +385,7 @@ static void i8080_dad(i8080 * const cpu, i8080_dbl_word_t reg_pair) {
 }
 
 /* Rotates accumulator left and sets carry to acc MSB. */
-static void i8080_rlc(i8080 * const cpu) {
+static void i8080_rlc(struct i8080 * const cpu) {
     int msb = get_bit(cpu->a, WORD_SIZE - 1);
     /* shift left */
     cpu->a <<= 1;
@@ -397,7 +395,7 @@ static void i8080_rlc(i8080 * const cpu) {
 }
 
 /* Rotates accumulator right and sets carry to acc LSB. */
-static void i8080_rrc(i8080 * const cpu) {
+static void i8080_rrc(struct i8080 * const cpu) {
     int lsb = get_bit(cpu->a, 0);
     /* shift right */
     cpu->a >>= 1;
@@ -407,7 +405,7 @@ static void i8080_rrc(i8080 * const cpu) {
 }
 
 /* Rotates accumulator left through carry. */
-static void i8080_ral(i8080 * const cpu) {
+static void i8080_ral(struct i8080 * const cpu) {
     /* Save previous cy to become new lsb */
     int prev_cy = cpu->cy;
     /* save previous msb to become new carry */
@@ -418,7 +416,7 @@ static void i8080_ral(i8080 * const cpu) {
 }
 
 /* Rotates accumulator right through carry. */
-static void i8080_rar(i8080 * const cpu) {
+static void i8080_rar(struct i8080 * const cpu) {
     int prev_cy = cpu->cy;
     int lsb = get_bit(cpu->a, 0);
     cpu->a >>= 1;
@@ -429,7 +427,7 @@ static void i8080_rar(i8080 * const cpu) {
 }
 
 /* Performs a decimal adjust on the accumulator (converts to BCD) and updates flags. */
-static void i8080_daa(i8080 * const cpu) {
+static void i8080_daa(struct i8080 * const cpu) {
     i8080_word_t lo_acc = word_lo_bits(cpu->a);
     /* If the lower bits are adjusted, we will end up
      * modifying the carry, which we don't want */
@@ -455,7 +453,7 @@ static void i8080_daa(i8080 * const cpu) {
 
 /* Pushes two words to the stack, and decrements the stack pointer by 2.
  * Pushes upper word before lower word. */
-static void i8080_push(i8080 * const cpu, i8080_dbl_word_t dbl_word) {
+static void i8080_push(struct i8080 * const cpu, i8080_dbl_word_t dbl_word) {
     i8080_word_t upper_word = dbl_word_upper(dbl_word);
     i8080_word_t lower_word = dbl_word_lower(dbl_word);
     cpu->write_memory(--cpu->sp, upper_word);
@@ -464,7 +462,7 @@ static void i8080_push(i8080 * const cpu, i8080_dbl_word_t dbl_word) {
 
 /* Pops last two words from the stack and increments the stack pointer by 2.
  * Pops lower word before upper word. */
-static i8080_dbl_word_t i8080_pop(i8080 * const cpu) {
+static i8080_dbl_word_t i8080_pop(struct i8080 * const cpu) {
     i8080_word_t lower_word = cpu->read_memory(cpu->sp++);
     i8080_word_t upper_word = cpu->read_memory(cpu->sp++);
     return concatenate(upper_word, lower_word);
@@ -474,7 +472,7 @@ static i8080_dbl_word_t i8080_pop(i8080 * const cpu) {
  * and if so, triggers cpu->emulator.special_region_handler() instead.
  * See more in i8080.h. This can be used to execute code during emu_runtime
  * without writing i8080 assembly. */
-static inline void i8080_jmp_addr(i8080 * const cpu, i8080_addr_t addr) {
+static inline void i8080_jmp_addr(struct i8080 * const cpu, i8080_addr_t addr) {
     if (cpu->emulator.special_region_handler != NULL
         &&(cpu->pc < cpu->emulator.tpa_pc_min || cpu->pc > cpu->emulator.tpa_pc_max)) {
         cpu->emulator.special_region_handler(cpu);
@@ -484,13 +482,13 @@ static inline void i8080_jmp_addr(i8080 * const cpu, i8080_addr_t addr) {
 }
 
 /* Pushes the current PC and jumps to addr. */
-static inline void i8080_call_addr(i8080 * const cpu, i8080_addr_t addr) {
+static inline void i8080_call_addr(struct i8080 * const cpu, i8080_addr_t addr) {
     i8080_push(cpu, (i8080_dbl_word_t)cpu->pc);
     i8080_jmp_addr(cpu, addr);
 }
 
 /* Jumps to immediate address, given condition is satisfied. */
-static inline void i8080_jmp(i8080 * const cpu, int condition) {
+static inline void i8080_jmp(struct i8080 * const cpu, int condition) {
     if (condition) {
         i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
     } else {
@@ -501,7 +499,7 @@ static inline void i8080_jmp(i8080 * const cpu, int condition) {
 
 /* Pushes the current PC and jumps to immediate address, given condition is satisfied.
  * Conditional calls take 6 cycles longer if condition is satisfied. */
-static inline void i8080_call(i8080 * const cpu, int condition) {
+static inline void i8080_call(struct i8080 * const cpu, int condition) {
     if (condition) {
         i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
         cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
@@ -513,7 +511,7 @@ static inline void i8080_call(i8080 * const cpu, int condition) {
 
 /* Pops the last PC and jumps to it, given condition is satisfied.
  * Conditional returns take 6 cycles longer if condition is satisfied. */
-static inline void i8080_ret(i8080 * const cpu, int condition) {
+static inline void i8080_ret(struct i8080 * const cpu, int condition) {
     if (condition) {
         i8080_jmp_addr(cpu, (i8080_addr_t)i8080_pop(cpu));
         cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
@@ -521,7 +519,7 @@ static inline void i8080_ret(i8080 * const cpu, int condition) {
 }
 
 /* Exchanges the top 2 words of the stack with {HL}. */
-static inline void i8080_xthl(i8080 * const cpu) {
+static inline void i8080_xthl(struct i8080 * const cpu) {
     i8080_word_t prev_lower_word = cpu->read_memory(cpu->sp++);
     i8080_word_t prev_upper_word = cpu->read_memory(cpu->sp);
     /* Exchange HL with the top two words on the stack */
@@ -532,13 +530,13 @@ static inline void i8080_xthl(i8080 * const cpu) {
 }
 
 /* Exchanges the contents of BC and HL. */
-static inline void i8080_xchg(i8080 * const cpu) {
+static inline void i8080_xchg(struct i8080 * const cpu) {
     i8080_dbl_word_t hl = i8080_get_hl(cpu);
     i8080_set_hl(cpu, i8080_get_de(cpu));
     i8080_set_de(cpu, hl);
 }
 
-void i8080_init(i8080 * const cpu) {
+void i8080_init(struct i8080 * const cpu) {
     i8080_reset(cpu);
     /* Initialize interrupts */
     i8080_mutex_init(&cpu->hardware.interrupt_lock);
@@ -549,12 +547,12 @@ void i8080_init(i8080 * const cpu) {
     cpu->emulator.special_region_handler = NULL;
 }
 
-void i8080_destroy(i8080 * const cpu) {
+void i8080_destroy(struct i8080 * const cpu) {
     /* release any internal OS resources for spinlock */
     i8080_mutex_destroy(&cpu->hardware.interrupt_lock);
 }
 
-void i8080_reset(i8080 * const cpu) {
+void i8080_reset(struct i8080 * const cpu) {
     cpu->pc = 0;
     cpu->is_halted = 0;
     cpu->ie = 0;
@@ -566,7 +564,7 @@ void i8080_reset(i8080 * const cpu) {
  * access to critical variables so that reads/writes are atomic and
  * completely synchronized. */
 
-void i8080_interrupt(i8080 * const cpu) {
+void i8080_interrupt(struct i8080 * const cpu) {
     i8080_mutex_lock(&cpu->hardware.interrupt_lock);
     /* When serviced by the i8080, this will be toggled back */
     if (cpu->ie && !cpu->hardware.interrupt_pending) {
@@ -575,7 +573,7 @@ void i8080_interrupt(i8080 * const cpu) {
     i8080_mutex_unlock(&cpu->hardware.interrupt_lock);
 }
 
-int i8080_next(i8080 * const cpu) {
+int i8080_next(struct i8080 * const cpu) {
     /* Quit if an error occurs in a special region call.
      * See i8080.h for more details. */
     if (cpu->emulator.special_region_error) return 0;
@@ -607,7 +605,7 @@ int i8080_next(i8080 * const cpu) {
     return success;
 }
 
-int i8080_exec(i8080 * const cpu, i8080_word_t opcode) {
+int i8080_exec(struct i8080 * const cpu, i8080_word_t opcode) {
 
     cpu->cycle_count += OPCODES_CYCLES[opcode];
     int exec_success = 1;
