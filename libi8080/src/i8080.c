@@ -5,6 +5,7 @@
 #include "i8080.h"
 #include "i8080_opcodes.h"
 #include "i8080_consts.h"
+#include "i8080_predef.h"
 
 /* define min to avoid including C stdlib */
 #ifndef min
@@ -107,6 +108,70 @@ static inline int aux_carry(i8080_word_t word1, i8080_word_t word2) {
 }
 
 /* --------- Utilities --------- */
+
+#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
+/*
+ * See i8080_types.h for how i8080_mutex_t is defined.
+ */
+static inline void i8080_mutex_init(i8080_mutex_t * mut) {
+#ifdef I8080_WINDOWS
+    InitializeCriticalSection(mut);
+#elif defined(I8080_UNIX)
+    pthread_mutex_init(mut, NULL);
+#else
+#ifdef __MACH__
+    *mut = mutex_alloc();
+    mutex_init(*mut);
+#elif defined(__GNUC__) || defined(__GNUG__)
+    mut->_lock = 0;
+#endif
+#endif
+}
+
+static inline void i8080_mutex_lock(i8080_mutex_t * mut) {
+#ifdef I8080_WINDOWS
+    EnterCriticalSection(mut);
+#elif defined(I8080_UNIX)
+    pthread_mutex_lock(mut);
+#else
+#ifdef __MACH__
+    mutex_lock(*mut);
+#elif defined(__GNUC__) || defined(__GNUG__)
+    while (__atomic_load_n(mut->_lock, __ATOMIC_ACQUIRE) != 0);
+    __atomic_store_n(mut->_lock, 1, __ATOMIC_RELEASE);
+#endif
+#endif
+}
+
+static inline void i8080_mutex_unlock(i8080_mutex_t * mut) {
+#ifdef I8080_WINDOWS
+    LeaveCriticalSection(mut);
+#elif defined(I8080_UNIX)
+    pthread_mutex_unlock(mut);
+#else
+#ifdef __MACH__
+    mutex_unlock(*mut);
+#elif defined(__GNUC__) || defined(__GNUG__)
+    __atomic_store_n(mut->_lock, 0, __ATOMIC_RELEASE);
+#endif
+#endif
+}
+
+static inline void i8080_mutex_destroy(i8080_mutex_t * mut) {
+#ifdef I8080_WINDOWS
+    DeleteCriticalSection(mut);
+#elif defined(I8080_UNIX)
+    pthread_mutex_destroy(mut);
+#else
+#ifdef __MACH__
+    mutex_free(*mut);
+#elif defined(__GNUC__) || defined(__GNUG__)
+    mut->_lock = -1;
+#endif
+#endif
+}
+
+#endif
 
 /* Calculates parity of a word. */
 static inline int parity(i8080_word_t word) {
@@ -538,60 +603,60 @@ static inline void i8080_xchg(struct i8080 * const cpu) {
 
 void i8080_init(struct i8080 * const cpu) {
     i8080_reset(cpu);
-    /* Initialize interrupts */
-    i8080_mutex_init(&cpu->hardware.interrupt_lock);
+#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
+    i8080_mutex_init(&cpu->hardware._intr_sync._intr_lock);
+#endif
     cpu->hardware.interrupt_acknowledge = NULL;
-    /* See i8080.h for more details. */
-    cpu->emulator.tpa_pc_min = 0;
-    cpu->emulator.tpa_pc_max = ADDR_MAX;
-    cpu->emulator.special_region_handler = NULL;
 }
 
 void i8080_destroy(struct i8080 * const cpu) {
-    /* release any internal OS resources for spinlock */
-    i8080_mutex_destroy(&cpu->hardware.interrupt_lock);
+#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
+    i8080_mutex_destroy(&cpu->hardware._intr_sync._intr_lock);
+#endif
+    return;
 }
 
 void i8080_reset(struct i8080 * const cpu) {
     cpu->pc = 0;
     cpu->is_halted = 0;
     cpu->ie = 0;
-    cpu->hardware.interrupt_pending = 0;
+    cpu->hardware._intr_sync._intr_pending = 0;
     cpu->cycle_count = 0;
 }
 
-/* i8080_interrupt() and i8080_next() can be on different threads, so lock
- * access to critical variables so that reads/writes are atomic and
- * completely synchronized. */
-
 void i8080_interrupt(struct i8080 * const cpu) {
-    i8080_mutex_lock(&cpu->hardware.interrupt_lock);
-    /* When serviced by the i8080, this will be toggled back */
-    if (cpu->ie && !cpu->hardware.interrupt_pending) {
-        cpu->hardware.interrupt_pending = 1;
+#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
+    i8080_mutex_lock(&cpu->hardware._intr_sync._intr_lock);
+#endif
+    if (cpu->ie && !cpu->hardware._intr_sync._intr_pending) {
+        cpu->hardware._intr_sync._intr_pending = 1;
     }
-    i8080_mutex_unlock(&cpu->hardware.interrupt_lock);
+#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
+    i8080_mutex_unlock(&cpu->hardware._intr_sync._intr_lock);
+#endif
 }
 
 int i8080_next(struct i8080 * const cpu) {
-    /* Quit if an error occurs in a special region call.
-     * See i8080.h for more details. */
-    if (cpu->emulator.special_region_error) return 0;
-
+#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
+    i8080_mutex_lock(&cpu->hardware._intr_sync._intr_lock);
+#endif
     /* Get next opcode */
-    i8080_mutex_lock(&cpu->hardware.interrupt_lock);
     i8080_word_t opcode = 0;
     /* Service interrupt if pending request exists */
-    if (cpu->ie && cpu->hardware.interrupt_pending && cpu->hardware.interrupt_acknowledge != NULL) {
+    if (cpu->ie && 
+        cpu->hardware._intr_sync._intr_pending && 
+        cpu->hardware.interrupt_acknowledge != NULL) {
         opcode = cpu->hardware.interrupt_acknowledge();
         /* disable interrupts and bring out of halt */
         cpu->ie = 0;
-        cpu->hardware.interrupt_pending = 0;
+        cpu->hardware._intr_sync._intr_pending = 0;
         cpu->is_halted = 0;
     } else if (!cpu->is_halted) {
         opcode = i8080_advance_read_word(cpu);
     }
-    i8080_mutex_unlock(&cpu->hardware.interrupt_lock);
+#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
+    i8080_mutex_unlock(&cpu->hardware._intr_sync._intr_lock);
+#endif
 
     /* Execute opcode */
     int success;
