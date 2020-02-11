@@ -3,10 +3,11 @@
  *
  * - Supports all instructions, documented and undocumented.
  * - Supports asynchronous interrupts (given your build environment supports
- *   some form of thread synchronization - see i8080_interrupt_async() below)
- * 
- * Define I8080_DISABLE_ASYNC_INTERRUPTS before including this header to
- * disable async interrupts if necessary.
+ *   some form of thread synchronization - see i8080_types.h)
+ *    - To disable async interrupts, define I8080_DISABLE_ASYNC_INTERRUPTS
+ *      before including this header.
+ *    - If async interrupts are enabled and available, the macro 
+ *      I8080_ASYNC_INTERRUPTS_AVAILABLE is defined.
  */
 
 #ifndef I8080_H
@@ -50,18 +51,16 @@ I8080_CDECL struct i8080 {
          * an interrupt request. Return the word to be 
          * executed next. */
         i8080_word_t(*interrupt_acknowledge)(void);
-
-#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
         /* 
-         * If async interrupts are available, this is
-         * used to sync with the interrupting thread.
-         * See i8080_interrupt_async() below. 
+         * Internal, if async interrupts are
+         * available, this is used to sync
+         * with the interrupting thread.
+         * See i8080_interrupt() below.
          */
         struct intr_sync {
             int _intr_pending;
             i8080_mutex_t _intr_lock;
         } _intr_sync;
-#endif
     } hardware;
 
     struct i8080_state {
@@ -101,14 +100,14 @@ I8080_CDECL int i8080_next(struct i8080 * const cpu);
 I8080_CDECL int i8080_exec(struct i8080 * const cpu, i8080_word_t opcode);
 
 /* 
- * Async interrupts are made available if your build environment supports some form
- * of thread synchronization. See i8080_sync.c for how this is implemented.
- * You can force async interrupts to be disabled by defining I8080_DISABLE_ASYNC_INTERRUPTS 
- * before including this header.
- */
-#ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
-/* 
- * Sends an interrupt asynchronously to the i8080 (i.e. is thread-safe).
+ * Sends an interrupt to the i8080.
+ *
+ * This is asynchronous (i.e. thread-safe) ONLY if your build environment
+ * supports some form of thread synchronization. 
+ * See i8080_types.h for how this is detected.
+ *
+ * If no thread synchronization type is found, this behaves synchronously.
+ *
  * When ready, the i8080 will call interrupt_acknowledge(), and execute the returned opcode.
  */
 I8080_CDECL void i8080_interrupt(struct i8080 * const cpu);
@@ -117,17 +116,6 @@ I8080_CDECL void i8080_interrupt(struct i8080 * const cpu);
  * Destroys any internal resources held by the OS for the _intr_lock, if any.
  */
 I8080_CDECL void i8080_destroy(struct i8080 * const cpu);
-
-#endif
-
-/*
- * Sends an interrupt synchronously (i.e. is NOT thread-safe).
- * Use this if async interrupts are not available (see above).
- * The i8080 will immediately call interrupt_acknowledge(), and execute the returned opcode.
- */
-I8080_CDECL void i8080_interrupt_sync(struct i8080 * const cpu);
-
-#undef I8080_ASYNC_INTERRUPTS_AVAILABLE
 
 /* 
  * Undef any macros used internally to prevent exporting them by default.

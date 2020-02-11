@@ -1,8 +1,6 @@
 /*
  * Predefs to detect different machines/compilers, and some compatibility
- * definitions. This is included at the top of every file in libi8080.
- *
- * Undef the macros defined here by including "i8080_predef_undef.h"
+ * definitions. This is included in every file in libi8080.
  *
  * On Windows, this should also be included at the top of every 
  * source file in your project, or before including <Windows.h>, <stdio.h> or <cstdio>.
@@ -13,18 +11,21 @@
  * https://web.archive.org/web/20190803041644/http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system
  */
 
-#ifndef I8080_PREDEF_H
-#define I8080_PREDEF_H
-
 /*
  * Detect system.
  */
 #if defined(_WIN32) || defined(__WIN32__) || defined(_MSC_VER)
-    #define I8080_WINDOWS
+    #ifndef I8080_WINDOWS
+        #define I8080_WINDOWS
+    #endif
 #elif defined(unix) || defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__))
-    #define I8080_UNIX
+    #ifndef I8080_UNIX
+        #define I8080_UNIX
+    #endif
 #else
-    #define I8080_NONSTD
+    #ifndef I8080_NONSTD
+        #define I8080_NONSTD
+    #endif
 #endif
 
 #ifdef I8080_WINDOWS
@@ -45,10 +46,10 @@
 #endif
 
 /* Allow C++ compilers to link to C headers */
-#ifdef __cplusplus
-    #define I8080_CDECL extern "C"
-#else
-    #define I8080_CDECL
+#ifndef I8080_CDECL
+    #ifdef __cplusplus
+        #define I8080_CDECL extern "C"
+    #else
+        #define I8080_CDECL
+    #endif
 #endif
-
-#endif /* I8080_PREDEF_H */

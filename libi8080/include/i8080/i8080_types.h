@@ -141,7 +141,7 @@ I8080_CDECL typedef void(*i8080_write_word_handler)(i8080_addr_t, i8080_word_t);
             (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 7) || \
             (__GNUC__ == 4 && __GNUC_MINOR__ == 7 && __GNUC_PATCHLEVEL__ >= 0))
             /* any basic type will do */
-            #define I8080_MUTEX int
+            #define I8080_MUTEX struct i8080_mutex { int _lock; }
         #endif
     #endif
 #endif
