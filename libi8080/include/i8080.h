@@ -64,10 +64,10 @@ I8080_CDECL struct i8080 {
     } hardware;
 
     struct i8080_state {
-        /* Last instruction executed. */
-        i8080_word_t last_instr;
+        /* Last opcode executed. */
+        i8080_word_t last_op;
         /* Number of cycles taken since startup */
-        i8080_uintmax_t cycle_count;
+        i8080_uintmax_t cycles;
     } state;
 };
 
@@ -106,7 +106,7 @@ I8080_CDECL int i8080_exec(struct i8080 * const cpu, i8080_word_t opcode);
  * supports some form of thread synchronization. 
  * See i8080_types.h for how this is detected.
  *
- * If no thread synchronization type is found, this behaves synchronously.
+ * If no thread synchronization type is found, this behaves synchronously (i.e. is not thread-safe).
  *
  * When ready, the i8080 will call interrupt_acknowledge(), and execute the returned opcode.
  */

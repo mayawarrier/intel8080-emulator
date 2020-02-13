@@ -659,21 +659,21 @@ int i8080_next(struct i8080 * const cpu) {
 #endif
 
     /* Execute opcode */
-    int success;
+    int ex_success;
     if (!cpu->is_halted) {
         /* Execute the opcode */
-        success = i8080_exec(cpu, opcode);
+        ex_success = i8080_exec(cpu, opcode);
     } else {
         /* indicate success but remain halted */
-        success = 1;
+        ex_success = 0;
     }
-    return success;
+    return ex_success;
 }
 
 int i8080_exec(struct i8080 * const cpu, i8080_word_t opcode) {
 
-    cpu->cycle_count += OPCODES_CYCLES[opcode];
-    int exec_success = 1;
+    cpu->state.cycles += OPCODES_CYCLES[opcode];
+    int ex_success = 0;
 
     switch (opcode) {
 
@@ -985,9 +985,9 @@ int i8080_exec(struct i8080 * const cpu, i8080_word_t opcode) {
          * Can only be brought out by interrupt or RESET. */
         case i8080_HLT: cpu->is_halted = 1; break;
 
-        default: exec_success = 0; /* unrecognized opcode */
+        default: ex_success = -1; /* unrecognized opcode */
     }
-    cpu->last_instr = opcode;
+    cpu->state.last_op = opcode;
 
-    return exec_success;
+    return ex_success;
 }
