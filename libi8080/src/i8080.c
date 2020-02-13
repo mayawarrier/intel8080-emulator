@@ -111,6 +111,7 @@ static inline int aux_carry(i8080_word_t word1, i8080_word_t word2) {
 
 #ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
 /*
+ * An attempt at portable thread synchronization.
  * See i8080_types.h for how i8080_mutex_t is defined.
  */
 static inline void i8080_mutex_init(i8080_mutex_t * mut) {
@@ -118,14 +119,13 @@ static inline void i8080_mutex_init(i8080_mutex_t * mut) {
     InitializeCriticalSection(mut);
 #elif defined(I8080_UNIX)
     pthread_mutex_init(mut, NULL);
-#else
-#ifdef __MACH__
+#elif defined( __MACH__)
     *mut = mutex_alloc();
     mutex_init(*mut);
 #elif defined(__GNUC__) || defined(__GNUG__)
     mut->_lock = 0;
 #endif
-#endif
+    return;
 }
 
 static inline void i8080_mutex_lock(i8080_mutex_t * mut) {
@@ -133,14 +133,13 @@ static inline void i8080_mutex_lock(i8080_mutex_t * mut) {
     EnterCriticalSection(mut);
 #elif defined(I8080_UNIX)
     pthread_mutex_lock(mut);
-#else
-#ifdef __MACH__
+#elif defined(__MACH__)
     mutex_lock(*mut);
 #elif defined(__GNUC__) || defined(__GNUG__)
     while (__atomic_load_n(mut->_lock, __ATOMIC_ACQUIRE) != 0);
     __atomic_store_n(mut->_lock, 1, __ATOMIC_RELEASE);
 #endif
-#endif
+    return;
 }
 
 static inline void i8080_mutex_unlock(i8080_mutex_t * mut) {
@@ -148,13 +147,12 @@ static inline void i8080_mutex_unlock(i8080_mutex_t * mut) {
     LeaveCriticalSection(mut);
 #elif defined(I8080_UNIX)
     pthread_mutex_unlock(mut);
-#else
-#ifdef __MACH__
+#elif defined(__MACH__)
     mutex_unlock(*mut);
 #elif defined(__GNUC__) || defined(__GNUG__)
     __atomic_store_n(mut->_lock, 0, __ATOMIC_RELEASE);
 #endif
-#endif
+    return;
 }
 
 static inline void i8080_mutex_destroy(i8080_mutex_t * mut) {
@@ -162,13 +160,12 @@ static inline void i8080_mutex_destroy(i8080_mutex_t * mut) {
     DeleteCriticalSection(mut);
 #elif defined(I8080_UNIX)
     pthread_mutex_destroy(mut);
-#else
-#ifdef __MACH__
+#elif defined(__MACH__)
     mutex_free(*mut);
 #elif defined(__GNUC__) || defined(__GNUG__)
     mut->_lock = -1;
 #endif
-#endif
+    return;
 }
 
 #endif
@@ -494,26 +491,21 @@ static void i8080_rar(struct i8080 * const cpu) {
 /* Performs a decimal adjust on the accumulator (converts to BCD) and updates flags. */
 static void i8080_daa(struct i8080 * const cpu) {
     i8080_word_t lo_acc = word_lo_bits(cpu->a);
-    /* If the lower bits are adjusted, we will end up
-     * modifying the carry, which we don't want */
-    int prev_cy = cpu->cy;
     /* if lo bits are greater than 9 or 15, add 6 to accumulator */
     if ((lo_acc > (i8080_word_t)9) || cpu->acy) {
-        i8080_add(cpu, 6); /* this is lo 6 */
+        /* Add lo 6 without modfiying carry */
+        cpu->acy = aux_carry(cpu->a, 6);
+        cpu->a += (i8080_word_t)6;
     }
-    /* Bring back the old carry */
-    cpu->cy = prev_cy;
-    /* We want to preserve the original auxiliary carry
-     * from here because DAA adds 6 only to the hi bits,
-     * and the auxiliary carry is not affected. */
-    int prev_acy = cpu->acy;
     /* if hi bits are greater than 9 or 15, add 6 to hi bits */
     i8080_word_t hi_acc = word_hi_bits(cpu->a) >> (WORD_SIZE / 2);
     if ((hi_acc > (i8080_word_t)9) || cpu->cy) {
-        i8080_add(cpu, 96); /* this is hi 6 */
+        /* Add hi 6 without modifying auxiliary carry */        
+        i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + (i8080_word_t)96;
+        cpu->cy = get_bit(acc_buf, WORD_SIZE);
+        cpu->a = dbl_word_lower(acc_buf);
     }
-    /* bring back previous acy */
-    cpu->acy = prev_acy;
+    update_ZSP(cpu, cpu->a);
 }
 
 /* Pushes two words to the stack, and decrements the stack pointer by 2.
