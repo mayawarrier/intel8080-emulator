@@ -525,18 +525,7 @@ static i8080_dbl_word_t i8080_pop(struct i8080 * const cpu) {
     return concatenate(upper_word, lower_word);
 }
 
-/* Jumps to immediate address after checking if addr is in a special region,
- * and if so, triggers cpu->emulator.special_region_handler() instead.
- * See more in i8080.h. This can be used to execute code during emu_runtime
- * without writing i8080 assembly. */
-static inline void i8080_jmp_addr(struct i8080 * const cpu, i8080_addr_t addr) {
-    if (cpu->emulator.special_region_handler != NULL
-        &&(cpu->pc < cpu->emulator.tpa_pc_min || cpu->pc > cpu->emulator.tpa_pc_max)) {
-        cpu->emulator.special_region_handler(cpu);
-    } else {
-        cpu->pc = addr;
-    }
-}
+#define i8080_jmp_addr(cpu, addr) ((cpu)->pc = (addr))
 
 /* Pushes the current PC and jumps to addr. */
 static inline void i8080_call_addr(struct i8080 * const cpu, i8080_addr_t addr) {
@@ -559,7 +548,7 @@ static inline void i8080_jmp(struct i8080 * const cpu, int condition) {
 static inline void i8080_call(struct i8080 * const cpu, int condition) {
     if (condition) {
         i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
-        cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
+        cpu->state.cycles += SUBROUTINE_CYCLES_OFFSET;
     } else {
         /* advance to word after address */
         cpu->pc += 2;
@@ -571,7 +560,7 @@ static inline void i8080_call(struct i8080 * const cpu, int condition) {
 static inline void i8080_ret(struct i8080 * const cpu, int condition) {
     if (condition) {
         i8080_jmp_addr(cpu, (i8080_addr_t)i8080_pop(cpu));
-        cpu->cycle_count += SUBROUTINE_CYCLES_OFFSET;
+        cpu->state.cycles += SUBROUTINE_CYCLES_OFFSET;
     }
 }
 
@@ -613,7 +602,7 @@ void i8080_reset(struct i8080 * const cpu) {
     cpu->is_halted = 0;
     cpu->ie = 0;
     cpu->hardware._intr_sync._intr_pending = 0;
-    cpu->cycle_count = 0;
+    cpu->state.cycles = 0;
 }
 
 void i8080_interrupt(struct i8080 * const cpu) {
@@ -944,7 +933,7 @@ int i8080_exec(struct i8080 * const cpu, i8080_word_t opcode) {
                 i8080_word_t port_addr = i8080_advance_read_word(cpu);
                 cpu->a = cpu->port_in((i8080_addr_t)concatenate(port_addr, port_addr));
             } else {
-                exec_success = 0;
+                ex_success = 0;
             }
             break;
         }
@@ -954,7 +943,7 @@ int i8080_exec(struct i8080 * const cpu, i8080_word_t opcode) {
                 i8080_word_t port_addr = i8080_advance_read_word(cpu);
                 cpu->port_out((i8080_addr_t)concatenate(port_addr, port_addr), cpu->a);
             } else {
-                exec_success = 0;
+                ex_success = 0;
             }
             break;
         }
