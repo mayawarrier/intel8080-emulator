@@ -2,6 +2,7 @@
  * Implement i8080.h
  */
 
+#include "i8080_msvc.h"
 #include "i8080.h"
 #include "i8080_opcodes.h"
 #include "i8080_consts.h"
@@ -21,7 +22,7 @@
 /* 
  * This cycles table was sourced from:
  * https://github.com/superzazu/8080/blob/master/i8080.c
- * Correction made: Corrected cycle count of XCHG (0xeb) to 5.
+ * Corrected cycle count of XCHG (0xeb) to 5.
  * For conditional RETs and CALLs, add 6 to the cycles if the condition is true. 
  */
 static const i8080_word_t OPCODES_CYCLES[] = {
@@ -107,7 +108,7 @@ static inline int aux_carry(i8080_word_t word1, i8080_word_t word2) {
     return get_bit(word_lo_bits(word1) + word_lo_bits(word2), WORD_SIZE / 2);
 }
 
-/* --------- Utilities --------- */
+/* ----------------------------- */
 
 #ifdef I8080_ASYNC_INTERRUPTS_AVAILABLE
 /*
