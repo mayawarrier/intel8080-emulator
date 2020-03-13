@@ -2,7 +2,7 @@
  * CP/M BIOS helpers.
  *
  * - generate_bios_disk_defns() has been adapted from the CP/M 2.0 disk re-definition library
- *   (mirrored here: http://www.gaby.de/cpm/manuals/archive/cpm22htm/axf.asm)
+ *   (mirror: http://www.gaby.de/cpm/manuals/archive/cpm22htm/axf.asm)
  * 
  * The following resources were useful:
  * - http://www.gaby.de/cpm/manuals/archive/cpm22htm/axa.asm (Intel MDS-800 I/O drivers in 8080 assembly)
@@ -17,10 +17,7 @@
 #ifndef CPM80_BIOS_H
 #define CPM80_BIOS_H
 
-#include "vm.h"
-#include "i8080_predef.h"
-
-I8080_CDECL typedef i8080_addr_t cpm80_addr_t;
+#include "cpm80_defs.h"
 
 /*
  * Generates logical disk drive definitions in BIOS memory.
@@ -53,9 +50,9 @@ I8080_CDECL typedef i8080_addr_t cpm80_addr_t;
  * disk_dph_arr_out will contain the addresses to the DPHs of the created disk drives when done. A maximum of 16 drives can be defined.
  * Returns 0 if successful.
  */
-I8080_CDECL int generate_bios_disk_defns(const int num_disks, const int disk_params[][], cpm80_addr_t disk_defns_begin, cpm80_addr_t disk_ram_begin, cpm80_addr_t disk_dph_arr_out[]);
+CPM80VM_CDECL int generate_bios_disk_defns(const int num_disks, const int disk_params[][], cpm80_addr_t disk_defns_begin, cpm80_addr_t disk_ram_begin, cpm80_addr_t disk_dph_arr_out[]);
 
-I8080_CDECL enum BIOS_CC {
+CPM80VM_CDECL enum BIOS_CC {
     BIOS_BOOT,
     /* Cold boot, initializes the devices and hardware. */
     BIOS_WBOOT,
@@ -127,7 +124,6 @@ I8080_CDECL enum BIOS_CC {
  * Calls a BIOS function with the given code. See BIOS_CC above.
  * Returns 0 if successful.
  */
-I8080_CDECL int bios_call_function(struct cpm80_vm * const vm, int call_code);
-
+CPM80VM_CDECL int bios_call_function(struct cpm80_vm * const vm, int call_code);
 
 #endif /* CPM80_BIOS_H */

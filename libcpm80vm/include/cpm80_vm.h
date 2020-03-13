@@ -1,10 +1,13 @@
-#include "i8080_predef.h"
 
 #ifndef CPM80_VM_H
 #define CPM80_VM_H
 
+#include "cpm80_defs.h"
+#include "cpm80_bios.h"
+#include "cpm80_devices.h"
+
 /* 8080-based microcomputer environment compatible with CP/M 2.2 */
-I8080_CDECL struct cpm80_vm {
+CPM80VM_CDECL struct cpm80_vm {
     struct i8080 cpu;
     /*
      * Should load the BIOS into resident memory and set up a jump
@@ -21,12 +24,12 @@ I8080_CDECL struct cpm80_vm {
     struct cpm80_disk_drive drives[16];
 };
 
-I8080_CDECL int cpm80_vm_init(struct cpm80_vm * const vm);
+CPM80VM_CDECL int cpm80_vm_init(struct cpm80_vm * const vm);
 
 /*
  * Configure a VM with default settings: 
  */
-I8080_CDECL int cpm80_vm_configure_default(struct cpm80_vm * const vm);
+CPM80VM_CDECL int cpm80_vm_config_default(struct cpm80_vm * const vm);
 
 /*
  * Starts the VM (cold boot).
@@ -38,6 +41,8 @@ I8080_CDECL int cpm80_vm_configure_default(struct cpm80_vm * const vm);
  *     warm boot/WBOOT/BIOS 01, likely to be largely shared with the cold boot routine).
  * If successful, does not return until computer is powered off, else returns -1.
  */
-I8080_CDECL int cpm80_vm_start(struct cpm80_vm * const vm);
+CPM80VM_CDECL int cpm80_vm_start(struct cpm80_vm * const vm);
+
+#undef CPM80VM_CDECL
 
 #endif /* CPM80_VM_H */
