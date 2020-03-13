@@ -1,5 +1,6 @@
 /*
- * Provides definitions for portable i8080 base types.
+ * Provides macros, and type definitions for i8080 base types.
+ * Do not include this file directly! Include i8080.h instead.
  *
  * - This also searches for a mutex/synchronization primitive on the 
  *   system (unless I8080_DISABLE_ASYNC_INTERRUPTS is defined). If found, the 
@@ -20,10 +21,17 @@
  * https://www.os-book.com/OS9/appendices-dir/b.pdf, pg 8 (NeXTSTEP/MACH system documentation)
  */
 
-#ifndef I8080_TYPES_H
-#define I8080_TYPES_H
+#ifndef I8080_DEFS_H
+#define I8080_DEFS_H
 
 #include "i8080_predef.h"
+
+ /* Allow C++ compilers to link to C headers */
+#ifdef __cplusplus
+    #define I8080_CDECL extern "C"
+#else
+    #define I8080_CDECL
+#endif
 
 /* 
  * Determine portable data types for the i8080.
@@ -150,4 +158,12 @@ I8080_CDECL typedef void(*i8080_write_word_handler)(i8080_addr_t, i8080_word_t);
     I8080_CDECL typedef I8080_MUTEX i8080_mutex_t;
 #endif
 
-#endif /* I8080_TYPES_H */
+/*
+ * Prevent exporting these macros by default.
+ * If you want access to these, include i8080_predef.h
+ */
+#undef I8080_WINDOWS
+#undef I8080_UNIX
+#undef I8080_NONSTD
+
+#endif /* I8080_DEFS_H */

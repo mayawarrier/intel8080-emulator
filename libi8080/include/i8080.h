@@ -3,7 +3,7 @@
  *
  * - Supports all instructions, documented and undocumented.
  * - Supports asynchronous interrupts (given your build environment supports
- *   some form of thread synchronization - see i8080_types.h)
+ *   some form of thread synchronization - see i8080_defs.h)
  *    - To disable async interrupts, define I8080_DISABLE_ASYNC_INTERRUPTS
  *      before including this header.
  *    - If async interrupts are enabled and available, the macro 
@@ -13,14 +13,14 @@
 #ifndef I8080_H
 #define I8080_H
 
-#include "i8080_types.h"
+#include "i8080_msvc.h" /* for compatibility with MSVC */
+#include "i8080_defs.h"
+
 #ifdef I8080_MUTEX
     /* i8080_mutex_t is available */
     #undef I8080_MUTEX
     #define I8080_ASYNC_INTERRUPTS_AVAILABLE
 #endif
-
-#include "i8080_predef.h"
 
 I8080_CDECL struct i8080 {
     /* Registers */
@@ -52,7 +52,7 @@ I8080_CDECL struct i8080 {
          * executed next. */
         i8080_word_t(*interrupt_acknowledge)(void);
         /* 
-         * Internal, if async interrupts are
+         * If async interrupts are
          * available, this is used to sync
          * with the interrupting thread.
          * See i8080_interrupt() below.
@@ -103,27 +103,22 @@ I8080_CDECL int i8080_exec(struct i8080 * const cpu, i8080_word_t opcode);
  * Sends an interrupt to the i8080.
  *
  * This is asynchronous (i.e. thread-safe) ONLY if your build environment
- * supports some form of thread synchronization. 
- * See i8080_types.h for how this is detected.
+ * supports some form of thread synchronization.
  *
- * If no thread synchronization type is found, this behaves synchronously (i.e. is not thread-safe).
+ * If no thread synchronization type is found, this behaves synchronously 
+ * (i.e. is not thread-safe).
  *
- * When ready, the i8080 will call interrupt_acknowledge(), and execute the returned opcode.
+ * See macros I8080_ASYNC_INTERRUPTS_AVAILABLE, I8080_DISABLE_ASYNC_INTERRUPTS,
+ * and i8080_defs.h for how this is detected.
+ * When ready, i8080 will call interrupt_acknowledge(), and execute the returned opcode.
  */
 I8080_CDECL void i8080_interrupt(struct i8080 * const cpu);
 
 /* 
- * Destroys any internal resources held by the OS for the _intr_lock, if any.
+ * Frees OS resources for the _intr_lock, if any.
  */
 I8080_CDECL void i8080_destroy(struct i8080 * const cpu);
 
-/* 
- * Undef any macros used internally to prevent exporting them by default.
- * If you want access to these macros, include i8080_predef.h
- */
-#undef I8080_WINDOWS
-#undef I8080_UNIX
-#undef I8080_NONSTD
 #undef I8080_CDECL
 
 #endif /* I8080_H */

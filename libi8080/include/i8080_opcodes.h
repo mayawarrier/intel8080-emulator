@@ -6,8 +6,8 @@
  * ALT_s are undocumented opcodes and are alternatives for existing opcodes.
  */
 
-#ifndef OPCODES_H
-#define OPCODES_H
+#ifndef I8080_OPCODES_H
+#define I8080_OPCODES_H
                                 /*    size       flags       details                           cycles  */
 #define i8080_NOP 0x00          /*      1                    no operation                         4    */
 #define i8080_LXI_B 0x01        /*      3                    B <- byte 3, C <- byte 2             10   */
@@ -293,4 +293,4 @@
 #define i8080_CPI 0xfe          /*      2       Z,S,P,CY,AC  A - byte 2                           7    */
 #define i8080_RST_7 0xff        /*      1                    CALL $38 interrupt vector            11   */
 
-#endif /* OPCODES_H */
+#endif /* I8080_OPCODES_H */
