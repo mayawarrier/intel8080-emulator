@@ -1,10 +1,10 @@
 /*
- * All the opcodes in the INTEL 8080.
- * Roughly categorized by instruction type.
- *
- * Conditional RETs and CALLs take 6 extra cycles if the condition succeeds.
- * ALT_s are undocumented opcodes and are alternatives for existing opcodes.
+ * All opcodes in the INTEL 8080.
  */
+
+#if defined(_MSC_VER) && (_MSC_VER > 1000)
+#pragma once
+#endif
 
 #ifndef I8080_OPCODES_H
 #define I8080_OPCODES_H
