@@ -64,7 +64,7 @@
 #include <unistd.h>
 #if ((defined(__APPLE__) && defined(__MACH__)) || (defined(_POSIX_VERSION) && _POSIX_VERSION >= 199506L)) && defined(_POSIX_THREADS)
     #include <pthread.h>
-	#define I8080_PLATFORM_UNIX
+	#define I8080_PLATFORM_PTHREAD
     #define I8080_MUTEX pthread_mutex_t
 #endif
 

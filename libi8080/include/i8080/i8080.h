@@ -1,9 +1,12 @@
 /*
  * Emulate an i8080.
  *
- * - Emulates all instructions, documented and undocumented.
- * - External interrupts are thread-safe if build env supports it
-	 (see i8080_intr_lock_create() and i8080_intr_lock_destroy()).
+ * - All instructions supported - documented and undocumented.
+ * - Includes no dependencies by default.
+ *
+ * - i8080_interrupt() is thread-synchronized if build env supports it.
+ *	 - Define NEED_INTR_LOCK=1 at the build level to enable
+ *	   (this will include dependencies)
  */
 
 #if defined(_MSC_VER) && (_MSC_VER > 1000)
@@ -69,8 +72,7 @@ struct i8080
 	/* Set by i8080_interrupt() to indicate pending
 	 * interrupt request. Cleared when serviced. */
 	int intr;
-	/* Synchronize with interrupt thread.
-	 * See i8080_intr_lock_create() and i8080_intr_lock_destroy(). */
+	/* Synchronize with interrupt thread. */
 	struct i8080_mutex intr_lock;
 
 	/* Clock cycles since reset */
@@ -115,7 +117,7 @@ void i8080_intr_lock_destroy(struct i8080 *const cpu);
 
 /*
  * Sends an interrupt to the CPU.
- * Is thread-safe if a lock primitive is available. See i8080::intr_lock.
+ * Is thread-sychronized if a lock primitive is available. See i8080::intr_lock.
  * When ready, i8080 will call interrupt_read() and execute the returned opcode.
  */
 void i8080_interrupt(struct i8080 *const cpu);
