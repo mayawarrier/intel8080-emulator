@@ -4,9 +4,9 @@
  * - All instructions supported - documented and undocumented.
  * - Includes no dependencies by default.
  *
- * - i8080_interrupt() is thread-synchronized if build env supports it.
- *	 - Define NEED_INTR_LOCK=1 at the build level to enable
- *	   (this will include dependencies)
+ * - i8080_interrupt() may be thread-synchronized if build env supports it.
+ *	 - Define NEED_INTR_LOCK at the build level to attempt including
+ *	   a lock primitive automatically.
  */
 
 #if defined(_MSC_VER) && (_MSC_VER > 1000)
@@ -23,8 +23,9 @@ extern "C" {
 /* 
  * I8080_WORD = at least 8 bits 
  * I8080_DBL_WORD = at least 16 bits
- * MSVC doesn't consistently support chars beyond 
- * version 1300, so fall back on Microsoft types instead.
+ * MSVC doesn't consistently support chars beyond version 1300
+ * so fall back on Microsoft types instead.
+ * https://github.com/libgit2/libgit2/blob/master/include/git2/stdint.h
  */
 #if defined(_MSC_VER) && (_MSC_VER >= 1300)
     #define I8080_WORD unsigned __int8
@@ -41,7 +42,38 @@ typedef I8080_DBL_WORD i8080_dbl_word_t;
 #undef I8080_WORD
 #undef I8080_DBL_WORD
 
-struct i8080_mutex;
+#ifdef NEED_INTR_LOCK
+#include "i8080_platform.h"
+
+struct i8080_mutex
+{
+#ifndef I8080_PLATFORM
+	/* may work */
+	volatile int mutx;
+#else
+#if I8080_PLATFORM == I8080_PLATFORM_WIN32
+	CRITICAL_SECTION mutx;
+#elif I8080_PLATFORM == I8080_PLATFORM_PTHREAD
+	pthread_mutex_t mutx;
+	pthread_mutexattr_t attr;
+#elif I8080_PLATFORM == I8080_PLATFORM_MACH
+	mutex_t mutx;
+#elif I8080_PLATFORM == I8080_PLATFORM_GNU
+	int mutx;
+#endif
+#endif
+};
+
+#undef I8080_PLATFORM
+#endif
+
+struct i8080;
+
+struct i8080_debugger
+{
+	int is_attached;
+	void(*on_breakpoint)(const struct i8080 *);
+};
 
 struct i8080
 {
@@ -58,7 +90,7 @@ struct i8080
 	int inte;
 
     /* If in HALT state (i.e. stopped execution).
-	 * Set by HLT. Can only be cleared by an external interrupt.  */
+	 * Set by HLT. Can only be cleared by an external interrupt/RESET. */
     int halt;
 
     i8080_word_t(*memory_read)(i8080_addr_t mem_addr);
@@ -72,11 +104,18 @@ struct i8080
 	/* Set by i8080_interrupt() to indicate pending
 	 * interrupt request. Cleared when serviced. */
 	int intr;
+
+#ifdef NEED_INTR_LOCK
 	/* Synchronize with interrupt thread. */
 	struct i8080_mutex intr_lock;
+#endif
 
 	/* Clock cycles since reset */
 	unsigned long cycles;
+
+	/* Attach a debug routine to be called when a
+	 * breakpoint is hit (mapped to RST 7). */
+	struct i8080_debugger debugger;
 
     /* User data */
     void *udata;
@@ -86,7 +125,8 @@ struct i8080
  * Resets the CPU. 
  * PC is set to 0, CPU comes out of HALT, cycles is reset.
  * No working registers or flags are affected.
- * Equivalent to pulling the RESET pin low.
+ * Equivalent to pulling RESET pin low.
+ * This also detaches the debugger if attached (see i8080::debugger).
  */
 void i8080_reset(struct i8080 *const cpu);
 
@@ -105,6 +145,14 @@ int i8080_next(struct i8080 *const cpu);
 int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode);
 
 /*
+ * Sends an interrupt to the CPU.
+ * Is thread-sychronized if a lock primitive is available. See i8080::intr_lock.
+ * When ready, i8080 will call interrupt_read() and execute the returned opcode.
+ */
+void i8080_interrupt(struct i8080 *const cpu);
+
+#ifdef NEED_INTR_LOCK
+/*
  * Creates i8080::intr_lock.
  * Returns 0 if successful, -1 if no lock primitive could be found.
  */
@@ -114,13 +162,7 @@ int i8080_intr_lock_create(struct i8080 *const cpu);
  * Destroys i8080::intr_lock.
  */
 void i8080_intr_lock_destroy(struct i8080 *const cpu);
-
-/*
- * Sends an interrupt to the CPU.
- * Is thread-sychronized if a lock primitive is available. See i8080::intr_lock.
- * When ready, i8080 will call interrupt_read() and execute the returned opcode.
- */
-void i8080_interrupt(struct i8080 *const cpu);
+#endif
 
 #ifdef __cplusplus
 }

@@ -2,90 +2,98 @@
 #include "i8080.h"
 #include "i8080_opcodes.h"
 
-/* see i8080.h. */
-#ifndef NEED_INTR_LOCK
-#define NEED_INTR_LOCK 0
-#endif
-
-#if (NEED_INTR_LOCK == 1)
- /* this includes dependencies! */
-#include "i8080_mutex.h"
-#endif
-
 #ifdef __STDC__
     #define inline
     #define volatile
 #endif
 
-/* see i8080_mutex.h */
-struct i8080_mutex
-{
-#ifdef I8080_MUTEX
-	I8080_MUTEX mutx;
-#else
-	/* this may or may not work */
-	volatile int mutx;
-#endif
-#ifdef I8080_PLATFORM_PTHREAD
-	pthread_mutexattr_t attr;
-#endif
-};
+/* include any target version macros before this */
+#ifdef NEED_INTR_LOCK
+
+#include "i8080_platform.h"
 
 static inline void i8080_lock_init(struct i8080_mutex *const lock) {
-#if defined(I8080_PLATFORM_WIN32)
+#ifndef I8080_PLATFORM
+	lock->mutx = 0;
+#else 
+#if I8080_PLATFORM == I8080_PLATFORM_WIN32
 	InitializeCriticalSection(&lock->mutx);
-#elif defined(I8080_PLATFORM_PTHREAD)
+#elif I8080_PLATFORM == I8080_PLATFORM_PTHREAD
 	pthread_mutexattr_init(&lock->attr);
 	pthread_mutex_init(&lock->mutx, &lock->attr);
-#elif defined(I8080_PLATFORM_OTHER) && defined(__MACH__)
+#elif I8080_PLATFORM == I8080_MACH
 	lock->mutx = mutex_alloc();
 	mutex_init(lock->mutx);
-#else
+#elif I8080_PLATFORM == I8080_PLATFORM_GNU
 	lock->mutx = 0;
+#endif
 #endif
 }
 
 static inline void i8080_lock_acquire(struct i8080_mutex *const lock) {
-#if defined(I8080_PLATFORM_WIN32)
-	EnterCriticalSection(&lock->mutx);
-#elif defined(I8080_PLATFORM_PTHREAD)
-	pthread_mutex_lock(&lock->mutx);
-#elif defined(I8080_PLATFORM_OTHER) && defined(__MACH__)
-	mutex_lock(lock->mutx);
-#elif defined(I8080_PLATFORM_OTHER) && (defined(__GNUC__) || defined(__GNUG__))
-	while (__atomic_test_and_set(&lock->mutx, __ATOMIC_ACQUIRE));
-#else
+#ifndef I8080_PLATFORM
 	while (lock->mutx != 0);
 	lock->mutx = 1;
+#else 
+#if I8080_PLATFORM == I8080_PLATFORM_WIN32
+	EnterCriticalSection(&lock->mutx);
+#elif I8080_PLATFORM == I8080_PLATFORM_PTHREAD
+	pthread_mutex_lock(&lock->mutx);
+#elif I8080_PLATFORM == I8080_MACH
+	mutex_lock(lock->mutx);
+#elif I8080_PLATFORM == I8080_PLATFORM_GNU
+	while (__atomic_test_and_set(&lock->mutx, __ATOMIC_ACQUIRE));
+#endif
 #endif
 }
 
 static inline void i8080_lock_release(struct i8080_mutex *const lock) {
-#if defined(I8080_PLATFORM_WIN32)
-	LeaveCriticalSection(&lock->mutx);
-#elif defined(I8080_PLATFORM_PTHREAD)
-	pthread_mutex_unlock(&lock->mutx);
-#elif defined(I8080_PLATFORM_OTHER) && defined(__MACH__)
-	mutex_unlock(lock->mutx);
-#elif defined(I8080_PLATFORM_OTHER) && (defined(__GNUC__) || defined(__GNUG__))
-	__atomic_store_n(&lock->mutx, 0, __ATOMIC_RELEASE);
-#else
+#ifndef I8080_PLATFORM
 	lock->mutx = 0;
+#else 
+#if I8080_PLATFORM == I8080_PLATFORM_WIN32
+	LeaveCriticalSection(&lock->mutx);
+#elif I8080_PLATFORM == I8080_PLATFORM_PTHREAD
+	pthread_mutex_unlock(&lock->mutx);
+#elif I8080_PLATFORM == I8080_MACH
+	mutex_unlock(lock->mutx);
+#elif I8080_PLATFORM == I8080_PLATFORM_GNU
+	__atomic_store_n(&lock->mutx, 0, __ATOMIC_RELEASE);
+#endif
 #endif
 }
 
 static inline void i8080_lock_destroy(struct i8080_mutex *const lock) {
-#if defined(I8080_PLATFORM_WIN32)
+#ifndef I8080_PLATFORM
+	lock->mutx = -1;
+#else
+#if I8080_PLATFORM == I8080_PLATFORM_WIN32
 	DeleteCriticalSection(&lock->mutx);
-#elif defined(I8080_PLATFORM_PTHREAD)
+#elif I8080_PLATFORM == I8080_PLATFORM_PTHREAD
 	pthread_mutex_destroy(&lock->mutx);
 	pthread_mutexattr_destroy(&lock->attr);
-#elif defined(I8080_PLATFORM_OTHER) && defined(__MACH__)
+#elif I8080_PLATFORM == I8080_MACH
 	mutex_free(lock->mutx);
-#else
+#elif I8080_PLATFORM == I8080_PLATFORM_GNU
 	lock->mutx = -1;
 #endif
+#endif
 }
+
+int i8080_intr_lock_create(struct i8080 *const cpu) {
+	i8080_lock_init(&cpu->intr_lock);
+#ifdef I8080_PLATFORM
+	return 0;
+#else
+	return -1;
+#endif
+}
+
+void i8080_intr_lock_destroy(struct i8080 *const cpu) {
+	i8080_lock_destroy(&cpu->intr_lock);
+}
+
+#endif
 
 /* 
  * Sourced from https://github.com/superzazu/8080/blob/master/i8080.c, with corrections.
@@ -580,25 +588,17 @@ static inline void i8080_out(struct i8080 *const cpu) {
 	cpu->io_write((i8080_addr_t)concatenate(port_addr, port_addr), cpu->a);
 }
 
-int i8080_intr_lock_create(struct i8080 *const cpu) {
-	i8080_lock_init(&cpu->intr_lock);
-#ifdef I8080_MUTEX
-	return 0;
-#else
-	return -1;
-#endif
-}
-
-void i8080_intr_lock_destroy(struct i8080 *const cpu){
-	i8080_lock_destroy(&cpu->intr_lock);
-}
 
 void i8080_interrupt(struct i8080 *const cpu) {
+#ifdef NEED_INTR_LOCK
 	i8080_lock_acquire(&cpu->intr_lock);
+#endif
 	if (cpu->inte && !cpu->intr) {
 		cpu->intr = 1;
 	}
+#ifdef NEED_INTR_LOCK
 	i8080_lock_release(&cpu->intr_lock);
+#endif
 }
 
 void i8080_reset(struct i8080 *const cpu) {
@@ -607,13 +607,16 @@ void i8080_reset(struct i8080 *const cpu) {
 	cpu->inte = 0;
 	cpu->intr = 0;
 	cpu->cycles = 0;
+	cpu->debugger.is_attached = 0;
 }
 
 int i8080_next(struct i8080 *const cpu) {
 	int intr_read = 0;
 	i8080_word_t opcode;
 
+#ifdef NEED_INTR_LOCK
 	i8080_lock_acquire(&cpu->intr_lock);
+#endif
     /* Service interrupt if pending request exists */
     if (cpu->inte && cpu->intr) {
         opcode = trim_to_word(cpu->interrupt_read());
@@ -623,7 +626,9 @@ int i8080_next(struct i8080 *const cpu) {
         cpu->halt = 0;
 		intr_read = 1;
     }
+#ifdef NEED_INTR_LOCK
 	i8080_lock_release(&cpu->intr_lock);
+#endif
 
     /* Execute opcode */
     int err;
@@ -664,7 +669,7 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 			i8080_mov_get_reg_pair(cpu, opcode, left_pptr, right_pptr);
 			*(*left_pptr) = *(*right_pptr);
 			break;
-		}	
+		}
 
         /* Move from memory to registers */
         case i8080_MOV_B_M: cpu->b = i8080_memory_read_indirect(cpu); break;
@@ -906,7 +911,7 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_IN: i8080_in(cpu); break;
 		case i8080_OUT: i8080_out(cpu); break;
 
-        /* Restart / software interrupts */
+        /* Restart / soft interrupts */
         case i8080_RST_0: i8080_call_addr(cpu, (i8080_addr_t)0x0000); break;
         case i8080_RST_1: i8080_call_addr(cpu, (i8080_addr_t)0x0008); break;
         case i8080_RST_2: i8080_call_addr(cpu, (i8080_addr_t)0x0010); break;
@@ -914,7 +919,14 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
         case i8080_RST_4: i8080_call_addr(cpu, (i8080_addr_t)0x0020); break;
         case i8080_RST_5: i8080_call_addr(cpu, (i8080_addr_t)0x0028); break;
         case i8080_RST_6: i8080_call_addr(cpu, (i8080_addr_t)0x0030); break;
-        case i8080_RST_7: i8080_call_addr(cpu, (i8080_addr_t)0x0038); break;
+		case i8080_RST_7: {
+			if (cpu->debugger.is_attached) {
+				cpu->debugger.on_breakpoint(cpu);
+			} else {
+				i8080_call_addr(cpu, (i8080_addr_t)0x0038);
+			}
+			break;
+		}
 
         /* Enable / disable interrupts */
         case i8080_EI: cpu->inte = 1; break;
