@@ -72,7 +72,10 @@ struct i8080;
 struct i8080_debugger
 {
 	int is_attached;
-	void(*on_breakpoint)(const struct i8080 *);
+	/* Return non-zero to signal error.
+	 * i8080_next() and i8080_exec() will
+	 * exit with this error code immediately. */
+	int(*on_breakpoint)(const struct i8080 *);
 };
 
 struct i8080
