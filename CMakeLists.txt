@@ -17,7 +17,20 @@ if(NOT MSVC)
 	endforeach()
 endif()
 
+option(BUILD_CMDLINE "Build command line frontend. Needs C++11 compiler or above." ON)
+
+if (BUILD_CMDLINE)
+	set(CMAKE_CXX_STANDARD 11)
+	set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
+
 add_subdirectory(libi8080)
 add_subdirectory(libcpm80vm)
+
+if (BUILD_CMDLINE)
+	add_executable(${EXE_NAME} frontend/test.cpp)
+	target_link_libraries(${EXE_NAME} cpm80vm)
+	file(COPY libi8080/tests DESTINATION ${CMAKE_BINARY_DIR})
+endif()
 
 # add command line frontend here eventually

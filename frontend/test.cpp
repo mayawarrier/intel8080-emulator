@@ -5,6 +5,7 @@
 
 #include <string>
 #include <algorithm>
+#include <limits>
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -12,6 +13,9 @@
 #include <thread>
 
 #include "i8080.h"
+#include "i8080_opcodes.h"
+
+void i8080_dump_stats(struct i8080& i8080);
 
 #define libi8080_EXIT (30)
 #define libi8080_K64 (0x10000)
@@ -29,9 +33,9 @@ static void memory_write(i8080_addr_t addr, i8080_word_t word) {
 	MEMORY[addr] = word;
 }
 
-/* Have to use this instead of exceptions as exceptions cannot be
-   thrown safely across the C/C++ boundary, and there are
-   cases where we must unconditionally crash the emulator. */
+/* Have to use longjmp instead of exceptions as exceptions cannot be
+   thrown safely across the C/C++ boundary, but there are cases where this
+   is absolutely necessary to unconditionally crash the emulator. */
 std::jmp_buf i8080_fatal;
 
 static void fatal_io_write(i8080_addr_t port, i8080_word_t word) {
@@ -42,11 +46,13 @@ static void fatal_io_write(i8080_addr_t port, i8080_word_t word) {
 static i8080_word_t fatal_io_read(i8080_addr_t port) {
 	std::printf("\nUnhandled I/O read from port 0x%02x\n", port & 0xff);
 	std::longjmp(i8080_fatal, 1);
+	return -1;
 }
 
 static i8080_word_t fatal_interrupt_read(void) {
 	std::printf("\nUnhandled interrupt\n");
 	std::longjmp(i8080_fatal, 1);
+	return -1;
 }
 
 struct cpm {
@@ -54,30 +60,30 @@ struct cpm {
 	int num_wboot; // number of calls to CP/M warm boot
 };
 
-// Emulate as much of CP/M BDOS and WBOOT as required to run test binaries.
-static int cpm_call(const struct i8080* cpu)
+// Emulate as much of CP/M BDOS and WBOOT as required to run included test binaries.
+static int cpm_call(struct i8080* cpu)
 {
 	bool unhandled = false;
 	switch (cpu->pc) 
 	{
-		case 0xfa03: {
+		case 0xfa04: {
 			// came here from WBOOT
 			struct cpm* vm = static_cast<struct cpm*>(cpu->udata);
 			vm->num_wboot += 1;
 
 			if (vm->num_wboot == 1) {
-				/* This would have been part of CP/M's startup boot process.
+				/* This would have been part of CP/M's startup boot process!
 				   We don't have any booting to do, so jump straight to the program. */
 				cpu->pc = libi8080_CPM_TPA_BEGIN;
 			}
 
 			if (vm->num_wboot == 2) {
-				// The program has terminated and is giving control back to CP/M, we're done!
+				// The program has terminated and is giving control back to CP/M, we're done
 				return libi8080_EXIT;
 			}
 		} break;
 
-		case 0x0005: {
+		case 0x0006: {
 			// came here from BDOS
 			switch (cpu->c) 
 			{
@@ -88,7 +94,7 @@ static int cpm_call(const struct i8080* cpu)
 				// print CP/M string ($-terminated)
 				case 0x09: {
 					i8080_word_t c;
-					i8080_addr_t ptr = (i8080_addr_t)(cpu->d << 8) | cpu->e; // starts at {DE}
+					i8080_addr_t ptr = (i8080_addr_t)(cpu->d << 8) | cpu->e; // starts at [DE]
 					while ((c = cpu->memory_read(ptr)) != '$') {
 						std::printf("%c", c);
 						ptr++;
@@ -115,10 +121,10 @@ static int cpm_call(const struct i8080* cpu)
 }
 
 static i8080_word_t cpm_interrupt_read(void) {
-	/* For the interrupts test, 0xc7 (RST 0) causes
+	/* For the interrupts test, RST 0 causes
 	   a call to CP/M WBOOT which we can catch later
 	   to detect when the program exits. */
-	return 0xc7;
+	return i8080_RST_0;
 }
 
 static void setup_cpm_environment(struct cpm& vm)
@@ -138,17 +144,18 @@ static void setup_cpm_environment(struct cpm& vm)
 	vm.cpu.udata = &vm;
 
 	// jump to WBOOT (0xfa03) on startup
-	vm.cpu.memory_write(0x0000, 0xc3);
+	vm.cpu.memory_write(0x0000, i8080_JMP);
 	vm.cpu.memory_write(0x0001, 0x03);
 	vm.cpu.memory_write(0x0002, 0xfa);
 
 	/* Put breakpoints at WBOOT (0xfa03) and BDOS (0x0005)
 	   so we regain control and can handle these calls. */
-	vm.cpu.memory_write(0xfa03, 0xff);
-	vm.cpu.memory_write(0x0005, 0xff);
+	vm.cpu.memory_write(0xfa03, i8080_RST_7); // WBOOT does not return
+	vm.cpu.memory_write(0x0005, i8080_RST_7);
+	vm.cpu.memory_write(0x0006, i8080_RET);
 }
 
-static void setup_user_environment(struct i8080& cpu)
+static void setup_normal_environment(struct i8080& cpu)
 {
 	cpu.memory_read = memory_read;
 	cpu.memory_write = memory_write;
@@ -161,7 +168,7 @@ static void setup_user_environment(struct i8080& cpu)
 	cpu.interrupt_read = fatal_interrupt_read;
 }
 
-static int load_memory(struct i8080& cpu, std::string& binpath, i8080_addr_t from, std::size_t maxlen)
+static int load_memory(struct i8080& cpu, std::string binpath, i8080_addr_t from, std::size_t maxlen)
 {
 	std::ifstream file(binpath.c_str(), std::ifstream::in | std::ifstream::binary);
 	if (!file.is_open()) {
@@ -177,7 +184,7 @@ static int load_memory(struct i8080& cpu, std::string& binpath, i8080_addr_t fro
 		return -1;
 	}
 	auto length = file.gcount();
-	if (length > maxlen) {
+	if ((std::size_t)length > maxlen) {
 		file.close();
 		std::cout << "File larger than " << maxlen << " bytes." << std::endl;
 		return -1;
@@ -190,7 +197,7 @@ static int load_memory(struct i8080& cpu, std::string& binpath, i8080_addr_t fro
 	// read
 	char buf[libi8080_K64];
 	file.read(buf, length);
-	if (file.fail() || !file.eof()) {
+	if (file.fail()) {
 		file.close();
 		std::cout << "File read error." << std::endl;
 		return -1;
@@ -225,7 +232,22 @@ static int run_emulator(struct i8080& cpu)
 	return err;
 }
 
-static int load_and_run(struct i8080& cpu, std::string& filepath, i8080_addr_t from, std::size_t maxlen)
+static int run_emulator_synchronizable(struct i8080& cpu, std::atomic_flag& lock)
+{
+	int err = 0;
+	while (1) {
+		while (lock.test_and_set(std::memory_order_acquire));
+		err = i8080_next(&cpu);
+		if (err) break;
+		lock.clear(std::memory_order_release);
+	}
+	if (err == libi8080_EXIT) {
+		return 0;
+	}
+	return err;
+}
+
+static int load_and_run(struct i8080& cpu, std::string filepath, i8080_addr_t from, std::size_t maxlen)
 {
 	int err = load_memory(cpu, filepath, from, maxlen);
 	if (err) return err;
@@ -233,26 +255,30 @@ static int load_and_run(struct i8080& cpu, std::string& filepath, i8080_addr_t f
 	return run_emulator(cpu);
 }
 
-static int load_and_run_interrupted(struct i8080& cpu, std::string& filepath, i8080_addr_t from, std::size_t maxlen, int ms_to_interrupt)
+static int load_and_run_interrupted(struct i8080& cpu, std::string filepath, i8080_addr_t from, std::size_t maxlen, int ms_to_interrupt)
 {
 	int err = load_memory(cpu, filepath, from, maxlen);
 	if (err) return err;
 
-	std::atomic<int> on_exit;
-
-	std::thread run_thread([&] {
-		on_exit = run_emulator(cpu);
-	});
+	// synchronize interrupt with cpu
+#if __cplusplus >= 202002L
+	std::atomic_flag lock; // ATOMIC_FLAG_INIT is deprecated from c++20
+#else
+	std::atomic_flag lock = ATOMIC_FLAG_INIT;
+#endif
 
 	std::thread intgen_thread([&] {
 		std::this_thread::sleep_for(std::chrono::milliseconds(ms_to_interrupt));
+		while (lock.test_and_set(std::memory_order_acquire));
 		i8080_interrupt(&cpu);
+		lock.clear(std::memory_order_release);
 	});
 
-	run_thread.join();
+	err = run_emulator_synchronizable(cpu, lock);
+
 	intgen_thread.join();
 
-	return on_exit;
+	return err;
 }
 
 static void cpm_reset(struct cpm& vm)
@@ -260,23 +286,23 @@ static void cpm_reset(struct cpm& vm)
 	vm.num_wboot = 0;
 	i8080_reset(&vm.cpu);
 	// overwrite the transient program area
-	overwrite_memory(vm.cpu, libi8080_CPM_TPA_BEGIN, 0x00, libi8080_CPM_TPA_SIZE);
+	overwrite_memory(vm.cpu, libi8080_CPM_TPA_BEGIN, 0xff, libi8080_CPM_TPA_SIZE);
 }
 
-static inline i8080_dbl_word_t concatenate(i8080_word_t w1, i8080_word_t w2) {
-	return ((i8080_dbl_word_t)w1 << 8) | w2;
-}
-
-static bool yesno_prompt(std::string& prompt)
+static bool yesno_prompt(const char prompt[])
 {
 	while (true) {
-		std::cout << prompt.c_str() << " [yn] ";
+		std::cout << prompt << " [yn] ";
 		std::string line;
 		std::getline(std::cin, line);
 		if (line.length() == 1 && line.find_first_of("YyNn") != std::string::npos) {
 			return line == "Y" || line == "y";
 		}
 	}
+}
+
+static inline i8080_dbl_word_t concatenate(i8080_word_t w1, i8080_word_t w2) {
+	return ((i8080_dbl_word_t)w1 << 8) | w2;
 }
 
 // dump debug info
@@ -295,8 +321,8 @@ static void i8080_dump_stats(struct i8080& i8080)
 	std::printf("BC: 0x%04x\n", concatenate(i8080.b, i8080.c));
 	std::printf("DE: 0x%04x\n", concatenate(i8080.d, i8080.e));
 	std::printf("HL: 0x%04x\n", concatenate(i8080.h, i8080.l));
-	std::printf("Flags: s=%d, z=%d, acy=%d, cy=%d, p=%d", i8080.s, i8080.z, i8080.acy, i8080.cy, i8080.p);
-	std::printf("HLT: %d, INTE: %d", i8080.halt, i8080.inte);
+	std::printf("Flags: s=%d, z=%d, acy=%d, cy=%d, p=%d\n", i8080.s, i8080.z, i8080.acy, i8080.cy, i8080.p);
+	std::printf("HLT: %d, INTE: %d\n", i8080.halt, i8080.inte);
 	std::printf("Cycles: %lu", i8080.cycles);
 
 	const std::string dump_filename = "memdump.bin";
@@ -306,7 +332,7 @@ static void i8080_dump_stats(struct i8080& i8080)
 		std::ofstream memdump(dump_filename, std::ofstream::out | std::ofstream::binary);
 		if (!memdump.is_open()) {
 			std::cout << "File not open." << std::endl;
-			return -1;
+			return;
 		}
 
 		char buf[libi8080_K64];
@@ -324,36 +350,36 @@ static void i8080_dump_stats(struct i8080& i8080)
 
 // default test paths to run if no path given
 static const int num_default_tests = 3;
-static const std::string TST8080_COM = "TST8080.COM";
-static const std::string CPUTEST_COM = "CPUTEST.COM";
-static const std::string INTERRUPTS_COM = "INTERRUPTS.COM";
+static const std::string TST8080_COM = "tests/TST8080.COM";
+static const std::string CPUTEST_COM = "tests/CPUTEST.COM";
+static const std::string INTERRUPTS_COM = "tests/INTERRUPT.COM";
 
-int run_TST8080_COM(struct cpm& vm)
+int run_TST8080_COM(struct cpm& vm, int testnum)
 {
-	std::cout << "\n-------------------------- Test 1: TST8080.COM --------------------------\n";
-	std::cout << "\t\t8080/8085 CPU Diagnostic, Kelly Smith, 1980";
+	std::cout << "\nTest " << testnum << ": TST8080.COM\n";
+	std::cout << "8080/8085 CPU Diagnostic, Kelly Smith, 1980";
 	std::cout << "\n-------------------------------------------------------------------------\n";
 	int err = load_and_run(vm.cpu, TST8080_COM, libi8080_CPM_TPA_BEGIN, libi8080_CPM_TPA_SIZE);
 	std::cout << "\n-------------------------------------------------------------------------\n";
 	return err;
 }
 
-int run_CPUTEST_COM(struct cpm& vm)
+int run_CPUTEST_COM(struct cpm& vm, int testnum)
 {
-	std::cout << "\n-------------------------- Test 2: CPUTEST.COM --------------------------\n";
-	std::cout << "\tSupersoft Associates CPU test, Diagnostics II suite, 1981";
+	std::cout << "\nTest " << testnum << ": CPUTEST.COM\n";
+	std::cout << "Supersoft Associates CPU test, Diagnostics II suite, 1981";
 	std::cout << "\n-------------------------------------------------------------------------\n";
 	int err = load_and_run(vm.cpu, CPUTEST_COM, libi8080_CPM_TPA_BEGIN, libi8080_CPM_TPA_SIZE);
 	std::cout << "\n-------------------------------------------------------------------------\n";
 	return err;
 }
 
-int run_INTERRUPTS_COM(struct cpm& vm)
+int run_INTERRUPTS_COM(struct cpm& vm, int testnum)
 {
-	std::cout << "\n-------------------------- Test 3: INTERRUPTS.COM -----------------------\n";
-	std::cout << "\t\tPrints '+' in a loop for 0.2s, then returns to \n\t\tWBOOT upon receiving interrupt.";
+	std::cout << "\nTest " << testnum << ": INTERRUPT.COM\n";
+	std::cout << "Spins for 5s until interrupted.";
 	std::cout << "\n-------------------------------------------------------------------------\n";
-	int err = load_and_run_interrupted(vm.cpu, INTERRUPTS_COM, libi8080_CPM_TPA_BEGIN, libi8080_CPM_TPA_SIZE, 200);
+	int err = load_and_run_interrupted(vm.cpu, INTERRUPTS_COM, libi8080_CPM_TPA_BEGIN, libi8080_CPM_TPA_SIZE, 5000);
 	std::cout << "\n-------------------------------------------------------------------------\n";
 	return err;
 }
@@ -366,21 +392,21 @@ int run_default_tests()
 	if (setjmp(i8080_fatal) != 0) {
 		// drop execution
 		i8080_dump_stats(vm.cpu);
-		return -1;
+		std::exit(EXIT_FAILURE);
 	}
 
 	int err, num_tests_passed = 0;
 
 	cpm_reset(vm);
-	err = run_TST8080_COM(vm);
+	err = run_TST8080_COM(vm, 1);
 	if (!err) num_tests_passed++;
 
 	cpm_reset(vm);
-	err = run_CPUTEST_COM(vm);
+	err = run_CPUTEST_COM(vm, 2);
 	if (!err) num_tests_passed++;
 
 	cpm_reset(vm);
-	err = run_INTERRUPTS_COM(vm);
+	err = run_INTERRUPTS_COM(vm, 3);
 	if (!err) num_tests_passed++;
 
 	std::cout << "\n" << num_tests_passed << "/" << num_default_tests << " tests passed." << std::endl;
@@ -388,7 +414,7 @@ int run_default_tests()
 	return num_tests_passed == num_default_tests ? 0 : -1;
 }
 
-int run_user_test(std::string& test_path)
+int run_user_test(std::string test_path)
 {
 	bool is_TST8080_COM = test_path == TST8080_COM;
 	bool is_CPUTEST_COM = test_path == CPUTEST_COM;
@@ -402,23 +428,23 @@ int run_user_test(std::string& test_path)
 
 		if (setjmp(i8080_fatal) != 0) {
 			i8080_dump_stats(vm.cpu);
-			return -1;
+			std::exit(EXIT_FAILURE);
 		}
 
-		if (is_TST8080_COM) return run_TST8080_COM(vm);
-		if (is_CPUTEST_COM) return run_CPUTEST_COM(vm);
-		if (is_INTERRUPTS_COM) return run_INTERRUPTS_COM(vm);
+		if (is_TST8080_COM) return run_TST8080_COM(vm, 1);
+		if (is_CPUTEST_COM) return run_CPUTEST_COM(vm, 1);
+		if (is_INTERRUPTS_COM) return run_INTERRUPTS_COM(vm, 1);
 	}
 
 	// this is a user test!
 	struct i8080 i8080;
-	setup_user_environment(i8080);
+	setup_normal_environment(i8080);
 	i8080_reset(&i8080);
 
 	if (setjmp(i8080_fatal) != 0) {
 		// drop execution
 		i8080_dump_stats(i8080);
-		return -1;
+		std::exit(EXIT_FAILURE);
 	}
 
 	return load_and_run(i8080, test_path, 0x0000, libi8080_K64);
@@ -448,7 +474,7 @@ int main(int argc, char** argv)
 	} else {
 		err = run_user_test(test_path);
 	}
-	
+
 	if (err) return EXIT_FAILURE;
 	else return EXIT_SUCCESS;
 }
