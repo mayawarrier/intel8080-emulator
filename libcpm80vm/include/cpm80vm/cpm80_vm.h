@@ -8,26 +8,26 @@
 
 /* 8080-based microcomputer environment compatible with CP/M 2.2 */
 CPM80VM_CDECL struct cpm80_vm {
-    struct i8080 cpu;
-    /*
-     * Should load the BIOS into resident memory and set up a jump
-     * to automatically launch into a cold boot.
-     * Return 0 if successful.
-     */
-    int(*bootloader)(struct cpm80_vm *);
-    /* Logical serial devices */
-    struct cpm80_serial_device con; /* console */
-    struct cpm80_serial_device lst; /* printer/list */
-    struct cpm80_serial_device rdr; /* reader */
-    struct cpm80_serial_device pun; /* punch machine */
-    /* Up to 16 logical disk drives. */
-    struct cpm80_disk_drive drives[16];
+	struct i8080 cpu;
+	/*
+	 * Should load the BIOS into resident memory and set up a jump
+	 * to automatically launch into a cold boot.
+	 * Return 0 if successful.
+	 */
+	int(*bootloader)(struct cpm80_vm *);
+	/* Logical serial devices */
+	struct cpm80_serial_device con; /* console */
+	struct cpm80_serial_device lst; /* printer/list */
+	struct cpm80_serial_device rdr; /* reader */
+	struct cpm80_serial_device pun; /* punch machine */
+	/* Up to 16 logical disk drives. */
+	struct cpm80_disk_drive drives[16];
 };
 
 CPM80VM_CDECL int cpm80_vm_init(struct cpm80_vm * const vm);
 
 /*
- * Configure a VM with default settings: 
+ * Configure a VM with default settings:
  */
 CPM80VM_CDECL int cpm80_vm_config_default(struct cpm80_vm * const vm);
 

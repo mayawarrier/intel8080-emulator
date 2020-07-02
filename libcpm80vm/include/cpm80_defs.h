@@ -6,9 +6,9 @@
 
 /* Allow C++ compilers to link to C headers */
 #ifdef __cplusplus
-    #define CPM80VM_CDECL extern "C"
+	#define CPM80VM_CDECL extern "C"
 #else
-    #define CPM80VM_CDECL
+	#define CPM80VM_CDECL
 #endif
 
 CPM80VM_CDECL typedef i8080_addr_t cpm80_addr_t;

@@ -64,7 +64,7 @@ struct cpm {
 static int cpm_call(struct i8080* cpu)
 {
 	bool unhandled = false;
-	switch (cpu->pc) 
+	switch (cpu->pc)
 	{
 		case 0xfa04: {
 			// came here from WBOOT
@@ -85,7 +85,7 @@ static int cpm_call(struct i8080* cpu)
 
 		case 0x0006: {
 			// came here from BDOS
-			switch (cpu->c) 
+			switch (cpu->c)
 			{
 				// print single char
 				case 0x02: std::printf("%c", cpu->e);
@@ -159,7 +159,7 @@ static void setup_normal_environment(struct i8080& cpu)
 {
 	cpu.memory_read = memory_read;
 	cpu.memory_write = memory_write;
-	
+
 	/* If user-supplied test does any I/O (or sends an
 	   interrupt somehow), we can't do anything sensible!
 	   The safest thing to do is just crash. */
@@ -261,11 +261,11 @@ static int load_and_run_interrupted(struct i8080& cpu, std::string filepath, i80
 	if (err) return err;
 
 	// synchronize interrupt with cpu
-#if __cplusplus >= 202002L
+	#if __cplusplus >= 202002L
 	std::atomic_flag lock; // ATOMIC_FLAG_INIT is deprecated from c++20
-#else
+	#else
 	std::atomic_flag lock = ATOMIC_FLAG_INIT;
-#endif
+	#endif
 
 	std::thread intgen_thread([&] {
 		std::this_thread::sleep_for(std::chrono::milliseconds(ms_to_interrupt));
