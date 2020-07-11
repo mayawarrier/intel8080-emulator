@@ -13,14 +13,14 @@ static void write_zeros(struct cpm80_vm *const vm, cpm80_addr_t buf, unsigned lo
 {
 	unsigned long i;
 	const unsigned long end = (unsigned long)buf + buflen;
-	for (i = 0; i < end; ++i) {
+	for (i = (unsigned long)buf; i < end; ++i) {
 		vm->cpu->memory_write((i8080_addr_t)i, 0x00);
 	}
 }
 
 static inline void write_word(void(*write_byte)(i8080_addr_t, i8080_word_t), cpm80_addr_t addr, cpm80_word_t word)
 {
-	i8080_word_t lo = (i8080_word_t)(word & 0x00ff), hi = (i8080_word_t)(word & 0xff00);
+	i8080_word_t lo = (i8080_word_t)(word & 0x00ff), hi = (i8080_word_t)((word & 0xff00) >> 8);
 	write_byte((i8080_addr_t)addr++, hi);
 	write_byte((i8080_addr_t)addr, lo);
 }
