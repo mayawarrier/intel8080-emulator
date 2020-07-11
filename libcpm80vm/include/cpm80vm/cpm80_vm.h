@@ -2,34 +2,42 @@
 #ifndef CPM80_VM_H
 #define CPM80_VM_H
 
-#include "cpm80_defs.h"
-#include "cpm80_bios.h"
-#include "cpm80_devices.h"
+#include "cpm80_types.h"
 
-/* 8080-based microcomputer environment compatible with CP/M 2.2 */
-CPM80VM_CDECL struct cpm80_vm {
-	struct i8080 cpu;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct i8080;
+struct cpm80_serial_device;
+struct cpm80_disk_drive;
+
+/* 8080-based microcomputer environment for CP/M 2.2 */
+struct cpm80_vm 
+{
+	struct i8080 *cpu;
 	/*
-	 * Should load the BIOS into resident memory and set up a jump
-	 * to automatically launch into a cold boot.
+	 * Load the BIOS into resident memory and set up the
+	 * launch into cold boot when powered on.
 	 * Return 0 if successful.
 	 */
 	int(*bootloader)(struct cpm80_vm *);
-	/* Logical serial devices */
-	struct cpm80_serial_device con; /* console */
-	struct cpm80_serial_device lst; /* printer/list */
-	struct cpm80_serial_device rdr; /* reader */
-	struct cpm80_serial_device pun; /* punch machine */
-	/* Up to 16 logical disk drives. */
-	struct cpm80_disk_drive drives[16];
+
+	/* serial devices */
+	struct cpm80_serial_device *con; /* console */
+	struct cpm80_serial_device *lst; /* printer/list */
+	struct cpm80_serial_device *rdr; /* reader */
+	struct cpm80_serial_device *pun; /* punch machine */
+
+	struct cpm80_disk_drive *disks;
 };
 
-CPM80VM_CDECL int cpm80_vm_init(struct cpm80_vm * const vm);
+int cpm80_vm_init(struct cpm80_vm *const vm);
 
 /*
  * Configure a VM with default settings:
  */
-CPM80VM_CDECL int cpm80_vm_config_default(struct cpm80_vm * const vm);
+int cpm80_vm_config_default(struct cpm80_vm *const vm);
 
 /*
  * Starts the VM (cold boot).
@@ -41,8 +49,10 @@ CPM80VM_CDECL int cpm80_vm_config_default(struct cpm80_vm * const vm);
  *     warm boot/WBOOT/BIOS 01, likely to be largely shared with the cold boot routine).
  * If successful, does not return until computer is powered off, else returns -1.
  */
-CPM80VM_CDECL int cpm80_vm_start(struct cpm80_vm * const vm);
+int cpm80_vm_start(struct cpm80_vm *const vm);
 
-#undef CPM80VM_CDECL
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CPM80_VM_H */
