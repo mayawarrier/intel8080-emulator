@@ -57,6 +57,7 @@ static i8080_word_t fatal_interrupt_read(void) {
 
 struct cpm {
 	struct i8080 cpu;
+	struct i8080_debugger debugger;
 	int num_wboot; // number of calls to CP/M warm boot
 };
 
@@ -137,8 +138,9 @@ static void setup_cpm_environment(struct cpm& vm)
 	vm.cpu.io_write = fatal_io_write;
 
 	// triggered by RST 7 (0xff)
-	vm.cpu.debugger.on_breakpoint = cpm_call;
-	vm.cpu.debugger.is_attached = 1;
+	vm.debugger.on_breakpoint = cpm_call;
+	vm.cpu.debugger = &vm.debugger;
+	vm.cpu.debugger_is_attached = 1;
 
 	vm.num_wboot = 0;
 	vm.cpu.udata = &vm;

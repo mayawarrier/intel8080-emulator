@@ -2,10 +2,6 @@
  * All opcodes in the INTEL 8080.
  */
 
-#if defined(_MSC_VER) && (_MSC_VER > 1000)
-#pragma once
-#endif
-
 #ifndef I8080_OPCODES_H
 #define I8080_OPCODES_H
 								/*    size       flags       details                           cycles  */

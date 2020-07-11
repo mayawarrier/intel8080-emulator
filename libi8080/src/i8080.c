@@ -818,8 +818,8 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_RST_5: i8080_call_addr(cpu, (i8080_addr_t)0x0028); break;
 		case i8080_RST_6: i8080_call_addr(cpu, (i8080_addr_t)0x0030); break;
 		case i8080_RST_7: {
-			if (cpu->debugger.is_attached) {
-				err = cpu->debugger.on_breakpoint(cpu);
+			if (cpu->debugger_is_attached) {
+				err = cpu->debugger->on_breakpoint(cpu);
 			} else {
 				i8080_call_addr(cpu, (i8080_addr_t)0x0038);
 			}

@@ -5,49 +5,16 @@
  * - Has no dependencies.
  */
 
-#if defined(_MSC_VER) && (_MSC_VER > 1000)
-#pragma once
-#endif
-
 #ifndef I8080_H
 #define I8080_H
+
+#include "i8080_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*
- * I8080_WORD = at least 8 bits
- * I8080_DBL_WORD = at least 16 bits
- * MSVC doesn't consistently support chars beyond version 1300
- * so fall back on Microsoft types instead.
- * https://github.com/libgit2/libgit2/blob/master/include/git2/stdint.h
- */
-#if defined(_MSC_VER) && (_MSC_VER >= 1300)
-	#define I8080_WORD unsigned __int8
-	#define I8080_DBL_WORD unsigned __int16
-#else
-	#define I8080_WORD unsigned char
-	#define I8080_DBL_WORD unsigned int
-#endif
-
-typedef I8080_WORD i8080_word_t;
-typedef I8080_DBL_WORD i8080_addr_t;
-typedef I8080_DBL_WORD i8080_dbl_word_t;
-
-#undef I8080_WORD
-#undef I8080_DBL_WORD
-
-struct i8080;
-
-struct i8080_debugger
-{
-	int is_attached;
-	/* Return non-zero to signal an error.
-	 * i8080_next()/i8080_exec() will
-	 * exit with this error code. */
-	int(*on_breakpoint)(struct i8080 *);
-};
+struct i8080_debugger;
 
 struct i8080
 {
@@ -82,12 +49,21 @@ struct i8080
 	/* Clock cycles since reset */
 	unsigned long cycles;
 
-	/* Attach a debug routine to be called when a
-	 * breakpoint is hit (mapped to RST 7). */
-	struct i8080_debugger debugger;
+	struct i8080_debugger *debugger;
+	int debugger_is_attached;
 
 	/* User data */
 	void *udata;
+};
+
+struct i8080_debugger
+{
+	/* Attach a debug routine to be called 
+	 * when a breakpoint is hit (RST 7). 
+	 * Return non-zero to signal an error.
+	 * i8080_next()/i8080_exec() will
+	 * exit with this error code. */
+	int(*on_breakpoint)(struct i8080 *);
 };
 
 /*
