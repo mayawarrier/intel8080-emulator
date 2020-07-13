@@ -18,69 +18,74 @@
 
 struct cpm80_vm;
 
-/* Cold boot, initializes the devices and hardware. */
+/* Cold boot: Initializes devices and hardware then jumps to warm boot. */
 #define BIOS_BOOT		(0)
-/* Terminates running program, reloads CPP and BDOS from disk, and calls the command processor/CPP. */
+/* Warm boot: Terminates running program, reloads CP/M from disk, and starts processing commands. */
 #define BIOS_WBOOT		(1)
-/* If a character is waiting to be read from the logical console device, returns 0x00 else 0xFF in register A. */
+/* Console status: Returns 0x00 in A if a character is waiting to be read from console, else 0xFF. */
 #define BIOS_CONST		(2)
-/* Reads the next character from the logical console device into register A. */
+/* Console in: Reads a character from console into A. */
 #define BIOS_CONIN		(3)
-/* Writes the character in register C to the logical console device. */
+/* Console out: Writes the character in C to console. */
 #define BIOS_CONOUT		(4)
-/* Writes the character in register C to the logical printer/list device. */
+/* List out: Writes the character in C to the printer/list device. */
 #define BIOS_LIST		(5)
-/* Writes the character in register C to the logical punch device. */
+/* Punch out: Writes the character in C to the punch device. */
 #define BIOS_PUNCH		(6)
-/* Reads the next character from the logical reader device into register A. */
+/* Reader in: Reads a character from the reader device into A. */
 #define BIOS_READER		(7)
-/* Moves to track 0 on the selected disk. */
+/* Disk home: Moves seek to track 0 on the selected disk. */
 #define BIOS_HOME		(8)
 /*
- * Select disk to be used in subsequent disk operations. Pass disk number (0-15) in register C.
- * If LSB of register E is 0, BIOS will perform first-time initialization of the disk.
- * If LSB of register E is 1, BIOS assumes disk is already initialized.
- * If successful, returns address of the Disk Parameter Header (DPH) else 0x00 in {HL}.
+ * Select disk: 
+ * Selects the disk number in C to be used in subsequent disk operations.
+ * If LSB of E is 0, the disk goes through first-time initialization.
+ * If LSB of E is 1, the BIOS assumes that the disk is already initialized.
+ * Returns the address of the disk's Disk Parameter Header in {HL}, else 0x00 if unsuccessful.
  */
 #define BIOS_SELDSK		(9)
-/* Set the track number for next read/write. Pass track number in {BC}. */
+/* Set track: Sets the current track from {BC} for next read/write. */
 #define BIOS_SETTRK		(10)
 /*
- * Set the sector number for next read/write. The physical sector number above may be
- * different from the logical sector number since sectors may be interlaced on the disk to
- * improve performance. If the address of the sector skew table in the DPH is not 0,
- * a call to SECTRAN is required before calling SETSEC. Pass translated sector number in {BC}.
+ * Set sector:
+ * Sets the current (logical) sector from {BC} for next read/write. 
+ * If the sectors are skewed on disk (i.e. if the address of the sector translate table 
+ * in the DPH is non-0), a call to SECTRAN is required first.
  */
 #define BIOS_SETSEC		(11)
 /*
- * Set the address of a buffer to be read to or written from by the disk READ and WRITE functions.
- * It must be large enough to hold one standard record/logical sector (128 bytes).
+ * Set DMA address:
+ * CP/M follows a direct memory access model for disks. Sets from {BC} the address of 
+ * the buffer to be read to or written from by the BIOS READ and WRITE functions.
+ * The buffer should be 128 bytes or larger.
  */
 #define BIOS_SETDMA		(12)
 /*
- * Transfer one standard record from the selected sector on disk to the DMA buffer. Returns in
- * register A 0 for success, 1 for unrecoverable error, and 0xff if media changed.
+ * Disk read:
+ * Transfers a 128-byte record/logical-sector from the selected sector on disk to the DMA buffer.
+ * Returns exit code in A: 0 for success, 1 for unrecoverable error, and 0xff if media changed.
  */
 #define BIOS_READ		(13)
-/* Transfer a standard record from the DMA buffer to the selected sector on disk. If the physical
- * sector size is larger than a standard record (128 bytes), the sector may have to be pre-read
- * before the record is written. Pass disk de-blocking code in register C:
- * - if C = 0, perform deferred write to a potentially allocated sector. If the
- *   sector is already allocated, it is pre-read and the record is inserted
- *   where required. Actual flush to disk is deferred until necessary.
- * - if C = 1, perform directory write, i.e. flush write to disk immediately.
- * - if C = 2, perform deferred write to an unallocated sector, writing to its first
- *   record without pre-reading. Actual flush to disk is deferred until necessary.
+/* 
+ * Disk write:
+ * Transfers a 128-byte record/logical-sector from the DMA buffer to the selected sector on disk.
+ * A physical sector may be larger than 128 bytes - if so it may have to be pre-read before
+ * the record is written (de-blocking). Modify this behavior by passing a de-blocking code in C:
+ * - if C = 0, performs deferred write to a potentially allocated sector. If the
+ *   sector is already allocated, it is pre-read and the record is inserted where required.
+ * - if C = 1, performs undeferred write, i.e. flushes write to disk immediately.
+ * - if C = 2, performs deferred write to an unallocated sector, writing to its first
+ *   record without pre-reading.
+ * Returns exit code in A: 0 for success, 1 for unrecoverable error, and 0xff if media changed.
  */
 #define BIOS_WRITE		(14)
-/*
- * If a character is waiting to be read from the logical printer/list device, returns 0x00
- * else 0xFF in register A.
- */
+/* List status: Returns 0x00 in A if a character is waiting to be read from the printer/list device, else 0xFF. */
 #define BIOS_LISTST		(15)
 /*
- * Convert a logical sector number to a physical sector number. Pass sector number in {BC}, and
- * skew table memory address in {DE}. Returns translated sector number in {HL}.
+ * Sector translate:
+ * Translates sector numbers to account for skewing of sectors on disk. 
+ * Translates logical sector number in {BC} to a physical sector number, using the translate table address in {DE}.
+ * Returns translated sector number in {HL}.
  */
 #define BIOS_SECTRAN	(16)
 
@@ -100,30 +105,30 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code);
  * - dn: Disk number 0,1,2... num_disks-1
  * - fsc: First sector number (usually 0 or 1)
  * - lsc: Last sector number on a track
- * - skf: Skew factor of the disk (see SECTRAN), 0 for no skew
- * - bls: Data block size
+ * - skf: Skew factor of the disk, 0 for no skew
+ * - bls: Block size
  * - dks: Disk size in increments of block size
- * - dir: Number of elements in a directory
+ * - dir: Number of directory elements
  * - cks: Number of directory elements to checksum (file modify check)
  * - ofs: Number of tracks to skip at the beginning (the first 2 tracks on a disk are usually system-reserved)
- * - k16: If 0, forces file extents to 16K each
+ * - k16: If 0, forces file extents to 16K
  *
- * The list may also contain only 2 params dn and dm, which defines disk dn with the same characteristics as disk dm.
- * The first element in every parameter list should be the number of params in that list, followed the params
- * in sequence as described above.
+ * The list may also contain only 2 params: dn and dm, which defines disk dn with the same params as disk dm (i.e. a shared defn).
+ * The first element in every parameter list should be the number of params in that list, followed the params in sequence as 
+ * described above.
  *
- * disk_defns_begin is the address of a buffer in BIOS memory large enough to accomodate all the disk definitions.
+ * disk_defns_begin is a ptr to a buffer in BIOS memory large enough to accomodate all the definitions.
  * This is filled with the following data sequentially:
  * - each disk's Disk Parameter Header (DPH, 16 bytes)
  * - each disk's Disk Parameter Block (DPB, 15 bytes) and Sector Translate Table (XLT, lsc-fsc+1 bytes, generated only when skf is non-zero)
- *   - if disk parameters are shared between disks, their DPBs and XLTs will also be shared 
+ *   - if disk parameters are shared, their DPBs and XLTs will also be shared 
  *     (see http://www.gaby.de/cpm/manuals/archive/cpm22htm/axa.htm for example layout)
  *
- * disk_ram_begin is the address of a buffer in BIOS memory large enough to contain:
+ * disk_ram_begin is a ptr to a buffer in BIOS memory large enough to contain:
  * - the DIRBUF (directory access buffer, 128 bytes)
- * - each disk's allocation vector (ALV, ciel(dks/8) bytes) and checksum vector (CSV, floor(cks/4) bytes)
+ * - each disk's allocation vector (ALV, ciel(dks/8) bytes) and checksum vector (CSV, cks/4 bytes)
  *
- * disk_dph_out will contain the addresses to the DPHs of created disk drives when done. The number of disks is capped at 16.
+ * disk_dph_out will contain the addresses to the DPHs of the disk drives when done. The number of disks is capped at 16.
  * Returns 0 if successful.
  */
 int cpm80_bios_redefine_disks(struct cpm80_vm *const vm, const int num_disks,

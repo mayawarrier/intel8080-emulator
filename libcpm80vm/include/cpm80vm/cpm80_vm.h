@@ -10,7 +10,7 @@ extern "C" {
 
 struct i8080;
 struct cpm80_serial_device;
-struct cpm80_disk_drive;
+struct cpm80_disk_device;
 
 /* 8080-based microcomputer environment for CP/M 2.2 */
 struct cpm80_vm 
@@ -29,7 +29,9 @@ struct cpm80_vm
 	struct cpm80_serial_device *rdr; /* reader */
 	struct cpm80_serial_device *pun; /* punch machine */
 
-	struct cpm80_disk_drive *disks;
+	int selected_disk;
+	cpm80_addr_t disk_dma_addr;
+	struct cpm80_disk_device *disks;
 };
 
 int cpm80_vm_init(struct cpm80_vm *const vm);

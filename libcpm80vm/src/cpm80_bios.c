@@ -4,9 +4,163 @@
 #include "cpm80_devices.h"
 #include "cpm80_bios.h"
 
-int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code) 
+#define lsbit(buf) (buf & (unsigned)1) 
+#define concatenate(byte1, byte2) ((unsigned)(byte1) << 8 | byte2)
+
+#define cpm80_bios_get_args_bc(cpu) concatenate((cpu)->b, (cpu)->c)
+#define cpm80_bios_get_args_de(cpu) concatenate((cpu)->d, (cpu)->e)
+
+static inline void cpm80_bios_set_return_hl(struct i8080 *const cpu, unsigned val)
 {
-	return 0;
+	cpu->h = (i8080_word_t)((val & 0xff00) >> 8);
+	cpu->l = (i8080_word_t)(val & 0xff);
+}
+
+#define cpm80_serial_device_in(cpu, ldev)  ((cpu)->a = (i8080_word_t)((ldev)->in((ldev)->dev)))
+#define cpm80_serial_device_out(cpu, ldev) ((ldev)->out((ldev)->dev, (char)((cpu)->c)))
+
+static inline void cpm80_serial_device_status(struct i8080 *const cpu, struct cpm80_serial_device *const ldev)
+{
+	int status = ldev->status(ldev->dev);
+	if (status) cpu->a = 0xff;
+	else cpu->a = 0x00;
+}
+
+static inline void cpm80_set_disk_exitcode(struct i8080 *const cpu, int exitcode)
+{
+	switch (exitcode)
+	{
+		case -1: cpu->a = 0xff; break;
+		default: cpu->a = (i8080_word_t)exitcode;
+	}
+}
+
+static inline void cpm80_select_disk(struct cpm80_vm *const vm, int disknum)
+{
+	int err;
+	struct cpm80_disk_device *disk = &vm->disks[disknum];
+
+	if (!lsbit(vm->cpu->e)) {
+		/* this will determine and generate the disk format, if possible */
+		err = disk->init(disk->dev);
+	}
+
+	if (err) {
+		cpm80_bios_set_return_hl(vm->cpu, 0);
+		return;
+	}
+
+	cpm80_bios_set_return_hl(vm->cpu, disk->dph_addr);
+	vm->selected_disk = disknum;
+}
+
+static inline void cpm80_disk_set_track(struct cpm80_vm *const vm, int disknum, unsigned track)
+{
+	struct cpm80_disk_device *disk = &vm->disks[disknum];
+	disk->set_track(disk->dev, track);
+}
+
+static inline void cpm80_disk_set_sector(struct cpm80_vm *const vm, int disknum, unsigned sector)
+{
+	struct cpm80_disk_device *disk = &vm->disks[disknum];
+	disk->set_sector(disk->dev, sector);
+}
+
+static inline void cpm80_disk_read(struct cpm80_vm *const vm, int disknum)
+{
+	int err;
+	struct cpm80_disk_device *disk = &vm->disks[disknum];
+
+	char buf[128];
+	err = disk->readl(disk->dev, buf);
+
+	cpm80_set_disk_exitcode(vm->cpu, err);
+	if (err) return;
+
+	unsigned long i;
+	unsigned long start = (unsigned long)vm->disk_dma_addr, end = start + 128;
+	for (i = start; i < end; ++i) {
+		vm->cpu->memory_write((i8080_addr_t)i, buf[i]);
+	}
+}
+
+static inline void cpm80_disk_write(struct cpm80_vm *vm, int disknum)
+{
+	int err;
+	struct cpm80_disk_device *disk = &vm->disks[disknum];
+
+	char buf[128];
+	unsigned long i;
+	unsigned long start = (unsigned long)vm->disk_dma_addr, end = start + 128;
+	for (i = start; i < end; ++i) {
+		buf[i] = vm->cpu->memory_read((i8080_addr_t)i);
+	}
+
+	err = disk->writel(disk->dev, buf, (int)vm->cpu->c);
+	cpm80_set_disk_exitcode(vm->cpu, err);
+}
+
+static inline void cpm80_disk_sectran(struct cpm80_vm *vm)
+{
+	unsigned lsector = cpm80_bios_get_args_bc(vm->cpu);
+	unsigned sectran_table_ptr = cpm80_bios_get_args_de(vm->cpu);
+
+	unsigned psector;
+	if (sectran_table_ptr == 0) {
+		/* If the table ptr is NULL, this function should never have been called.
+		 * But the BDOS has a bug where this is not validated before being passed to SECTRAN:
+		 * http://cpuville.com/Code/CPM-on-a-new-computer.html
+		 * Return the sector number without translation. */
+		psector = lsector;
+	} else {
+		psector = vm->cpu->memory_read((i8080_addr_t)(sectran_table_ptr + lsector));
+	}
+
+	cpm80_bios_set_return_hl(vm->cpu, psector);
+}
+
+int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
+{
+	int err = 0;
+	struct i8080 *const cpu = vm->cpu; 
+	struct cpm80_disk_device *const disks = vm->disks;
+	struct cpm80_serial_device *const con = vm->con,
+		*const lst = vm->lst, *const pun = vm->pun, *const rdr = vm->rdr;
+
+	switch (call_code)
+	{
+		case BIOS_BOOT:
+			/* todo */
+			break;
+
+		case BIOS_WBOOT:
+			/* todo */
+			break;
+
+		case BIOS_CONST:  cpm80_serial_device_status(cpu, con); break;
+		case BIOS_LISTST: cpm80_serial_device_status(cpu, lst); break;
+
+		case BIOS_CONIN:  cpm80_serial_device_in(cpu, con); break;
+		case BIOS_CONOUT: cpm80_serial_device_out(cpu, con); break;
+		case BIOS_LIST:   cpm80_serial_device_out(cpu, lst); break;
+		case BIOS_PUNCH:  cpm80_serial_device_out(cpu, pun); break;
+		case BIOS_READER: cpm80_serial_device_in(cpu, rdr); break;
+
+		case BIOS_SELDSK: cpm80_select_disk(vm, cpu->c); break;
+		case BIOS_HOME:   cpm80_disk_set_track(vm, vm->selected_disk, 0); break;
+		case BIOS_SETTRK: cpm80_disk_set_track(vm, vm->selected_disk, cpm80_bios_get_args_bc(cpu)); break;
+		case BIOS_SETSEC: cpm80_disk_set_sector(vm, vm->selected_disk, cpm80_bios_get_args_bc(cpu)); break;
+
+		case BIOS_SETDMA: vm->disk_dma_addr = (cpm80_addr_t)cpm80_bios_get_args_bc(cpu); break;
+
+		case BIOS_READ:    cpm80_disk_read(vm, vm->selected_disk); break;
+		case BIOS_WRITE:   cpm80_disk_write(vm, vm->selected_disk); break;
+		case BIOS_SECTRAN: cpm80_disk_sectran(vm); break;
+
+		default: err = 1; /* unrecognized BIOS call */
+	}
+
+	return err;
 }
 
 static void write_zeros(struct cpm80_vm *const vm, cpm80_addr_t buf, unsigned long buflen)
