@@ -1,21 +1,23 @@
 
-#include "i8080.h"
 #include "cpm80_vm.h"
 #include "cpm80_devices.h"
 #include "cpm80_bios.h"
+#include "i8080.h"
+#include "i8080_opcodes.h"
 
 #define lsbit(buf) (buf & (unsigned)1) 
 #define concatenate(byte1, byte2) ((unsigned)(byte1) << 8 | byte2)
 
-#define cpm80_bios_get_args_bc(cpu) concatenate((cpu)->b, (cpu)->c)
-#define cpm80_bios_get_args_de(cpu) concatenate((cpu)->d, (cpu)->e)
+#define get_bios_args_bc(cpu) concatenate((cpu)->b, (cpu)->c)
+#define get_bios_args_de(cpu) concatenate((cpu)->d, (cpu)->e)
 
-static inline void cpm80_bios_set_return_hl(struct i8080 *const cpu, unsigned val)
+static inline void set_bios_return_hl(struct i8080 *const cpu, unsigned val)
 {
 	cpu->h = (i8080_word_t)((val & 0xff00) >> 8);
 	cpu->l = (i8080_word_t)(val & 0xff);
 }
 
+#define cpm80_serial_device_init(ldev)     ((ldev)->init((ldev)->dev))
 #define cpm80_serial_device_in(cpu, ldev)  ((cpu)->a = (i8080_word_t)((ldev)->in((ldev)->dev)))
 #define cpm80_serial_device_out(cpu, ldev) ((ldev)->out((ldev)->dev, (char)((cpu)->c)))
 
@@ -26,7 +28,7 @@ static inline void cpm80_serial_device_status(struct i8080 *const cpu, struct cp
 	else cpu->a = 0x00;
 }
 
-static inline void cpm80_set_disk_exitcode(struct i8080 *const cpu, int exitcode)
+static inline void set_exitcode(struct i8080 *const cpu, int exitcode)
 {
 	switch (exitcode)
 	{
@@ -35,7 +37,7 @@ static inline void cpm80_set_disk_exitcode(struct i8080 *const cpu, int exitcode
 	}
 }
 
-static inline void cpm80_select_disk(struct cpm80_vm *const vm, int disknum)
+static inline void cpm80_disk_select(struct cpm80_vm *const vm, int disknum)
 {
 	int err;
 	struct cpm80_disk_device *disk = &vm->disks[disknum];
@@ -46,12 +48,12 @@ static inline void cpm80_select_disk(struct cpm80_vm *const vm, int disknum)
 	}
 
 	if (err) {
-		cpm80_bios_set_return_hl(vm->cpu, 0);
+		set_bios_return_hl(vm->cpu, 0);
 		return;
 	}
 
-	cpm80_bios_set_return_hl(vm->cpu, disk->dph_addr);
-	vm->selected_disk = disknum;
+	set_bios_return_hl(vm->cpu, disk->dph_addr);
+	vm->sel_disk = disknum;
 }
 
 static inline void cpm80_disk_set_track(struct cpm80_vm *const vm, int disknum, unsigned track)
@@ -74,11 +76,11 @@ static inline void cpm80_disk_read(struct cpm80_vm *const vm, int disknum)
 	char buf[128];
 	err = disk->readl(disk->dev, buf);
 
-	cpm80_set_disk_exitcode(vm->cpu, err);
+	set_exitcode(vm->cpu, err);
 	if (err) return;
 
 	unsigned long i;
-	unsigned long start = (unsigned long)vm->disk_dma_addr, end = start + 128;
+	unsigned long start = (unsigned long)vm->dma_addr, end = start + 128;
 	for (i = start; i < end; ++i) {
 		vm->cpu->memory_write((i8080_addr_t)i, buf[i]);
 	}
@@ -91,33 +93,124 @@ static inline void cpm80_disk_write(struct cpm80_vm *vm, int disknum)
 
 	char buf[128];
 	unsigned long i;
-	unsigned long start = (unsigned long)vm->disk_dma_addr, end = start + 128;
+	unsigned long start = (unsigned long)vm->dma_addr, end = start + 128;
 	for (i = start; i < end; ++i) {
-		buf[i] = vm->cpu->memory_read((i8080_addr_t)i);
+		buf[i] = (char)vm->cpu->memory_read((i8080_addr_t)i);
 	}
 
 	err = disk->writel(disk->dev, buf, (int)vm->cpu->c);
-	cpm80_set_disk_exitcode(vm->cpu, err);
+	set_exitcode(vm->cpu, err);
 }
 
 static inline void cpm80_disk_sectran(struct cpm80_vm *vm)
 {
-	unsigned lsector = cpm80_bios_get_args_bc(vm->cpu);
-	unsigned sectran_table_ptr = cpm80_bios_get_args_de(vm->cpu);
+	unsigned lsector = get_bios_args_bc(vm->cpu);
+	unsigned sectran_table_ptr = get_bios_args_de(vm->cpu);
 
 	unsigned psector;
 	if (sectran_table_ptr == 0) {
-		/* If the table ptr is NULL, this function should never have been called.
-		 * But the BDOS has a bug where this is not validated before being passed to SECTRAN:
+		/* If the table ptr is NULL, the BDOS should never have called this function.
+		 * But it has a bug where it does not always verify the table before calling SECTRAN:
 		 * http://cpuville.com/Code/CPM-on-a-new-computer.html
 		 * Return the sector number without translation. */
 		psector = lsector;
 	} else {
-		psector = vm->cpu->memory_read((i8080_addr_t)(sectran_table_ptr + lsector));
+		psector = (unsigned)vm->cpu->memory_read((i8080_addr_t)(sectran_table_ptr + lsector));
 	}
 
-	cpm80_bios_set_return_hl(vm->cpu, psector);
+	set_bios_return_hl(vm->cpu, psector);
 }
+
+/* strcpy, but returns pointer to end of dest and sets length. */
+static inline char *kstrcpy_end(char *dest, const char *src, unsigned *length)
+{
+	unsigned l = 0;
+	while (*src != '\0') {
+		*dest = *src;
+		src++; dest++; l++;
+	}
+	*dest = '\0';
+	*length = l;
+	return dest;
+}
+
+/* unsigned value to string, base 10 */
+static inline char *kutoa10(unsigned value, char *dest)
+{
+	char *odest = dest;
+
+	/* Extract each digit (units first)
+	   and append to string as ascii */
+	unsigned digit;
+	while (value != 0) {
+		digit = value % 10;
+		*dest = digit + '0';
+		value /= 10;
+		dest++;
+	}
+	*dest = '\0';
+
+	/* reverse string so units is last */
+	char temp;
+	char *start = odest, *end = dest - 1;
+	while (start < end) {
+		temp = *start;
+		*start = *end;
+		*end = temp;
+		start++; end--;
+	}
+
+	return odest;
+}
+
+/* bounds aren't checked on the args -> should only be as many args as format specifiers! */
+static inline int ksprintf_stronly(char *dest, const char *format, char const *const *args)
+{
+	unsigned nchars = 0;
+
+	char fc; unsigned arglen;
+	while ((fc = *format) != '\0') {
+		if (fc == '%') {
+			/* increment format assuming we always chomp the next character */
+			switch (fc = *format++)
+			{
+				/* %% escapes % */
+				case '%':
+					*dest = fc;
+					dest++; nchars++;
+					break;
+
+				case 's':
+					dest = kstrcpy_end(dest, *args, &arglen);
+					nchars += arglen; args++;
+					break;
+
+				/* not supported */
+				default: return -1;
+			}
+		} else {
+			/* no formatting */
+			*dest = fc;
+			dest++; nchars++;
+		}
+		format++;
+	}
+	*dest = '\0';
+
+	return (int)nchars;
+}
+
+/* Assumes console device is initialized and ready! */
+static inline void kputs(struct cpm80_serial_device *con, char *msg)
+{
+	char c;
+	while ((c = *msg) != '\0') {
+		con->out(con->dev, c);
+		msg++;
+	}
+}
+
+static const char BOOT_signon_fmt[] = "github.com/mayawarrier/intel8080-emulator\r\n%sK CP/M VERS %s";
 
 int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 {
@@ -130,13 +223,45 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 	switch (call_code)
 	{
 		case BIOS_BOOT:
-			/* todo */
-			break;
+		{
+			char memsize_str[3]; char signon_str[64];
+
+			/* initialize attached devices */
+			if (con) cpm80_serial_device_init(con);
+			if (lst) cpm80_serial_device_init(lst);
+			if (pun) cpm80_serial_device_init(pun);
+			if (rdr) cpm80_serial_device_init(rdr);
+
+			/* print signon message */
+			kutoa10((unsigned)vm->memsize, memsize_str);
+			char *fargs[] = { memsize_str, CPM_BIOS_VERSION };
+			ksprintf_stronly(signon_str, BOOT_signon_fmt, fargs);
+			kputs(con, signon_str);
+
+			/* C must be set to 0 to select disk 0/drive A as the boot drive.
+			 * CP/M 2.2 Alteration guide, pg 17:
+			 * https://archive.org/details/bitsavers_digitalResationGuide1979_3864305/page/n19/mode/2up */
+			cpu->c = 0;
+		}
 
 		case BIOS_WBOOT:
-			/* todo */
-			break;
+		{
+			/* Create wboot and bdos entry points at 0x0 and 0x5 for user code */
+			cpm80_addr_t wboot_entry = vm->cpm_origin + 0x1603;
+			cpu->memory_write(0x0000, i8080_JMP);
+			cpu->memory_write(0x0001, (i8080_word_t)(wboot_entry & 0xff));
+			cpu->memory_write(0x0002, (i8080_word_t)((wboot_entry & 0xff00) >> 8));
+			cpm80_addr_t bdos_entry = vm->cpm_origin + 0x0806;
+			cpu->memory_write(0x0005, i8080_JMP);
+			cpu->memory_write(0x0006, (i8080_word_t)(bdos_entry & 0xff));
+			cpu->memory_write(0x0007, (i8080_word_t)((bdos_entry & 0xff00) >> 8));
 
+			/* jump to CP/M command processor */
+			cpu->pc = (i8080_addr_t)vm->cpm_origin;
+
+			break;
+		}
+			
 		case BIOS_CONST:  cpm80_serial_device_status(cpu, con); break;
 		case BIOS_LISTST: cpm80_serial_device_status(cpu, lst); break;
 
@@ -146,15 +271,15 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 		case BIOS_PUNCH:  cpm80_serial_device_out(cpu, pun); break;
 		case BIOS_READER: cpm80_serial_device_in(cpu, rdr); break;
 
-		case BIOS_SELDSK: cpm80_select_disk(vm, cpu->c); break;
-		case BIOS_HOME:   cpm80_disk_set_track(vm, vm->selected_disk, 0); break;
-		case BIOS_SETTRK: cpm80_disk_set_track(vm, vm->selected_disk, cpm80_bios_get_args_bc(cpu)); break;
-		case BIOS_SETSEC: cpm80_disk_set_sector(vm, vm->selected_disk, cpm80_bios_get_args_bc(cpu)); break;
+		case BIOS_SELDSK: cpm80_disk_select(vm, cpu->c); break;
+		case BIOS_HOME:   cpm80_disk_set_track(vm, vm->sel_disk, 0); break;
+		case BIOS_SETTRK: cpm80_disk_set_track(vm, vm->sel_disk, get_bios_args_bc(cpu)); break;
+		case BIOS_SETSEC: cpm80_disk_set_sector(vm, vm->sel_disk, get_bios_args_bc(cpu)); break;
 
-		case BIOS_SETDMA: vm->disk_dma_addr = (cpm80_addr_t)cpm80_bios_get_args_bc(cpu); break;
+		case BIOS_SETDMA: vm->dma_addr = (cpm80_addr_t)get_bios_args_bc(cpu); break;
 
-		case BIOS_READ:    cpm80_disk_read(vm, vm->selected_disk); break;
-		case BIOS_WRITE:   cpm80_disk_write(vm, vm->selected_disk); break;
+		case BIOS_READ:    cpm80_disk_read(vm, vm->sel_disk); break;
+		case BIOS_WRITE:   cpm80_disk_write(vm, vm->sel_disk); break;
 		case BIOS_SECTRAN: cpm80_disk_sectran(vm); break;
 
 		default: err = 1; /* unrecognized BIOS call */
@@ -163,7 +288,7 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 	return err;
 }
 
-static void write_zeros(struct cpm80_vm *const vm, cpm80_addr_t buf, unsigned long buflen)
+static inline void write_zeros(struct cpm80_vm *const vm, cpm80_addr_t buf, unsigned long buflen)
 {
 	unsigned long i;
 	const unsigned long end = (unsigned long)buf + buflen;
@@ -317,7 +442,7 @@ static unsigned write_alv_csv(struct cpm80_vm *vm, struct disk_params *params,
 }
 
 /* Euclid's GCD algorithm */
-static inline unsigned greatest_common_divisor(unsigned a, unsigned b)
+static unsigned greatest_common_divisor(unsigned a, unsigned b)
 {
 	/* divide by the remainder till we can divide no more */
 	unsigned rem;
@@ -342,6 +467,7 @@ write_sector_translate_table(struct cpm80_vm *const vm, struct disk_params *para
 	unsigned skew = params->skf;
 	unsigned sectors = param_block->spt;
 	unsigned sector_offset = params->fsc;
+
 	/* Number of sector mappings to generate before we start overlapping previously mapped sectors.
 	 * For eg. with spt=72 and skf=10:
 	 * 0,10,20,...70,8,18,...68,6,16,...66,4,14,...64,2,12,...62,0,10...

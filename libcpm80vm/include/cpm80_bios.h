@@ -1,5 +1,5 @@
 /*
- * CP/M BIOS helpers.
+ * CP/M BIOS.
  *
  * The following resources were useful:
  * - http://www.gaby.de/cpm/manuals/archive/cpm22htm/axa.asm (Intel MDS-800 I/O drivers in 8080 assembly)
@@ -16,11 +16,17 @@
 
 #include "cpm80_types.h"
 
+#define CPM_BIOS_VERSION "2.2"
+
 struct cpm80_vm;
 
-/* Cold boot: Initializes devices and hardware then jumps to warm boot. */
+/* Cold boot:
+ * The first routine to get control after the bootloader.
+ * Initializes devices, prints a signon message, selects boot disk 0, then falls into warm boot. */
 #define BIOS_BOOT		(0)
-/* Warm boot: Terminates running program, reloads CP/M from disk, and starts processing commands. */
+/* Warm boot: 
+ * Reloads CP/M from selected disk (terminating the current program), sets up system parameters 
+ * and starts processing commands. */
 #define BIOS_WBOOT		(1)
 /* Console status: Returns 0x00 in A if a character is waiting to be read from console, else 0xFF. */
 #define BIOS_CONST		(2)
