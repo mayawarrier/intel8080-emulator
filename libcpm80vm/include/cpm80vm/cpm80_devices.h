@@ -4,6 +4,10 @@
 
 #include "cpm80_types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* CP/M logical serial device */
 struct cpm80_serial_device 
 {
@@ -53,5 +57,9 @@ struct cpm80_disk_device
 	 */
 	int(*writel)(void *dev, char buf[128], int deblock_code);
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CPM80_DEVICES_H */

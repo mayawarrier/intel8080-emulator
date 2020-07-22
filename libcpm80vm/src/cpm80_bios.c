@@ -1,9 +1,10 @@
 
-#include "cpm80_vm.h"
-#include "cpm80_devices.h"
-#include "cpm80_bios.h"
 #include "i8080.h"
 #include "i8080_opcodes.h"
+#include "cpm80_devices.h"
+#include "cpm80_vm.h"
+#include "cpm80_bios_callcodes.h"
+#include "cpm80_bios.h"
 
 #define lsbit(buf) (buf & (unsigned)1) 
 #define concatenate(byte1, byte2) ((unsigned)(byte1) << 8 | byte2)
@@ -109,8 +110,8 @@ static inline void cpm80_disk_sectran(struct cpm80_vm *vm)
 
 	unsigned psector;
 	if (sectran_table_ptr == 0) {
-		/* If the table ptr is NULL, the BDOS should never have called this function.
-		 * But it has a bug where it does not always verify the table before calling SECTRAN:
+		/* If the table ptr is 0, the BDOS should never have called this function.
+		 * However this is a bug; the BDOS does not always verify the table first:
 		 * http://cpuville.com/Code/CPM-on-a-new-computer.html
 		 * Return the sector number without translation. */
 		psector = lsector;
@@ -122,7 +123,7 @@ static inline void cpm80_disk_sectran(struct cpm80_vm *vm)
 }
 
 /* strcpy, but returns pointer to end of dest and sets length. */
-static inline char *kstrcpy_end(char *dest, const char *src, unsigned *length)
+static inline char *kstrcpy_getlen(char *dest, const char *src, unsigned *length)
 {
 	unsigned l = 0;
 	while (*src != '\0') {
@@ -138,7 +139,6 @@ static inline char *kstrcpy_end(char *dest, const char *src, unsigned *length)
 static inline char *kutoa10(unsigned value, char *dest)
 {
 	char *odest = dest;
-
 	/* Extract each digit (units first)
 	   and append to string as ascii */
 	unsigned digit;
@@ -159,12 +159,12 @@ static inline char *kutoa10(unsigned value, char *dest)
 		*end = temp;
 		start++; end--;
 	}
-
 	return odest;
 }
 
-/* bounds aren't checked on the args -> should only be as many args as format specifiers! */
-static inline int ksprintf_stronly(char *dest, const char *format, char const *const *args)
+/* Supports only %u and %s.
+ * Bounds aren't checked on the args -> should only be as many args as format specifiers! */
+static inline int ksprintf(char *dest, const char *format, void const *const *args)
 {
 	unsigned nchars = 0;
 
@@ -180,8 +180,17 @@ static inline int ksprintf_stronly(char *dest, const char *format, char const *c
 					dest++; nchars++;
 					break;
 
+				case 'u':
+				{
+					char ustr[6]; /* assume max 16-bit value*/
+					kutoa10(*args, ustr);
+					dest = kstrcpy_getlen(dest, ustr, &arglen);
+					nchars += arglen; args++;
+					break;
+				}
+
 				case 's':
-					dest = kstrcpy_end(dest, *args, &arglen);
+					dest = kstrcpy_getlen(dest, *args, &arglen);
 					nchars += arglen; args++;
 					break;
 
@@ -210,7 +219,7 @@ static inline void kputs(struct cpm80_serial_device *con, char *msg)
 	}
 }
 
-static const char BOOT_signon_fmt[] = "github.com/mayawarrier/intel8080-emulator\r\n%sK CP/M VERS %s";
+static const char BOOT_signon_fmt[] = "github.com/mayawarrier/intel8080-emulator\r\n%uK CP/M VERS %s";
 
 int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 {
@@ -224,7 +233,7 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 	{
 		case BIOS_BOOT:
 		{
-			char memsize_str[3]; char signon_str[64];
+			char signon_str[64];
 
 			/* initialize attached devices */
 			if (con) cpm80_serial_device_init(con);
@@ -233,9 +242,8 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 			if (rdr) cpm80_serial_device_init(rdr);
 
 			/* print signon message */
-			kutoa10((unsigned)vm->memsize, memsize_str);
-			char *fargs[] = { memsize_str, CPM_BIOS_VERSION };
-			ksprintf_stronly(signon_str, BOOT_signon_fmt, fargs);
+			void *fargs[] = { vm->memsize, CPM_BIOS_VERSION };
+			ksprintf(signon_str, BOOT_signon_fmt, fargs);
 			kputs(con, signon_str);
 
 			/* C must be set to 0 to select disk 0/drive A as the boot drive.
