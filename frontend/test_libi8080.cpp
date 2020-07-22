@@ -4,7 +4,6 @@
 #include <csetjmp>
 
 #include <string>
-#include <algorithm>
 #include <limits>
 #include <iostream>
 #include <fstream>
@@ -57,7 +56,7 @@ static i8080_word_t fatal_interrupt_read(void) {
 
 struct cpm {
 	struct i8080 cpu;
-	struct i8080_debugger debugger;
+	struct i8080_monitor monitor;
 	int num_wboot; // number of calls to CP/M warm boot
 };
 
@@ -138,9 +137,8 @@ static void setup_cpm_environment(struct cpm& vm)
 	vm.cpu.io_write = fatal_io_write;
 
 	// triggered by RST 7 (0xff)
-	vm.debugger.on_breakpoint = cpm_call;
-	vm.cpu.debugger = &vm.debugger;
-	vm.cpu.debugger_is_attached = 1;
+	vm.monitor.enter_monitor = cpm_call;
+	vm.cpu.monitor = &vm.monitor;
 
 	vm.num_wboot = 0;
 	vm.cpu.udata = &vm;
@@ -159,6 +157,7 @@ static void setup_cpm_environment(struct cpm& vm)
 
 static void setup_normal_environment(struct i8080& cpu)
 {
+	cpu.monitor = 0;
 	cpu.memory_read = memory_read;
 	cpu.memory_write = memory_write;
 
@@ -223,29 +222,22 @@ static void overwrite_memory(struct i8080& cpu, i8080_addr_t dest, i8080_word_t 
 
 static int run_emulator(struct i8080& cpu)
 {
-	int err = 0;
-	while (1) {
-		err = i8080_next(&cpu);
-		if (err) break;
-	}
-	if (err == libi8080_EXIT) {
-		return 0;
-	}
+	int err;
+	while (!(err = i8080_next(&cpu)));
+	if (err == libi8080_EXIT) return 0;
 	return err;
 }
 
 static int run_emulator_synchronizable(struct i8080& cpu, std::atomic_flag& lock)
 {
-	int err = 0;
+	int err;
 	while (1) {
 		while (lock.test_and_set(std::memory_order_acquire));
 		err = i8080_next(&cpu);
 		if (err) break;
 		lock.clear(std::memory_order_release);
 	}
-	if (err == libi8080_EXIT) {
-		return 0;
-	}
+	if (err == libi8080_EXIT) return 0;
 	return err;
 }
 
@@ -308,7 +300,7 @@ static inline i8080_dbl_word_t concatenate(i8080_word_t w1, i8080_word_t w2) {
 }
 
 // dump debug info
-static void i8080_dump_stats(struct i8080& i8080)
+void i8080_dump_stats(struct i8080& i8080)
 {
 	std::printf("\nDebug information:\n");
 	std::printf("PC: 0x%04x\n", i8080.pc);
@@ -356,7 +348,7 @@ static const std::string TST8080_COM = "tests/TST8080.COM";
 static const std::string CPUTEST_COM = "tests/CPUTEST.COM";
 static const std::string INTERRUPTS_COM = "tests/INTERRUPT.COM";
 
-int run_TST8080_COM(struct cpm& vm, int testnum)
+static int run_TST8080_COM(struct cpm& vm, int testnum)
 {
 	std::cout << "\nTest " << testnum << ": TST8080.COM\n";
 	std::cout << "8080/8085 CPU Diagnostic, Kelly Smith, 1980";
@@ -366,7 +358,7 @@ int run_TST8080_COM(struct cpm& vm, int testnum)
 	return err;
 }
 
-int run_CPUTEST_COM(struct cpm& vm, int testnum)
+static int run_CPUTEST_COM(struct cpm& vm, int testnum)
 {
 	std::cout << "\nTest " << testnum << ": CPUTEST.COM\n";
 	std::cout << "Supersoft Associates CPU test, Diagnostics II suite, 1981";
@@ -376,7 +368,7 @@ int run_CPUTEST_COM(struct cpm& vm, int testnum)
 	return err;
 }
 
-int run_INTERRUPTS_COM(struct cpm& vm, int testnum)
+static int run_INTERRUPTS_COM(struct cpm& vm, int testnum)
 {
 	std::cout << "\nTest " << testnum << ": INTERRUPT.COM\n";
 	std::cout << "Spins for 5s until interrupted.";
@@ -386,7 +378,7 @@ int run_INTERRUPTS_COM(struct cpm& vm, int testnum)
 	return err;
 }
 
-int run_default_tests()
+int i8080_run_default_tests()
 {
 	struct cpm vm;
 	setup_cpm_environment(vm);
@@ -416,7 +408,7 @@ int run_default_tests()
 	return num_tests_passed == num_default_tests ? 0 : -1;
 }
 
-int run_user_test(std::string test_path)
+int i8080_run_user_test(std::string test_path)
 {
 	bool is_TST8080_COM = test_path == TST8080_COM;
 	bool is_CPUTEST_COM = test_path == CPUTEST_COM;
@@ -450,33 +442,4 @@ int run_user_test(std::string test_path)
 	}
 
 	return load_and_run(i8080, test_path, 0x0000, libi8080_K64);
-}
-
-int main(int argc, char** argv)
-{
-	int err;
-	std::string test_path;
-
-	// change for platform or usage
-	const int argmax = 5;
-	const int args_start_at = 1;
-
-	if (argv && argc >= args_start_at) {
-		for (int i = args_start_at; i < std::min(argc, argmax); ++i) {
-			if (argv[i]) {
-				// use the first valid string
-				test_path = argv[i];
-				break;
-			}
-		}
-	}
-
-	if (test_path.empty()) {
-		err = run_default_tests();
-	} else {
-		err = run_user_test(test_path);
-	}
-
-	if (err) return EXIT_FAILURE;
-	else return EXIT_SUCCESS;
 }
