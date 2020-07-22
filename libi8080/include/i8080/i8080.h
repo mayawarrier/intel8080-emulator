@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-struct i8080_debugger;
+struct i8080_monitor;
 
 struct i8080
 {
@@ -49,27 +49,26 @@ struct i8080
 	/* Clock cycles since reset */
 	unsigned long cycles;
 
-	struct i8080_debugger *debugger;
-	int debugger_is_attached;
+	/* Set to 0 if not used */
+	struct i8080_monitor *monitor;
 
 	/* User data */
 	void *udata;
 };
 
-struct i8080_debugger
+struct i8080_monitor
 {
-	/* Attach a debug routine to be called 
-	 * when a breakpoint is hit (RST 7). 
-	 * Return non-zero to signal an error.
-	 * i8080_next()/i8080_exec() will
+	/* Attach a routine to be called
+	 * on RST 7. Returning non-zero will
+	 * cause i8080_next()/i8080_exec() to
 	 * exit with this error code. */
-	int(*on_breakpoint)(struct i8080 *);
+	int(*enter_monitor)(struct i8080 *);
 };
 
 /*
  * Resets the CPU.
  * PC is set to 0, CPU comes out of HALT, cycles is reset.
- * No working registers or flags are affected.
+ * No other registers or flags are affected.
  * Equivalent to pulling RESET pin low.
  */
 void i8080_reset(struct i8080 *const cpu);
@@ -82,7 +81,7 @@ void i8080_reset(struct i8080 *const cpu);
 int i8080_next(struct i8080 *const cpu);
 
 /*
- * Executes a given opcode.
+ * Executes an opcode.
  * Updates cycle count, registers and flags.
  * Returns 0 if execution is successful.
  */

@@ -25,11 +25,13 @@ if (BUILD_CMDLINE)
 endif()
 
 add_subdirectory(libi8080)
-add_subdirectory(libcpm80vm)
+#add_subdirectory(libcpm80vm)
 
 if (BUILD_CMDLINE)
-	add_executable(${EXE_NAME} frontend/test.cpp)
-	target_link_libraries(${EXE_NAME} cpm80vm)
+	add_executable(${EXE_NAME} frontend/test_libi8080.cpp frontend/main.cpp)
+	target_include_directories(${EXE_NAME} PRIVATE frontend/include)
+	#target_link_libraries(${EXE_NAME} cpm80vm)
+	target_link_libraries(${EXE_NAME} i8080)
 	file(COPY libi8080/tests DESTINATION ${CMAKE_BINARY_DIR})
 endif()
 

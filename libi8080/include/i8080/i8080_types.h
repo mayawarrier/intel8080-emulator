@@ -13,12 +13,12 @@ extern "C" {
  * I8080_WORD = at least 8 bits
  * I8080_DBL_WORD = at least 16 bits
  * MSVC doesn't consistently support chars beyond version 1300
- * so fall back on Microsoft type instead.
+ * so fall back on Microsoft types instead.
  * https://github.com/libgit2/libgit2/blob/master/include/git2/stdint.h
  */
 #if defined(_MSC_VER) && (_MSC_VER >= 1300)
 #define I8080_WORD unsigned __int8
-#define I8080_DBL_WORD unsigned int
+#define I8080_DBL_WORD unsigned __int16
 #else
 #define I8080_WORD unsigned char
 #define I8080_DBL_WORD unsigned int

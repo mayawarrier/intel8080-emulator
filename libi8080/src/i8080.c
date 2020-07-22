@@ -197,61 +197,6 @@ static inline i8080_addr_t i8080_advance_read_addr(struct i8080 *const cpu) {
 	return (i8080_addr_t)concatenate(hi_addr, lo_addr);
 }
 
-/* Return pointers to the left and right registers for a mov operation. */
-static inline void i8080_mov_get_reg_pair(struct i8080 *const cpu, i8080_word_t opcode, i8080_word_t *left[1], i8080_word_t *right[1])
-{
-	i8080_word_t lo_opcode = opcode & 0x0f;
-	i8080_word_t hi_opcode = opcode & 0xf0;
-
-	switch (lo_opcode) {
-		case 0x00: case 0x08:
-			*right = &cpu->b; break;
-		case 0x01: case 0x09:
-			*right = &cpu->c; break;
-		case 0x02: case 0x0a:
-			*right = &cpu->d; break;
-		case 0x03: case 0x0b:
-			*right = &cpu->e; break;
-		case 0x04: case 0x0c:
-			*right = &cpu->h; break;
-		case 0x05: case 0x0d:
-			*right = &cpu->l; break;
-		case 0x07: case 0x0f:
-			*right = &cpu->a; break;
-		default: break;
-	}
-
-	switch (hi_opcode) {
-		case 0x40:
-			if (lo_opcode <= 0x07) {
-				*left = &cpu->b;
-			} else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
-				*left = &cpu->c;
-			}
-			break;
-		case 0x50:
-			if (lo_opcode <= 0x07) {
-				*left = &cpu->d;
-			} else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
-				*left = &cpu->e;
-			}
-			break;
-		case 0x60:
-			if (lo_opcode <= 0x07) {
-				*left = &cpu->h;
-			} else if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
-				*left = &cpu->l;
-			}
-			break;
-		case 0x70:
-			if (lo_opcode >= 0x08 && lo_opcode <= 0x0f) {
-				*left = &cpu->a;
-			}
-			break;
-		default: break;
-	}
-}
-
 /* Perform an add to accumulator and update flags. */
 static void i8080_add(struct i8080 *const cpu, i8080_word_t word) {
 	/* Do the addition in a larger type to preserve carry */
@@ -499,11 +444,8 @@ static inline void i8080_out(struct i8080 *const cpu) {
 	cpu->io_write((i8080_addr_t)concatenate(port_addr, port_addr), cpu->a);
 }
 
-
 void i8080_interrupt(struct i8080 *const cpu) {
-	if (cpu->inte && !cpu->intr) {
-		cpu->intr = 1;
-	}
+	cpu->intr = cpu->inte;
 }
 
 void i8080_reset(struct i8080 *const cpu) {
@@ -519,7 +461,7 @@ int i8080_next(struct i8080 *const cpu) {
 	i8080_word_t opcode;
 
 	/* Service interrupt if pending request exists */
-	if (cpu->inte && cpu->intr) {
+	if (cpu->intr) {
 		opcode = trim_to_word(cpu->interrupt_read());
 		/* disable interrupts and bring out of halt */
 		cpu->inte = 0;
@@ -554,20 +496,21 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 			break;
 
 		/* Move between registers */
-		case i8080_MOV_B_B: case i8080_MOV_B_C: case i8080_MOV_B_D: case i8080_MOV_B_E: case i8080_MOV_B_H: case i8080_MOV_B_L: case i8080_MOV_B_A:
-		case i8080_MOV_C_B: case i8080_MOV_C_C: case i8080_MOV_C_D: case i8080_MOV_C_E: case i8080_MOV_C_H: case i8080_MOV_C_L: case i8080_MOV_C_A:
-		case i8080_MOV_D_B: case i8080_MOV_D_C: case i8080_MOV_D_D: case i8080_MOV_D_E: case i8080_MOV_D_H: case i8080_MOV_D_L: case i8080_MOV_D_A:
-		case i8080_MOV_E_B: case i8080_MOV_E_C: case i8080_MOV_E_D: case i8080_MOV_E_E: case i8080_MOV_E_H: case i8080_MOV_E_L: case i8080_MOV_E_A:
-		case i8080_MOV_H_B: case i8080_MOV_H_C: case i8080_MOV_H_D: case i8080_MOV_H_E: case i8080_MOV_H_H: case i8080_MOV_H_L: case i8080_MOV_H_A:
-		case i8080_MOV_L_B: case i8080_MOV_L_C: case i8080_MOV_L_D: case i8080_MOV_L_E: case i8080_MOV_L_H: case i8080_MOV_L_L: case i8080_MOV_L_A:
-		case i8080_MOV_A_B: case i8080_MOV_A_C: case i8080_MOV_A_D: case i8080_MOV_A_E: case i8080_MOV_A_H: case i8080_MOV_A_L: case i8080_MOV_A_A:
-		{
-			/* get register pair and perform move */
-			i8080_word_t *left_pptr[1], *right_pptr[1];
-			i8080_mov_get_reg_pair(cpu, opcode, left_pptr, right_pptr);
-			*(*left_pptr) = *(*right_pptr);
-			break;
-		}
+		case i8080_MOV_B_C: cpu->b = cpu->c; break; case i8080_MOV_B_D: cpu->b = cpu->d; break; case i8080_MOV_B_E: cpu->b = cpu->e; break;
+		case i8080_MOV_B_H: cpu->b = cpu->h; break; case i8080_MOV_B_L: cpu->b = cpu->l; break; case i8080_MOV_B_A: cpu->b = cpu->a; break;
+		case i8080_MOV_C_B: cpu->c = cpu->b; break; case i8080_MOV_C_D: cpu->c = cpu->d; break; case i8080_MOV_C_E: cpu->c = cpu->e; break;
+		case i8080_MOV_C_H: cpu->c = cpu->h; break; case i8080_MOV_C_L: cpu->c = cpu->l; break; case i8080_MOV_C_A: cpu->c = cpu->a; break;
+		case i8080_MOV_D_C: cpu->d = cpu->c; break; case i8080_MOV_D_B: cpu->d = cpu->b; break; case i8080_MOV_D_E: cpu->d = cpu->e; break;
+		case i8080_MOV_D_H: cpu->d = cpu->h; break; case i8080_MOV_D_L: cpu->d = cpu->l; break; case i8080_MOV_D_A: cpu->d = cpu->a; break;
+		case i8080_MOV_E_C: cpu->e = cpu->c; break; case i8080_MOV_E_D: cpu->e = cpu->d; break; case i8080_MOV_E_B: cpu->e = cpu->b; break;
+		case i8080_MOV_E_H: cpu->e = cpu->h; break; case i8080_MOV_E_L: cpu->e = cpu->l; break; case i8080_MOV_E_A: cpu->e = cpu->a; break;
+		case i8080_MOV_H_C: cpu->h = cpu->c; break; case i8080_MOV_H_D: cpu->h = cpu->d; break; case i8080_MOV_H_E: cpu->h = cpu->e; break;
+		case i8080_MOV_H_B: cpu->h = cpu->b; break; case i8080_MOV_H_L: cpu->h = cpu->l; break; case i8080_MOV_H_A: cpu->h = cpu->a; break;
+		case i8080_MOV_L_C: cpu->l = cpu->c; break; case i8080_MOV_L_D: cpu->l = cpu->d; break; case i8080_MOV_L_E: cpu->l = cpu->e; break;
+		case i8080_MOV_L_H: cpu->l = cpu->h; break; case i8080_MOV_L_B: cpu->l = cpu->b; break; case i8080_MOV_L_A: cpu->l = cpu->a; break;
+		case i8080_MOV_A_C: cpu->a = cpu->c; break; case i8080_MOV_A_D: cpu->a = cpu->d; break; case i8080_MOV_A_E: cpu->a = cpu->e; break;
+		case i8080_MOV_A_H: cpu->a = cpu->h; break; case i8080_MOV_A_L: cpu->a = cpu->l; break; case i8080_MOV_A_B: cpu->a = cpu->b; break;
+		case i8080_MOV_C_C: case i8080_MOV_D_D: case i8080_MOV_E_E: case i8080_MOV_H_H: case i8080_MOV_L_L: case i8080_MOV_A_A: break;
 
 		/* Move from memory to registers */
 		case i8080_MOV_B_M: cpu->b = i8080_memory_read_indirect(cpu); break;
@@ -762,38 +705,38 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		/* Subroutine calls */
 		case i8080_CALL: case i8080_ALT_CALL0: case i8080_ALT_CALL1: case i8080_ALT_CALL2:
 			i8080_call(cpu, 1); break;
-		case i8080_CNZ: i8080_call(cpu, !cpu->z); break;  /* CALL on !Z i.e. non-zero acc */
-		case i8080_CZ: i8080_call(cpu, cpu->z); break;    /* CALL on Z i.e. zero acc */
-		case i8080_CNC: i8080_call(cpu, !cpu->cy); break; /* CALL on !CY i.e. carry reset */
-		case i8080_CC: i8080_call(cpu, cpu->cy); break;   /* CALL on CY i.e. carry set */
-		case i8080_CPO: i8080_call(cpu, !cpu->p); break;  /* CALL on !P i.e. acc parity odd */
-		case i8080_CPE: i8080_call(cpu, cpu->p); break;   /* CALL on P i.e. acc parity even */
-		case i8080_CP:  i8080_call(cpu, !cpu->s); break;  /* CALL on !S i.e. acc positive */
-		case i8080_CM: i8080_call(cpu, cpu->s); break;    /* CALL on S i.e. acc negative */
+		case i8080_CNZ: i8080_call(cpu, !cpu->z); break;
+		case i8080_CZ: i8080_call(cpu, cpu->z); break;
+		case i8080_CNC: i8080_call(cpu, !cpu->cy); break;
+		case i8080_CC: i8080_call(cpu, cpu->cy); break;
+		case i8080_CPO: i8080_call(cpu, !cpu->p); break;
+		case i8080_CPE: i8080_call(cpu, cpu->p); break;
+		case i8080_CP:  i8080_call(cpu, !cpu->s); break;
+		case i8080_CM: i8080_call(cpu, cpu->s); break;
 
 		/* Subroutine returns */
 		case i8080_RET: case i8080_ALT_RET0:
 			i8080_ret(cpu, 1); break;
-		case i8080_RNZ: i8080_ret(cpu, !cpu->z); break;   /* RET on !Z i.e. non-zero acc */
-		case i8080_RZ: i8080_ret(cpu, cpu->z); break;     /* RET on Z i.e. zero acc */
-		case i8080_RNC: i8080_ret(cpu, !cpu->cy); break;  /* RET on !CY i.e. carry reset */
-		case i8080_RC: i8080_ret(cpu, cpu->cy); break;    /* RET on CY i.e. carry set */
-		case i8080_RPO: i8080_ret(cpu, !cpu->p); break;   /* RET on !P i.e. acc parity odd */
-		case i8080_RPE: i8080_ret(cpu, cpu->p); break;    /* RET on P i.e. acc parity even */
-		case i8080_RP: i8080_ret(cpu, !cpu->s); break;    /* RET on !S i.e. acc positive */
-		case i8080_RM: i8080_ret(cpu, cpu->s); break;     /* RET on S i.e. acc negative */
+		case i8080_RNZ: i8080_ret(cpu, !cpu->z); break;
+		case i8080_RZ: i8080_ret(cpu, cpu->z); break;
+		case i8080_RNC: i8080_ret(cpu, !cpu->cy); break;
+		case i8080_RC: i8080_ret(cpu, cpu->cy); break;
+		case i8080_RPO: i8080_ret(cpu, !cpu->p); break;
+		case i8080_RPE: i8080_ret(cpu, cpu->p); break;
+		case i8080_RP: i8080_ret(cpu, !cpu->s); break;
+		case i8080_RM: i8080_ret(cpu, cpu->s); break;
 
 		/* Jumps */
 		case i8080_JMP: case i8080_ALT_JMP0:
 			i8080_jmp(cpu, 1); break;
-		case i8080_JNZ: i8080_jmp(cpu, !cpu->z); break;    /* JMP on !Z i.e. non-zero acc */
-		case i8080_JZ: i8080_jmp(cpu, cpu->z); break;      /* JMP on Z i.e. zero acc */
-		case i8080_JNC: i8080_jmp(cpu, !cpu->cy); break;   /* JMP on !CY i.e. carry reset */
-		case i8080_JC: i8080_jmp(cpu, cpu->cy); break;     /* JMP on CY i.e. carry set */
-		case i8080_JPO: i8080_jmp(cpu, !cpu->p); break;    /* JMP on !P i.e. acc parity odd */
-		case i8080_JPE: i8080_jmp(cpu, cpu->p); break;     /* JMP on P i.e. acc parity even */
-		case i8080_JP: i8080_jmp(cpu, !cpu->s); break;     /* JMP on !S i.e. acc positive */
-		case i8080_JM: i8080_jmp(cpu, cpu->s); break;      /* JMP on S i.e. acc negative */
+		case i8080_JNZ: i8080_jmp(cpu, !cpu->z); break;
+		case i8080_JZ: i8080_jmp(cpu, cpu->z); break;
+		case i8080_JNC: i8080_jmp(cpu, !cpu->cy); break;
+		case i8080_JC: i8080_jmp(cpu, cpu->cy); break;
+		case i8080_JPO: i8080_jmp(cpu, !cpu->p); break;
+		case i8080_JPE: i8080_jmp(cpu, cpu->p); break;
+		case i8080_JP: i8080_jmp(cpu, !cpu->s); break;
+		case i8080_JM: i8080_jmp(cpu, cpu->s); break;
 
 		/* Special instructions */
 		case i8080_DAA: i8080_daa(cpu); break;                                           /* Decimal adjust acc (convert acc to BCD) */
@@ -817,14 +760,10 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_RST_4: i8080_call_addr(cpu, (i8080_addr_t)0x0020); break;
 		case i8080_RST_5: i8080_call_addr(cpu, (i8080_addr_t)0x0028); break;
 		case i8080_RST_6: i8080_call_addr(cpu, (i8080_addr_t)0x0030); break;
-		case i8080_RST_7: {
-			if (cpu->debugger_is_attached) {
-				err = cpu->debugger->on_breakpoint(cpu);
-			} else {
-				i8080_call_addr(cpu, (i8080_addr_t)0x0038);
-			}
+		case i8080_RST_7:
+			if (cpu->monitor) err = cpu->monitor->enter_monitor(cpu);
+			else i8080_call_addr(cpu, (i8080_addr_t)0x0038);
 			break;
-		}
 
 		/* Enable / disable interrupts */
 		case i8080_EI: cpu->inte = 1; break;
