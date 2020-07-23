@@ -2,7 +2,7 @@
 #ifndef CPM80_DEVICES_H
 #define CPM80_DEVICES_H
 
-#include "cpm80_types.h"
+#include "vm_types.h"
 
 #ifdef __cplusplus
 extern "C" {

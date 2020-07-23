@@ -1,11 +1,15 @@
 
 #include "i8080.h"
 #include "i8080_opcodes.h"
-#include "cpm80_devices.h"
-#include "cpm80_vm.h"
-#include "cpm80_bios_callcodes.h"
-#include "cpm80_bios.h"
-#include "cpm80_vm.h"
+#include "vm_devices.h"
+#include "vm_bios_callno.h"
+#include "vm_bios.h"
+#include "vm.h"
+
+#ifdef __STDC__
+	#define inline
+	#define volatile
+#endif
 
 #define MONITOR_ERR (30)
 

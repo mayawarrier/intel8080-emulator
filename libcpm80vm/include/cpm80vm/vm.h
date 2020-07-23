@@ -3,13 +3,12 @@
  *
  * To bring the VM to a startable state, call cpm80_vm_init() then
  * configure the serial and disk devices below.
- *
  */
 
 #ifndef CPM80_VM_H
 #define CPM80_VM_H
 
-#include "cpm80_types.h"
+#include "vm_types.h"
 
 #ifdef __cplusplus
 extern "C" {

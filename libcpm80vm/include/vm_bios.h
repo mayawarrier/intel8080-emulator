@@ -14,7 +14,7 @@
 #ifndef CPM80_BIOS_H
 #define CPM80_BIOS_H
 
-#include "cpm80_types.h"
+#include "vm_types.h"
 
 #define CPM_BIOS_VERSION "2.2"
 
