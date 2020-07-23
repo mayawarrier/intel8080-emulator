@@ -22,6 +22,8 @@ struct cpm80_disk_device;
 struct cpm80_vm 
 {
 	struct i8080 *cpu;
+	/* binds C functions to i8080 memory locations */
+	struct i8080_monitor cpu_mon;
 
 	/* Memory size in KB (up to 64) */
 	int memsize;
@@ -35,7 +37,7 @@ struct cpm80_vm
 	int(*bios_call)(struct cpm80_vm *const, int);
 
 	/* Serial devices.
-	 * Set to 0 if a device is not used.
+	 * Set device to NULL if not used.
 	 * A console device is mandatory to operate the system. */
 	struct cpm80_serial_device *con; /* console */
 	struct cpm80_serial_device *lst; /* printer/list */
@@ -48,26 +50,28 @@ struct cpm80_vm
 	int ndisks;
 	struct cpm80_disk_device *disks;
 
-	/* private, need not assign */
+	/* private */
 	int sel_disk;
 	cpm80_addr_t dma_addr;
 };
 
 /* 
  * First-time initialization. 
- * Call this after setting cpu, memsize and cpm_origin.
- * - sets bios_call() handler
+ * Call this after initializing or modifying cpu, memsize and cpm_origin.
+ * - initializes cpu_mon and sets bios_call() handler
  * - binds BIOS entry points in i8080 memory to bios_call()
  * - resets the i8080 and writes a JMP to cold boot at 0x0
+ * Returns 0 if successful.
  */
 int cpm80_vm_init(struct cpm80_vm *const vm);
 
 /*
  * Start the VM.
  * Call this only after configuring the VM (assigning the serial devices, disks, etc).
- * If successful, does not return until computer is powered off, else returns -1.
+ * If successful, returns 0 once computer is powered off, else returns -1 immediately.
+ * If not NULL, cpu_exitcode will contain the exit code from i8080.
  */
-int cpm80_vm_start(struct cpm80_vm *const vm);
+int cpm80_vm_start(struct cpm80_vm *const vm, int cpu_exitcode[1]);
 
 #ifdef __cplusplus
 }
