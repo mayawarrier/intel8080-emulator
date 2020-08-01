@@ -2,7 +2,7 @@
 #include "i8080.h"
 #include "i8080_opcodes.h"
 
-#ifdef __STDC__
+#if defined (__STDC__) && !defined(__STDC_VERSION__)
 	#define inline
 	#define volatile
 #endif
@@ -384,11 +384,8 @@ static inline void i8080_call_addr(struct i8080 *const cpu, i8080_addr_t addr) {
 
 /* Jump to immediate address if condition is satisfied. */
 static inline void i8080_jmp(struct i8080 *const cpu, int condition) {
-	if (condition) {
-		i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
-	} else {
-		cpu->pc += 2; /* advance to word after address */
-	}
+	if (condition) i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
+	else cpu->pc += 2; /* advance to word after address */	 
 }
 
 /* Push PC and jump to immediate address if condition is satisfied.
@@ -397,9 +394,7 @@ static inline void i8080_call(struct i8080 *const cpu, int condition) {
 	if (condition) {
 		i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
 		cpu->cycles += SUBROUTINE_CYCLES_OFFSET;
-	} else {
-		cpu->pc += 2;
-	}
+	} else cpu->pc += 2;
 }
 
 /* Pop PC and jump to it if condition is satisfied.
@@ -433,27 +428,38 @@ static inline void i8080_xchg(struct i8080 *const cpu) {
  * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 97 */
 
  /* I/O: Read input port into accumulator. */
-static inline void i8080_in(struct i8080 *const cpu) {
+static inline int i8080_in(struct i8080 *const cpu) {
+	if (!cpu->io_read) return -1;
 	i8080_word_t port_addr = i8080_advance_read_word(cpu);
 	cpu->a = trim_to_word(cpu->io_read((i8080_addr_t)concatenate(port_addr, port_addr)));
+	if (cpu->exitcode) return -1;
+	return 0;
 }
 
 /* I/O: Write accumulator to output port. */
-static inline void i8080_out(struct i8080 *const cpu) {
+static inline int i8080_out(struct i8080 *const cpu) {
+	if (!cpu->io_write) return -1;
 	i8080_word_t port_addr = i8080_advance_read_word(cpu);
 	cpu->io_write((i8080_addr_t)concatenate(port_addr, port_addr), cpu->a);
+	if (cpu->exitcode) return -1;
+	return 0;
 }
 
-void i8080_interrupt(struct i8080 *const cpu) {
-	cpu->intr = cpu->inte;
+void i8080_init(struct i8080 *const cpu) {
+	cpu->cycles = 0;
+	cpu->intr = 0;
+	cpu->exitcode = 0;
+	cpu->monitor = 0;
 }
 
 void i8080_reset(struct i8080 *const cpu) {
 	cpu->pc = 0;
 	cpu->halt = 0;
 	cpu->inte = 0;
-	cpu->intr = 0;
-	cpu->cycles = 0;
+}
+
+void i8080_interrupt(struct i8080 *const cpu) {
+	if (cpu->inte) cpu->intr = 1;
 }
 
 int i8080_next(struct i8080 *const cpu) {
@@ -461,8 +467,9 @@ int i8080_next(struct i8080 *const cpu) {
 	i8080_word_t opcode;
 
 	/* Service interrupt if pending request exists */
-	if (cpu->intr) {
+	if (cpu->inte && cpu->intr) {
 		opcode = trim_to_word(cpu->interrupt_read());
+		if (cpu->exitcode) return -1;
 		/* disable interrupts and bring out of halt */
 		cpu->inte = 0;
 		cpu->intr = 0;
@@ -471,16 +478,12 @@ int i8080_next(struct i8080 *const cpu) {
 	}
 
 	/* Execute opcode */
-	int err;
+	int err = 0;
 	if (!cpu->halt) {
-		if (!intr_read) {
-			opcode = i8080_advance_read_word(cpu);
-		}
+		if (!intr_read) opcode = i8080_advance_read_word(cpu);
 		err = i8080_exec(cpu, opcode);
-	} else {
-		/* success but remain halted */
-		err = 0;
 	}
+
 	return err;
 }
 
@@ -749,8 +752,8 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_XCHG: i8080_xchg(cpu); break;                                         /* Exchanges the contents of BC and DE */
 
 		/* I/O, accumulator <-> word */
-		case i8080_IN: i8080_in(cpu); break;
-		case i8080_OUT: i8080_out(cpu); break;
+		case i8080_IN: err = i8080_in(cpu); break;
+		case i8080_OUT: err = i8080_out(cpu); break;
 
 		/* Restart / soft interrupts */
 		case i8080_RST_0: i8080_call_addr(cpu, (i8080_addr_t)0x0000); break;
@@ -761,9 +764,11 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_RST_5: i8080_call_addr(cpu, (i8080_addr_t)0x0028); break;
 		case i8080_RST_6: i8080_call_addr(cpu, (i8080_addr_t)0x0030); break;
 		case i8080_RST_7:
-			if (cpu->monitor) err = cpu->monitor->enter_monitor(cpu);
-			else i8080_call_addr(cpu, (i8080_addr_t)0x0038);
-			break;
+			if (cpu->monitor) {
+				cpu->exitcode = cpu->monitor->enter_monitor(cpu);
+				if (cpu->exitcode) err = -1;
+			} else i8080_call_addr(cpu, (i8080_addr_t)0x0038);
+			break;	
 
 		/* Enable / disable interrupts */
 		case i8080_EI: cpu->inte = 1; break;
