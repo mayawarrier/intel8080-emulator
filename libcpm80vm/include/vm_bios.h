@@ -16,18 +16,26 @@
 
 #include "vm_types.h"
 
-#define CPM_BIOS_VERSION "2.2"
+#define CPM80_MAX_DISKS (16)
+#define CPM80_BIOS_VERSION "2.2"
 
 struct cpm80_vm;
 
 /*
- * Calls a BIOS function with a given code (0-16).
+ * BIOS implementation.
+ *
+ * This does not implement any logical devices!
+ * See vm.h; devices should be implemented before getting here.
+ * cpm80_vm.bios_call() points to this by default.
+ *
+ * Call a BIOS function with a call number (0-16).
  * Returns 0 if successful.
  */
-int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code);
+int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno);
 
 /*
- * Generates disk definitions in BIOS memory.
+ * Utlity function for disk device implementations.
+ * Generate disk definitions in BIOS memory.
  *
  * Adapted from the CP/M 2.0 disk re-definition library
  * (http://www.gaby.de/cpm/manuals/archive/cpm22htm/axf.asm)

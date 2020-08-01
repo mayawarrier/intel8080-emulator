@@ -2,33 +2,192 @@
 #include "i8080.h"
 #include "i8080_opcodes.h"
 #include "vm_devices.h"
-#include "vm_bios_callno.h"
+#include "vm_callno.h"
 #include "vm_bios.h"
+#include "vm_types.h"
 #include "vm.h"
 
-#ifdef __STDC__
+#if defined (__STDC__) && !defined(__STDC_VERSION__)
 	#define inline
 	#define volatile
 #endif
 
-#define MONITOR_ERR (30)
+static inline unsigned vmstrlen(const char *str)
+{
+	unsigned l = 0;
+	while (*str != '\0') {
+		str++; l++;
+	}
+	return l;
+}
+
+/* strcpy, but returns ptr to end of dest and also sets length. */
+static inline char *vmstrcpy(char *dest, const char *src, unsigned *length)
+{
+	unsigned l = 0;
+	while (*src != '\0') {
+		*dest = *src;
+		src++; dest++; l++;
+	}
+	*dest = '\0';
+	if (length) *length = l;
+	return dest;
+}
+
+/* utoa (unsigned value to string) but also sets length */
+static inline char *vmutoa(unsigned value, char *dest, const int base, unsigned *length)
+{
+	char *odest = dest;
+	/* Extract each digit (units first)
+	   and append to string as ascii */
+	unsigned digit, l = 0;
+	while (value != 0) {
+		digit = value % base;
+		if (digit > 9) *dest = (digit - 9) + 'a'; /* hexadecimal */
+		else *dest = digit + '0';
+		value /= base;
+		dest++; l++;
+	}
+	*dest = '\0';
+
+	/* reverse string so units is last */
+	char temp;
+	char *start = odest, *end = dest - 1;
+	while (start < end) {
+		temp = *start;
+		*start = *end;
+		*end = temp;
+		start++; end--;
+	}
+
+	if (length) *length = l;
+	return odest;
+}
+
+#define STRBUF_SIZE (128)
+static const char vmsprintf_buf[STRBUF_SIZE], VM_strbuf[STRBUF_SIZE];
+
+/* Supports %u, %s and %x, width, and 0-padding.
+ * Non-string args are treated as a pointer to an integer type
+ * (as ANSI C doesn't guarantee that void * can hold all integer
+ *  values. though it can certainly point to them)
+ * Bounds are not checked on the args -> should only be as many args as format specifiers! */
+static inline int vmsprintf(char *dest, const char *format, void const *const *args)
+{
+	unsigned arglen, width, nchars = 0;
+
+	char fc, pad_char;
+	while ((fc = *format) != '\0') {
+		width = 0; pad_char = ' ';
+
+		if (fc == '%') {
+			/* chomp at least 1 char */
+			fc = *format++;
+
+			/* flags */
+			switch (fc)
+			{
+				case '0':
+					pad_char = '0';
+					fc = *format++;
+					break;
+			}
+
+			/* width */
+			while (fc >= '0' && fc <= '9') {
+				width = 10 * width + (fc - '0');
+				fc = *format++;
+			}
+
+			/* specifiers */
+			switch (fc)
+			{
+				/* %% escapes % */
+				case '%':
+					vmsprintf_buf[0] = fc;
+					vmsprintf_buf[1] = '\0';
+					arglen = 1;
+					break;
+
+				case 'u':
+					vmutoa(*(unsigned *)(*args), vmsprintf_buf, 10, &arglen);
+					args++;
+					break;
+
+				case 'x':
+					vmutoa(*(unsigned *)(*args), vmsprintf_buf, 16, &arglen);
+					args++;
+					break;
+
+				case 's':
+					if (vmstrlen(*args) >= STRBUF_SIZE) 
+						return -1; /* too large */
+					vmstrcpy(vmsprintf_buf, *args, &arglen);
+					args++;
+					break;
+
+				/* not supported */
+				default: return -1;
+			}
+
+			/* pad to reach width */
+			if (arglen < width) {
+				unsigned num_to_pad = width - arglen;
+				nchars += num_to_pad;
+				while (num_to_pad > 0) {
+					*dest = pad_char;
+					dest++; num_to_pad--;
+				}
+			}
+
+			dest = vmstrcpy(dest, vmsprintf_buf, 0);
+			nchars += arglen;
+		} else {
+			/* no formatting */
+			*dest = fc;
+			dest++; nchars++;
+		}
+	}
+	*dest = '\0';
+
+	return (int)nchars;
+}
+
+static inline void vmputs(struct cpm80_serial_device *con, char *msg)
+{
+	char c;
+	while ((c = *msg) != '\0') {
+		con->out(con->dev, c);
+		msg++;
+	}
+}
+
+static const char VM_fatal_fmt[] = "\r\nFatal error: %s\r\n";
 
 static int cpu_monitor(struct i8080 *cpu)
 {
 	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
 	cpm80_addr_t bios_jmp_table_ptr = vm->cpm_origin + 0x1600;
 
-	/* Translate CP/M's bios jump table addresses to VM's bios_call() */
+	/* Translate CP/M's bios jump table to VM's bios_call() */
 	int callno = (int)(cpu->pc - bios_jmp_table_ptr) / 3;
-	if (callno > 16) return MONITOR_ERR; /* invalid bios call, fatal */
-	else vm->bios_call(vm, callno);
 
-	return 0;
+	if (callno > 16) {
+		/* huh? how did this happen? */
+		void *fargs[] = { &cpu->pc };
+		vmsprintf(VM_strbuf + 64, "Unexpected monitor call at 0x%04x", fargs);
+		fargs[0] = VM_strbuf + 64;
+		vmsprintf(VM_strbuf, VM_fatal_fmt, fargs);
+
+		vmputs(vm->con, VM_strbuf);
+		return VM80_UNEXPECTED_MONITOR_CALL;
+	} 
+	else return vm->bios_call(vm, callno);
 }
 
 int cpm80_vm_init(struct cpm80_vm *const vm)
 {
-	cpm80_addr_t bios_jmp_table_ptr = vm->cpm_origin + 0x1600;
+	const cpm80_addr_t bios_jmp_table_ptr = vm->cpm_origin + 0x1600;
 
 	int is_valid = 0;
 	if (vm->cpu && vm->cpu->memory_read && vm->cpu->memory_write &&
@@ -43,12 +202,13 @@ int cpm80_vm_init(struct cpm80_vm *const vm)
 	vm->cpu->monitor = &vm->cpu_mon;
 	vm->cpu_mon.enter_monitor = cpu_monitor;
 	vm->bios_call = cpm80_bios_call_function;
+	vm->is_poweron = 0;
 	
 	/* monitor calls are made on RST 7 */
-	int i;
+	int i; cpm80_addr_t ptr = bios_jmp_table_ptr;
 	for (i = 0; i < 17; ++i) {
-		vm->cpu->memory_write(bios_jmp_table, i8080_RST_7);
-		bios_jmp_table_ptr += 0x0003;
+		vm->cpu->memory_write(ptr, i8080_RST_7);
+		ptr += 0x0003;
 	}
 
 	/* JMP to cold boot on reset */
@@ -58,23 +218,96 @@ int cpm80_vm_init(struct cpm80_vm *const vm)
 	vm->cpu->memory_write(0x0001, boot_ptr_lo);
 	vm->cpu->memory_write(0x0002, boot_ptr_hi);
 
+	return 0;
+}
+
+static inline int is_serial_device_initialized(struct cpm80_serial_device *ldev)
+{
+	return (ldev && ldev->init && ldev->in && ldev->out && ldev->status);
+}
+
+static inline int is_disk_device_initialized(struct cpm80_disk_device *disk)
+{
+	return (disk && disk->init && disk->readl && disk->writel && disk->set_sector && disk->set_track);
+}
+
+static void fatal_io_write(i8080_addr_t port, i8080_word_t word)
+{
+	port &= 0xff; /* actual port is only 8 bits */
+	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
+
+	void *fargs[] = { &word, &port };
+	vmsprintf(VM_strbuf + 64, "Unhandled write 0x%02x to port 0x%02x", fargs);
+	fargs[0] = VM_strbuf + 64;
+	vmsprintf(VM_strbuf, VM_fatal_fmt, fargs);
+	vmputs(vm->con, VM_strbuf);
+
+	vm->cpu->exitcode = VM80_UNHANDLED_IO;
+}
+
+static i8080_word_t fatal_io_read(i8080_addr_t port)
+{
+	port &= 0xff; /* actual port is only 8 bits */
+	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
+
+	void *fargs[] = { &port };
+	vmsprintf(VM_strbuf + 64, "Unhandled read from port 0x%02x", fargs);
+	fargs[0] = VM_strbuf + 64;
+	vmsprintf(VM_strbuf, VM_fatal_fmt, fargs);
+	vmputs(vm->con, VM_strbuf);
+
+	vm->cpu->exitcode = VM80_UNHANDLED_IO;
+	return 0;
+}
+
+static i8080_word_t fatal_interrupt_read(void)
+{
+	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
+
+	void *fargs[] = { "Unhandled interrupt" };
+	vmsprintf(VM_strbuf, VM_fatal_fmt, fargs);
+	vmputs(vm->con, VM_strbuf);
+
+	vm->cpu->exitcode = VM80_UNHANDLED_INTR;
+	return 0;
+}
+
+int cpm80_vm_poweron(struct cpm80_vm *const vm)
+{
+	/* check for bad configuration */
+	if (!vm || !is_serial_device_initialized(vm->con) || !vm->bios_call ||
+		!vm->disks || vm->ndisks < 1 || !is_disk_device_initialized(vm->disks[0]) ||
+		!vm->cpu || !vm->cpu->memory_read || !vm->cpu->memory_write || vm->cpu->exitcode != 0) {
+		return -1;
+	}
+
+	/* If these handlers don't exist we can't substitute them with anything
+	 * reasonable as the program may misbehave after calling them and fail to exit.
+	 * Catch this attempt and quit the VM */
+	if (!vm->cpu->io_read) vm->cpu->io_read = fatal_io_read;
+	if (!vm->cpu->io_write) vm->cpu->io_write = fatal_io_write;
+	if (!vm->cpu->interrupt_read) vm->cpu->interrupt_read = fatal_interrupt_read;
+
 	i8080_reset(vm->cpu);
+	vm->is_poweron = 1;
 
 	return 0;
 }
 
-int cpm80_vm_start(struct cpm80_vm *const vm, int cpu_exitcode[1])
+static i8080_word_t poweroff_handler(void)
 {
-	/* check VM parameters */
-	if (!vm->cpu || !vm->con || !vm->disks || vm->ndisks < 1 || !vm->bios_call) return -1;
-	/* check cpu parameters */
-	if (vm->cpu->pc != 0 || !vm->cpu->memory_read || !vm->cpu->memory_write) return -1;
-
-	/* start execution! process instructions until error */
-	int err; while (!(err = i8080_next(vm->cpu)));
-	if (cpu_exitcode) *cpu_exitcode = err;				/* todo: deal with MONITOR_ERR */
-
+	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
+	vm->cpu->exitcode = VM80_POWEROFF;
 	return 0;
+}
+
+void cpm80_vm_poweroff(struct cpm80_vm *const vm)
+{
+	i8080_word_t(*old_handler)(void) = vm->cpu->interrupt_read;
+	vm->cpu->interrupt_read = poweroff_handler;
+	i8080_interrupt(vm->cpu);
+	vm->cpu->interrupt_read = old_handler;
+	vm->is_poweron = 0;
 }
 
 #define lsbit(buf) (buf & (unsigned)1) 
@@ -181,10 +414,9 @@ static inline void cpm80_disk_sectran(struct cpm80_vm *vm)
 
 	unsigned psector;
 	if (sectran_table_ptr == 0) {
-		/* If the table ptr is 0, the BDOS should never have called this function.
-		 * However this is a bug; the BDOS does not always verify the table first:
-		 * http://cpuville.com/Code/CPM-on-a-new-computer.html
-		 * Return the sector number without translation. */
+		/* CP/M occasionally fails to check if the table ptr is NULL.
+		 * This is a bug: http://cpuville.com/Code/CPM-on-a-new-computer.html
+		 * Return without translation. */
 		psector = lsector;
 	} else {
 		psector = (unsigned)vm->cpu->memory_read((i8080_addr_t)(sectran_table_ptr + lsector));
@@ -193,106 +425,9 @@ static inline void cpm80_disk_sectran(struct cpm80_vm *vm)
 	set_bios_return_hl(vm->cpu, psector);
 }
 
-/* strcpy, but returns pointer to end of dest and sets length. */
-static inline char *kstrcpy_getlen(char *dest, const char *src, unsigned *length)
-{
-	unsigned l = 0;
-	while (*src != '\0') {
-		*dest = *src;
-		src++; dest++; l++;
-	}
-	*dest = '\0';
-	*length = l;
-	return dest;
-}
+static const char BOOT_signon_fmt[] = "github.com/mayawarrier/intel8080-emulator\r\n%uK CP/M VERS %s\r\n\n";
 
-/* unsigned value to string, base 10 */
-static inline char *kutoa10(unsigned value, char *dest)
-{
-	char *odest = dest;
-	/* Extract each digit (units first)
-	   and append to string as ascii */
-	unsigned digit;
-	while (value != 0) {
-		digit = value % 10;
-		*dest = digit + '0';
-		value /= 10;
-		dest++;
-	}
-	*dest = '\0';
-
-	/* reverse string so units is last */
-	char temp;
-	char *start = odest, *end = dest - 1;
-	while (start < end) {
-		temp = *start;
-		*start = *end;
-		*end = temp;
-		start++; end--;
-	}
-	return odest;
-}
-
-/* Supports only %u and %s.
- * Bounds aren't checked on the args -> should only be as many args as format specifiers! */
-static inline int ksprintf(char *dest, const char *format, void const *const *args)
-{
-	unsigned nchars = 0;
-
-	char fc; unsigned arglen;
-	while ((fc = *format) != '\0') {
-		if (fc == '%') {
-			/* increment format assuming we always chomp the next character */
-			switch (fc = *format++)
-			{
-				/* %% escapes % */
-				case '%':
-					*dest = fc;
-					dest++; nchars++;
-					break;
-
-				case 'u':
-				{
-					char ustr[6]; /* assume max 16-bit value*/
-					kutoa10(*args, ustr);
-					dest = kstrcpy_getlen(dest, ustr, &arglen);
-					nchars += arglen; args++;
-					break;
-				}
-
-				case 's':
-					dest = kstrcpy_getlen(dest, *args, &arglen);
-					nchars += arglen; args++;
-					break;
-
-				/* not supported */
-				default: return -1;
-			}
-		} else {
-			/* no formatting */
-			*dest = fc;
-			dest++; nchars++;
-		}
-		format++;
-	}
-	*dest = '\0';
-
-	return (int)nchars;
-}
-
-/* Assumes console device is initialized and ready! */
-static inline void kputs(struct cpm80_serial_device *con, char *msg)
-{
-	char c;
-	while ((c = *msg) != '\0') {
-		con->out(con->dev, c);
-		msg++;
-	}
-}
-
-static const char BOOT_signon_fmt[] = "github.com/mayawarrier/intel8080-emulator\r\n%uK CP/M VERS %s\n\r\n";
-
-int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
+int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno)
 {
 	int err = 0;
 	struct i8080 *const cpu = vm->cpu; 
@@ -300,12 +435,10 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 	struct cpm80_serial_device *const con = vm->con,
 		*const lst = vm->lst, *const pun = vm->pun, *const rdr = vm->rdr;
 
-	switch (call_code)
+	switch (callno)
 	{
 		case BIOS_BOOT:
 		{
-			char signon_str[70];
-
 			/* initialize attached devices */
 			if (con) cpm80_serial_device_init(con);
 			if (lst) cpm80_serial_device_init(lst);
@@ -313,9 +446,9 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 			if (rdr) cpm80_serial_device_init(rdr);
 
 			/* print signon message */
-			void *fargs[] = { vm->memsize, CPM_BIOS_VERSION };
-			ksprintf(signon_str, BOOT_signon_fmt, fargs);
-			kputs(con, signon_str);
+			void *fargs[] = { &vm->memsize, CPM80_BIOS_VERSION };
+			vmsprintf(VM_strbuf, BOOT_signon_fmt, fargs);
+			vmputs(con, VM_strbuf);
 
 			/* C must be set to 0 to select disk 0/drive A as the boot drive.
 			 * CP/M 2.2 Alteration guide, pg 17:
@@ -361,7 +494,7 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int call_code)
 		case BIOS_WRITE:   cpm80_disk_write(vm, vm->sel_disk); break;
 		case BIOS_SECTRAN: cpm80_disk_sectran(vm); break;
 
-		default: err = 1; /* unrecognized BIOS call */
+		default: err = -1; /* unrecognized BIOS call */
 	}
 
 	return err;
@@ -455,14 +588,15 @@ static void get_disk_parameter_block(struct disk_params *params, struct disk_par
 			kilobytes_per_block >>= 1;
 		}
 		/* The entry allocation map is 16 bytes - each byte is the address of a block. 
-		 * For more than 256 blocks a disk, we need two bytes per address resulting
-		 * in half the number of blocks. As a result the available extents are also halved. */
+		 * For more than 256 blocks a disk, we need two bytes per address - resulting
+		 * in half the number of blocks => half the number of extents. */
 		if (params->dks > 256) extent_mask >>= 1;
 	}
 
 	param_block->exm = (cpm80_byte_t)extent_mask;
 
-	/* Generate the directory allocation bitmap (maps blocks allocated to the disk directory) */
+	/* Generate the directory allocation bitmap.
+	 * This maps blocks allocated to the disk directory. */
 	unsigned dir_alloc = 0;
 	unsigned dir_remaining = params->dir;
 	unsigned dir_block_size = params->bls / 32;
@@ -551,7 +685,7 @@ write_sector_translate_table(struct cpm80_vm *const vm, struct disk_params *para
 	 * For eg. with spt=72 and skf=10:
 	 * 0,10,20,...70,8,18,...68,6,16,...66,4,14,...64,2,12,...62,0,10...
 	 *                                                          ^^^
-	 * we overlap every 5 rotations (every 36 mapped sectors)
+	 * we overlap every 5 rotations (or 36 mapped sectors)
 	 */
 	const unsigned num_before_overlap = sectors / greatest_common_divisor(sectors, skew);
 

@@ -1,9 +1,12 @@
+/*
+ * BIOS functions mapped to integers.
+ * To be used in conjunction with cpm80_vm.bios_call().
+ */
 
-#ifndef CPM80_BIOS_CALLCODES_H
-#define CPM80_BIOS_CALLCODES_H
+#ifndef CPM80_BIOS_CALLNO_H
+#define CPM80_BIOS_CALLNO_H
 
 /* Cold boot:
- * The first routine to get control after the bootloader.
  * Initializes devices, prints a signon message, selects boot disk 0, then falls into warm boot. */
 #define BIOS_BOOT		(0)
 /* Warm boot:
@@ -77,4 +80,4 @@
  */
 #define BIOS_SECTRAN	(16)
 
-#endif /* CPM80_BIOS_CALLCODES_H */
+#endif /* CPM80_BIOS_CALLNO_H */
