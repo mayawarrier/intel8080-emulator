@@ -35,6 +35,8 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno);
 
 /*
  * Utlity function for disk device implementations.
+ * vm->cpu must be initialized first.
+ *
  * Generate disk definitions in BIOS memory.
  *
  * Adapted from the CP/M 2.0 disk re-definition library

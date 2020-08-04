@@ -10,7 +10,7 @@
 #include "vm_types.h"
 
 /* CP/M logical serial device */
-struct cpm80_serial_device 
+struct cpm80_serial_ldevice 
 {
 	/* Handle to underlying device. */
 	void *dev;
@@ -25,7 +25,7 @@ struct cpm80_serial_device
 };
 
 /* CP/M logical disk drive */
-struct cpm80_disk_device
+struct cpm80_disk_ldevice
 {
 	/* Handle to underlying device. */
 	void *dev;
@@ -50,7 +50,7 @@ struct cpm80_disk_device
 	int(*readl)(void *dev, char buf[128]);
 	/*
 	 * Write 128-byte logical sector to disk.
-	 * See cpm80_bios.h for deblock_code.
+	 * See vm_callno.h for deblock_code.
 	 * Return 0 if successful, 1 for unrecoverable error,
 	 * and -1 if media changed during write.
 	 */

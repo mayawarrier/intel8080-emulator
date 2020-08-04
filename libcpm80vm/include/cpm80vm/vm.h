@@ -1,17 +1,20 @@
 /*
- * i8080 microcomputer VM for CP/M 2.2.
+ * 8-bit virtual machine for CP/M 2.2 (based on the Intel 8080).
  *
- * To start running cpm80_vm:
- * - Call cpm80_vm_init(),
- * - configure the serial and disk devices,
- * - then call cpm80_vm_poweron().
+ * To get the machine running:
+ * - implement its serial and disk devices,
+ * - initalize the members of cpm80_vm as required,
+ * - call cpm80_vm_init()
+ * - then cpm80_vm_poweron().
  *
  * When powered on, you can run CPU instructions in a loop like so:
  * while(!i8080_next(vm->cpu)) {...}
  *
- * To power off, call cpm80_vm_poweroff() within the
- * body of the loop above or on another thread. The next
- * call to i8080_next() will exit with -1. 
+ * To power off, call cpm80_vm_poweroff() within the body of
+ * the loop above or from another thread. The next call to
+ * i8080_next() will exit with -1. 
+ * 
+ * See sample_vm.c for an example.
  */
 
 #ifndef CPM80_VM_H
@@ -24,17 +27,27 @@ extern "C" {
 #endif
 
 struct i8080;
-struct cpm80_serial_device;
-struct cpm80_disk_device;
+struct cpm80_serial_ldevice;
+struct cpm80_disk_ldevice;
 
-/* cpu->exitcode is 
- * set to one of these 
- * when the VM quits */
+/* 
+ * cpu->exitcode is set to one
+ * of these when i8080_next() fails.
+ * The first 3 are fatal errors that
+ * cause the VM to quit instantly. 
+ */
 enum cpm80_vm_exitcode
 {
+	/* The program made an I/O request but cpu->io_read()
+	 * or cpu->io_write() was not assigned. */
 	VM80_UNHANDLED_IO = 1,
+	/* The cpu received an interrupt but interrupt_read()
+	 * was not assigned. */
 	VM80_UNHANDLED_INTR,
+	/* A bios call was made from an unexpected memory location. 
+	 * This could indicate a fault in the binary. */
 	VM80_UNEXPECTED_MONITOR_CALL,
+	/* The VM quit normally i.e. on poweroff. */
 	VM80_POWEROFF
 }
 
@@ -55,17 +68,17 @@ struct cpm80_vm
 	/* Serial devices.
 	 * Set device to NULL if not used.
 	 * CP/M requires at least a console device. */
-	struct cpm80_serial_device *con; /* console */
-	struct cpm80_serial_device *lst; /* printer/list */
-	struct cpm80_serial_device *rdr; /* tape reader */
-	struct cpm80_serial_device *pun; /* punch machine */
+	struct cpm80_serial_ldevice *con; /* console */
+	struct cpm80_serial_ldevice *lst; /* printer/list */
+	struct cpm80_serial_ldevice *rdr; /* tape reader */
+	struct cpm80_serial_ldevice *pun; /* punch machine */
 
 	/* Disk devices.
 	 * An array of up to 16 disks.
 	 * At least 1 disk is required (to boot from).
 	 * Disk 0 is always the boot disk. */
 	int ndisks;
-	struct cpm80_disk_device *disks;
+	struct cpm80_disk_ldevice *disks;
 
 	/* Set automatically by cpm80_vm_init(). 
 	 * Re-assign to override certain bios

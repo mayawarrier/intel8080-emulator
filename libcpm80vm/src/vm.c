@@ -153,7 +153,7 @@ static inline int vmsprintf(char *dest, const char *format, void const *const *a
 	return (int)nchars;
 }
 
-static inline void vmputs(struct cpm80_serial_device *con, char *msg)
+static inline void vmputs(struct cpm80_serial_ldevice *con, char *msg)
 {
 	char c;
 	while ((c = *msg) != '\0') {
@@ -221,12 +221,12 @@ int cpm80_vm_init(struct cpm80_vm *const vm)
 	return 0;
 }
 
-static inline int is_serial_device_initialized(struct cpm80_serial_device *ldev)
+static inline int is_serial_device_initialized(struct cpm80_serial_ldevice *ldev)
 {
 	return (ldev && ldev->init && ldev->in && ldev->out && ldev->status);
 }
 
-static inline int is_disk_device_initialized(struct cpm80_disk_device *disk)
+static inline int is_disk_device_initialized(struct cpm80_disk_ldevice *disk)
 {
 	return (disk && disk->init && disk->readl && disk->writel && disk->set_sector && disk->set_track);
 }
@@ -322,11 +322,11 @@ static inline void set_bios_return_hl(struct i8080 *const cpu, unsigned val)
 	cpu->l = (i8080_word_t)(val & 0xff);
 }
 
-#define cpm80_serial_device_init(ldev)     ((ldev)->init((ldev)->dev))
-#define cpm80_serial_device_in(cpu, ldev)  ((cpu)->a = (i8080_word_t)((ldev)->in((ldev)->dev)))
-#define cpm80_serial_device_out(cpu, ldev) ((ldev)->out((ldev)->dev, (char)((cpu)->c)))
+#define cpm80_serial_ldevice_init(ldev)     ((ldev)->init((ldev)->dev))
+#define cpm80_serial_ldevice_in(cpu, ldev)  ((cpu)->a = (i8080_word_t)((ldev)->in((ldev)->dev)))
+#define cpm80_serial_ldevice_out(cpu, ldev) ((ldev)->out((ldev)->dev, (char)((cpu)->c)))
 
-static inline void cpm80_serial_device_status(struct i8080 *const cpu, struct cpm80_serial_device *const ldev)
+static inline void cpm80_serial_ldevice_status(struct i8080 *const cpu, struct cpm80_serial_ldevice *const ldev)
 {
 	int status = ldev->status(ldev->dev);
 	if (status) cpu->a = 0xff;
@@ -345,7 +345,7 @@ static inline void set_exitcode(struct i8080 *const cpu, int exitcode)
 static inline void cpm80_disk_select(struct cpm80_vm *const vm, int disknum)
 {
 	int err;
-	struct cpm80_disk_device *disk = &vm->disks[disknum];
+	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
 
 	if (!lsbit(vm->cpu->e)) {
 		/* this will determine and generate the disk format, if possible */
@@ -363,20 +363,20 @@ static inline void cpm80_disk_select(struct cpm80_vm *const vm, int disknum)
 
 static inline void cpm80_disk_set_track(struct cpm80_vm *const vm, int disknum, unsigned track)
 {
-	struct cpm80_disk_device *disk = &vm->disks[disknum];
+	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
 	disk->set_track(disk->dev, track);
 }
 
 static inline void cpm80_disk_set_sector(struct cpm80_vm *const vm, int disknum, unsigned sector)
 {
-	struct cpm80_disk_device *disk = &vm->disks[disknum];
+	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
 	disk->set_sector(disk->dev, sector);
 }
 
 static inline void cpm80_disk_read(struct cpm80_vm *const vm, int disknum)
 {
 	int err;
-	struct cpm80_disk_device *disk = &vm->disks[disknum];
+	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
 
 	char buf[128];
 	err = disk->readl(disk->dev, buf);
@@ -394,7 +394,7 @@ static inline void cpm80_disk_read(struct cpm80_vm *const vm, int disknum)
 static inline void cpm80_disk_write(struct cpm80_vm *vm, int disknum)
 {
 	int err;
-	struct cpm80_disk_device *disk = &vm->disks[disknum];
+	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
 
 	char buf[128];
 	unsigned long i;
@@ -431,8 +431,8 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno)
 {
 	int err = 0;
 	struct i8080 *const cpu = vm->cpu; 
-	struct cpm80_disk_device *const disks = vm->disks;
-	struct cpm80_serial_device *const con = vm->con,
+	struct cpm80_disk_ldevice *const disks = vm->disks;
+	struct cpm80_serial_ldevice *const con = vm->con,
 		*const lst = vm->lst, *const pun = vm->pun, *const rdr = vm->rdr;
 
 	switch (callno)
@@ -440,10 +440,10 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno)
 		case BIOS_BOOT:
 		{
 			/* initialize attached devices */
-			if (con) cpm80_serial_device_init(con);
-			if (lst) cpm80_serial_device_init(lst);
-			if (pun) cpm80_serial_device_init(pun);
-			if (rdr) cpm80_serial_device_init(rdr);
+			if (con) cpm80_serial_ldevice_init(con);
+			if (lst) cpm80_serial_ldevice_init(lst);
+			if (pun) cpm80_serial_ldevice_init(pun);
+			if (rdr) cpm80_serial_ldevice_init(rdr);
 
 			/* print signon message */
 			void *fargs[] = { &vm->memsize, CPM80_BIOS_VERSION };
@@ -474,14 +474,14 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno)
 			break;
 		}
 			
-		case BIOS_CONST:  cpm80_serial_device_status(cpu, con); break;
-		case BIOS_LISTST: cpm80_serial_device_status(cpu, lst); break;
+		case BIOS_CONST:  cpm80_serial_ldevice_status(cpu, con); break;
+		case BIOS_LISTST: cpm80_serial_ldevice_status(cpu, lst); break;
 
-		case BIOS_CONIN:  cpm80_serial_device_in(cpu, con); break;
-		case BIOS_CONOUT: cpm80_serial_device_out(cpu, con); break;
-		case BIOS_LIST:   cpm80_serial_device_out(cpu, lst); break;
-		case BIOS_PUNCH:  cpm80_serial_device_out(cpu, pun); break;
-		case BIOS_READER: cpm80_serial_device_in(cpu, rdr); break;
+		case BIOS_CONIN:  cpm80_serial_ldevice_in(cpu, con); break;
+		case BIOS_CONOUT: cpm80_serial_ldevice_out(cpu, con); break;
+		case BIOS_LIST:   cpm80_serial_ldevice_out(cpu, lst); break;
+		case BIOS_PUNCH:  cpm80_serial_ldevice_out(cpu, pun); break;
+		case BIOS_READER: cpm80_serial_ldevice_in(cpu, rdr); break;
 
 		case BIOS_SELDSK: cpm80_disk_select(vm, cpu->c); break;
 		case BIOS_HOME:   cpm80_disk_set_track(vm, vm->sel_disk, 0); break;
