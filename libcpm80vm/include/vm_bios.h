@@ -24,9 +24,9 @@ struct cpm80_vm;
 /*
  * BIOS implementation.
  *
- * This does not implement any logical devices!
- * See vm.h; devices should be implemented before getting here.
- * cpm80_vm.bios_call() points to this by default.
+ * This does not implement any device drivers!
+ * See vm.h; implement those before getting here.
+ * cpm80_vm.bios_call() points to this function by default.
  *
  * Call a BIOS function with a call number (0-16).
  * Returns 0 if successful.

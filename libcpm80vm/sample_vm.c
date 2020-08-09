@@ -8,52 +8,9 @@
 #include "vm_types.h"
 #include "vm_bios.h"
 #include "vm_devices.h"
-#include "vm_sample.h"
+#include "sample_vm.h"
 
-#define VM_MAX_DISKS (4)
 #define VM_243K (248832)
-
-static struct cpm80_sample_vm
-{
-	i8080_word_t *memory;
-	i8080_addr_t memory_maxaddr;
-	int memory_ksize;
-
-	struct vm_vconsole {
-		FILE *sin;
-		FILE *sout;
-	} vcon_device;
-
-	struct vm_vibm3740 {
-		unsigned sector, track;
-		char *disk; /* 243KB */
-	}
-	vdisk_devices[VM_MAX_DISKS];
-
-	struct i8080 cpu;
-	struct cpm80_vm base_vm;
-	struct cpm80_serial_ldevice lcon;
-	struct cpm80_disk_ldevice ldisks[VM_MAX_DISKS];
-}
-SAMPLE_VM =
-{
-	.memory = 0,
-	.vcon_device =
-	{
-		.sin = stdin,
-		.sout = stdout
-	},
-	.vdisk_devices =
-	{
-		{.sector = 0,.track = 0,.disk = 0 },
-		{.sector = 0,.track = 0,.disk = 0 },
-		{.sector = 0,.track = 0,.disk = 0 },
-		{.sector = 0,.track = 0,.disk = 0 }
-	}
-};
-
-static i8080_word_t vm_memory_read(i8080_addr_t a) { return VM_MEMORY[a]; }
-static void vm_memory_write(i8080_addr_t a, i8080_word_t w) { VM_MEMORY[a] = w; }
 
 /* does nothing */
 static int vm_vdev_noinit(void *) { return 0; }
@@ -61,7 +18,7 @@ static int vm_vdev_noinit(void *) { return 0; }
 static int vm_vcon_status(void *dev)
 {
 	struct vm_vconsole *cdev = (struct vm_vconsole *)dev;
-	return ferror(cdev->sin) || ferror(cdev->sout);
+	return ferror((FILE *)cdev->sin) || ferror((FILE *)cdev->sout);
 }
 
 static char vm_vcon_in(void *dev)
@@ -69,7 +26,7 @@ static char vm_vcon_in(void *dev)
 	char c;
 	struct vm_vconsole *cdev = (struct vm_vconsole *)dev;
 	/* blocks until success */
-	do { c = (char)getc(cdev->sin); } while (ferror(cdev->sin));
+	do { c = (char)getc((FILE *)cdev->sin); } while (ferror((FILE *)cdev->sin));
 	return c;
 }
 
@@ -77,7 +34,7 @@ static void vm_vcon_out(void *dev, char c)
 {
 	struct vm_vconsole *cdev = (struct vm_vconsole *)dev;
 	/* blocks until success */
-	do { putc(c, cdev->sout); } while (ferror(cdev->sout));
+	do { putc(c, (FILE *)cdev->sout); } while (ferror((FILE *)cdev->sout));
 }
 
 static void vm_vdisk_setsec(void *dev, unsigned sector)
@@ -112,45 +69,59 @@ static int vm_vdisk_writel(void *dev, char buf[128], int /* deblock_code */)
 	return 0;
 }
 
-void sample_vm_set_working_memory(i8080_word_t *memory, i8080_addr_t maxaddr)
+#define get_svm_memory_ptr(cpu) ((i8080_word_t *)((struct cpm80_vm *)((cpu)->udata))->udata)
+
+static i8080_word_t vm_memory_read(const struct i8080 *cpu, i8080_addr_t a)
 {
-	SAMPLE_VM.memory = memory;
-	SAMPLE_VM.memory_maxaddr = maxaddr;
-	SAMPLE_VM.memory_ksize = maxaddr / 1024 + 1;
+	return *(get_svm_memory_ptr(cpu) + a);
+}
+static void vm_memory_write(const struct i8080 *cpu, i8080_addr_t a, i8080_word_t w)
+{
+	*(get_svm_memory_ptr(cpu) + a) = w;
 }
 
-void sample_vm_set_disk_memory(char *memory, int ndisks)
+static int set_svm_memory_ptr(struct cpm80_sample_vm *const svm, const struct cpm80_sample_vm_params *params)
 {
-	struct vm_vibm3740 *vdisk_devs = SAMPLE_VM.vdisk_devices;
+	if (!params->working_memory) return -1;
+	svm->base_vm.udata = params->working_memory;
+	return 0;
+}
 
-	if (ndisks > 0 && ndisks <= VM_MAX_DISKS) {
-		SAMPLE_VM.base_vm.ndisks = ndisks;
+static int
+set_svm_disk_memory_bufs(struct cpm80_sample_vm *const svm, const struct cpm80_sample_vm_params *params)
+{
+	int ndisks = params->ndisks;
+	i8080_word_t *memory_buf = params->disk_memory;
+	if (ndisks < 1 || ndisks > SAMPLEVM_MAX_DISKS || !memory_buf) return -1;
 
+	struct vm_vibm3740 *vdisk_devs = svm->vdisk_devices;
+
+	ndisks--;
+	while (ndisks > -1) {
+		vdisk_devs[ndisks].disk = memory_buf;
+		memory_buf += VM_243K;
 		ndisks--;
-		while (ndisks > -1) {
-			vdisk_devs[ndisks].disk = memory;
-			memory += VM_243K;
-			ndisks--;
-		}
 	}
+
+	return 0;
 }
 
-static void sample_vm_init_console(void)
+static void sample_vm_init_console(struct cpm80_sample_vm *const svm)
 {
-	struct cpm80_serial_ldevice *const con = &SAMPLE_VM.lcon;
-	con->dev = &SAMPLE_VM.vcon_device;
+	struct cpm80_serial_ldevice *const con = &svm->lcon;
+	con->dev = &svm->vcon_device;
 	con->init = vm_vdev_noinit;
 	con->status = vm_vcon_status;
 	con->in = vm_vcon_in;
 	con->out = vm_vcon_out;
 }
 
-static void sample_vm_init_disk(int disknum, cpm80_addr_t dph_addr)
+static void sample_vm_init_disk(struct cpm80_sample_vm *const svm, int disknum, cpm80_addr_t dph_addr)
 {
-	struct cpm80_disk_ldevice *const disk = SAMPLE_VM.ldisks + disknum;
-	disk->dev = SAMPLE_VM.vdisk_devices + disknum;
+	struct cpm80_disk_ldevice *const disk = svm->ldisks + disknum;
+	disk->dev = svm->vdisk_devices + disknum;
 	disk->dph_addr = dph_addr;
-	disk->init = vm_vdev_noinit; /* DPH already created */
+	disk->init = vm_vdev_noinit; /* DPH should already be initialized */
 	disk->set_sector = vm_vdisk_setsec;
 	disk->set_track = vm_vdisk_settrk;
 	disk->readl = vm_vdisk_readl;
@@ -178,39 +149,43 @@ static const unsigned *const vm_disk_params[] =
 };
 
 /* base_vm->cpu must be initialized first */
-static int sample_vm_init_all_disks(void)
+static int sample_vm_init_all_disks(struct cpm80_sample_vm *const svm, i8080_addr_t cpm_origin, int ndisks)
 {
-	cpm80_addr_t dph_addrs[VM_MAX_DISKS];
+	cpm80_addr_t dph_addrs[SAMPLEVM_MAX_DISKS];
 	/* right below the BIOS jump table */
-	const cpm80_addr_t disk_defns_begin = base_vm->cpm_origin + 0x1633;
+	const cpm80_addr_t disk_defns_begin = cpm_origin + 0x1633;
 	/* same as in MDS-800 I/O drivers; should be enough clearance */
-	const cpm80_addr_t disk_bdos_ram_begin = base_vm->cpm_origin + 0x186e;
+	const cpm80_addr_t disk_bdos_ram_begin = cpm_origin + 0x186e;
 
 	/* Define disk parameters in BIOS memory in the correct format for CP/M.
-	 * This is a C translation of the CP/M 2.0 disk re-definition library. 
+	 * This is a translation of the CP/M 2.0 disk re-definition library to C.
 	 * See vm_bios.h for more details */
-	int err = cpm80_bios_redefine_disks(base_vm, SAMPLE_VM.base_vm.ndisks,
+	int err = cpm80_bios_redefine_disks(svm->base_vm, ndisks,
 		vm_disk_params, disk_defns_begin, disk_bdos_ram_begin, dph_addrs);
 	if (err) return err;
 
 	int i;
-	for (i = 0; i < SAMPLE_VM.base_vm.ndisks; ++i) {
-		sample_vm_init_disk(i, dph_addrs[i]);
+	for (i = 0; i < ndisks; ++i) {
+		sample_vm_init_disk(svm, i, dph_addrs[i]);
 	}
-
-	SAMPLE_VM.base_vm.disks = SAMPLE_VM.ldisks;
 
 	return 0;
 }
 
-int sample_vm_init(void)
+int sample_vm_init(struct cpm80_sample_vm *const svm,
+	const struct cpm80_sample_vm_params *params, const i8080_word_t cpmbin[0x1633])
 {
-	struct cpm80_vm *base_vm = &SAMPLE_VM.base_vm;
-	struct i8080 *cpu = &SAMPLE_VM.cpu;
+	int err;
+	struct i8080 *const cpu = &svm->cpu;
+	struct cpm80_vm *base_vm = &svm->base_vm;
 
-	/* no memory to boot from! */
-	if (!SAMPLE_VM.memory || !SAMPLE_VM.vdisk_devices[0].disk)
-		return -1;
+	/* init sample_vm */
+	err = set_svm_memory_ptr(svm, params);
+	if (err) return err;
+	err = set_svm_disk_memory_bufs(svm, params);
+	if (err) return err;
+	svm->vcon_device.sin = stdin;
+	svm->vcon_device.sout = stdout;
 
 	/* init cpu */
 	i8080_init(cpu);
@@ -219,19 +194,24 @@ int sample_vm_init(void)
 	
 	/* init base_vm */
 	base_vm->cpu = cpu;
-	base_vm->memsize = SAMPLE_VM.memory_ksize;
+	base_vm->memsize = params->maxaddr / 1024 + 1;
 	/* the usual case, but may depend on manufacturer */
-	base_vm->cpm_origin = (SAMPLE_VM.memory_ksize - 7) * 1024;
+	base_vm->cpm_origin = (base_vm->memsize - 7) * 1024;
 	err = cpm80_vm_init(base_vm);
 	if (err) return err;
 
-	/* init disks and console */
-	err = sample_vm_init_all_disks();
-	if (err) return err;
-	sample_vm_init_console();	
+	/* load cpm binary */
+	memcpy(params->working_memory + base_vm->cpm_origin, cpmbin, 0x1633 * sizeof(i8080_word_t));
 
-	/* assign base_vm devices */
-	base_vm->con = &SAMPLE_VM.lcon;
+	/* init disks and console */
+	err = sample_vm_init_all_disks(svm, (i8080_addr_t)base_vm->cpm_origin, params->ndisks);
+	if (err) return err;
+	base_vm->ndisks = params->ndisks;
+	base_vm->disks = svm->ldisks;
+	sample_vm_init_console(svm);
+	base_vm->con = &svm->lcon;
+
+	/* unused base_vm devices */
 	base_vm->lst = 0;
 	base_vm->rdr = 0;
 	base_vm->pun = 0;
@@ -239,22 +219,25 @@ int sample_vm_init(void)
 	return 0;
 }
 
+static struct cpm80_vm *vm_to_poweroff;
+
 static void poweroff_handler(int sig)
 {
 	signal(sig, SIG_IGN); /* prevent a second signal from arriving */
-	cpm80_vm_poweroff(&SAMPLE_VM.base_vm);
+	cpm80_vm_poweroff(vm_to_poweroff);
 	signal(sig, poweroff_handler);
 }
 
-int sample_vm_start(void)
+int sample_vm_start(struct cpm80_sample_vm *const svm)
 {
-	struct i8080 *cpu = &SAMPLE_VM.cpu;
-	struct cpm80_vm *base_vm = &SAMPLE_VM.base_vm;
+	struct i8080 *cpu = &svm->cpu;
+	struct cpm80_vm *base_vm = &svm->base_vm;
 
 	/* power on! */
 	int err = cpm80_vm_poweron(base_vm);
 	if (err) return err;
 
+	vm_to_poweroff = base_vm;
 	signal(SIGINT, poweroff_handler);
 
 	/* execute instructions until poweroff or fatal error */

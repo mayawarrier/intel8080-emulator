@@ -1,5 +1,5 @@
 /*
- * 8-bit virtual machine for CP/M 2.2 (based on the Intel 8080).
+ * 8-bit virtual machine for CP/M 2.2 based on the Intel 8080.
  *
  * To get the machine running:
  * - implement its serial and disk devices,
@@ -39,13 +39,14 @@ struct cpm80_disk_ldevice;
 enum cpm80_vm_exitcode
 {
 	/* The program made an I/O request but cpu->io_read()
-	 * or cpu->io_write() was not assigned. */
+	 * or cpu->io_write() is NULL. */
 	VM80_UNHANDLED_IO = 1,
-	/* The cpu received an interrupt but interrupt_read()
-	 * was not assigned. */
+	/* The cpu received an interrupt but cpu->interrupt_read()
+	 * is NULL. */
 	VM80_UNHANDLED_INTR,
-	/* A bios call was made from an unexpected memory location. 
-	 * This could indicate a fault in the binary. */
+	/* A bios call was made from an unexpected memory location.
+	 * This should almost never happen. If it does, there might
+	 * be a fault in the 8080 binary. */
 	VM80_UNEXPECTED_MONITOR_CALL,
 	/* The VM quit normally i.e. on poweroff. */
 	VM80_POWEROFF
@@ -54,8 +55,12 @@ enum cpm80_vm_exitcode
 struct cpm80_vm 
 {
 	/* CPU.
-	 * VM reserves usage of cpu->udata,
-	 * cpu->monitor and RST 7 */
+	 * The usage of cpu->udata,
+	 * cpu->monitor and RST 7 is 
+	 * reserved for the VM.
+	 * A valid CP/M 2.2 CCP + BDOS binary
+	 * should be loaded into the CPU's memory
+	 * at cpm_origin (see below). */
 	struct i8080 *cpu;
 
 	/* Memory size in KB (up to 64) */
@@ -82,9 +87,12 @@ struct cpm80_vm
 
 	/* Set automatically by cpm80_vm_init(). 
 	 * Re-assign to override certain bios
-	 * calls if necessary. See vm_callno.h.
+	 * calls if required. See vm_callno.h.
 	 * Return 0 on success, -1 otherwise. */
 	int(*bios_call)(struct cpm80_vm *const, int);
+
+	/* User data */
+	void *udata;
 
 	/* ----------------- private ----------------- */
 
@@ -113,10 +121,10 @@ int cpm80_vm_poweron(struct cpm80_vm *const vm);
 
 /*
  * Power off the VM.
- * Sends an interrupt to i8080 and makes it quit immediately.
+ * Sends an interrupt to the CPU and makes it quit immediately.
  * The next call to i8080_next() exits with -1.
- * If called on another thread, ensure mutual exclusion between
- * i8080_next() and cpm80_vm_poweroff().
+ * If called asynchronously, ensure mutual exclusion 
+ * between calls to this and i8080_next().
  */
 void cpm80_vm_poweroff(struct cpm80_vm *const vm);
 
