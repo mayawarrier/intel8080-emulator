@@ -40,13 +40,13 @@ struct i8080
 	/* io_read(), io_write() and interrupt_read()
 	 * are optional. Set them to NULL if unused. */
 
-	i8080_word_t(*memory_read)(i8080_addr_t mem_addr);
-	i8080_word_t(*io_read)(i8080_addr_t port_addr);
+	i8080_word_t(*memory_read)(const struct i8080 *, i8080_addr_t mem_addr);
+	i8080_word_t(*io_read)(const struct i8080 *, i8080_addr_t port_addr);
 
-	void(*memory_write)(i8080_addr_t mem_addr, i8080_word_t word);
-	void(*io_write)(i8080_addr_t port_addr, i8080_word_t word);
+	void(*memory_write)(const struct i8080 *, i8080_addr_t mem_addr, i8080_word_t word);
+	void(*io_write)(const struct i8080 *, i8080_addr_t port_addr, i8080_word_t word);
 	
-	i8080_word_t(*interrupt_read)(void);
+	i8080_word_t(*interrupt_read)(const struct i8080 *);
 
 	/* Clock cycles since init */
 	unsigned long cycles;

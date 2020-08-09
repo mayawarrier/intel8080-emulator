@@ -72,7 +72,7 @@ static const char vmsprintf_buf[STRBUF_SIZE], VM_strbuf[STRBUF_SIZE];
  * (as ANSI C doesn't guarantee that void * can hold all integer
  *  values. though it can certainly point to them)
  * Bounds are not checked on the args -> should only be as many args as format specifiers! */
-static inline int vmsprintf(char *dest, const char *format, void const *const *args)
+static int vmsprintf(char *dest, const char *format, void const *const *args)
 {
 	unsigned arglen, width, nchars = 0;
 
@@ -231,7 +231,7 @@ static inline int is_disk_device_initialized(struct cpm80_disk_ldevice *disk)
 	return (disk && disk->init && disk->readl && disk->writel && disk->set_sector && disk->set_track);
 }
 
-static void fatal_io_write(i8080_addr_t port, i8080_word_t word)
+static void fatal_io_write(const struct i8080 *cpu, i8080_addr_t port, i8080_word_t word)
 {
 	port &= 0xff; /* actual port is only 8 bits */
 	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
@@ -245,7 +245,7 @@ static void fatal_io_write(i8080_addr_t port, i8080_word_t word)
 	vm->cpu->exitcode = VM80_UNHANDLED_IO;
 }
 
-static i8080_word_t fatal_io_read(i8080_addr_t port)
+static i8080_word_t fatal_io_read(const struct i8080 *cpu, i8080_addr_t port)
 {
 	port &= 0xff; /* actual port is only 8 bits */
 	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
@@ -260,7 +260,7 @@ static i8080_word_t fatal_io_read(i8080_addr_t port)
 	return 0;
 }
 
-static i8080_word_t fatal_interrupt_read(void)
+static i8080_word_t fatal_interrupt_read(const struct i8080 *cpu)
 {
 	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
 
@@ -294,7 +294,7 @@ int cpm80_vm_poweron(struct cpm80_vm *const vm)
 	return 0;
 }
 
-static i8080_word_t poweroff_handler(void)
+static i8080_word_t poweroff_handler(const struct i8080 *cpu)
 {
 	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
 	vm->cpu->exitcode = VM80_POWEROFF;

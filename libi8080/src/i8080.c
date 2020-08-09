@@ -175,17 +175,17 @@ static inline void i8080_set_psw(struct i8080 *const cpu, i8080_dbl_word_t dbl_w
 
 /* Read word at [HL] */
 static inline i8080_word_t i8080_memory_read_indirect(struct i8080 *const cpu) {
-	return trim_to_word(cpu->memory_read((i8080_addr_t)i8080_get_hl(cpu)));
+	return trim_to_word(cpu->memory_read(cpu, (i8080_addr_t)i8080_get_hl(cpu)));
 }
 
 /* Write word to [HL] */
 static inline void i8080_memory_write_indirect(struct i8080 *const cpu, i8080_word_t word) {
-	cpu->memory_write((i8080_addr_t)i8080_get_hl(cpu), word);
+	cpu->memory_write(cpu, (i8080_addr_t)i8080_get_hl(cpu), word);
 }
 
 /* Read a word and advance PC by 1. */
 static inline i8080_word_t i8080_advance_read_word(struct i8080 *const cpu) {
-	return trim_to_word(cpu->memory_read(cpu->pc++));
+	return trim_to_word(cpu->memory_read(cpu, cpu->pc++));
 }
 
 /* Read address and advance PC by 2.
@@ -294,15 +294,15 @@ static void i8080_dad(struct i8080 *const cpu, i8080_dbl_word_t reg_pair) {
 /* Store HL to immediate address. */
 static inline void i8080_shld(struct i8080 *const cpu) {
 	i8080_addr_t addr = i8080_advance_read_addr(cpu);
-	cpu->memory_write(addr++, cpu->l);
-	cpu->memory_write(addr, cpu->h);
+	cpu->memory_write(cpu, addr++, cpu->l);
+	cpu->memory_write(cpu, addr, cpu->h);
 }
 
 /* Load HL from immediate address. */
 static inline void i8080_lhld(struct i8080 *const cpu) {
 	i8080_addr_t addr = i8080_advance_read_addr(cpu);
-	cpu->l = trim_to_word(cpu->memory_read(addr++));
-	cpu->h = trim_to_word(cpu->memory_read(addr));
+	cpu->l = trim_to_word(cpu->memory_read(cpu, addr++));
+	cpu->h = trim_to_word(cpu->memory_read(cpu, addr));
 }
 
 /* Circular shift accumulator left, set carry to old MSB. */
@@ -362,15 +362,15 @@ static void i8080_daa(struct i8080 *const cpu) {
 static void i8080_push(struct i8080 *const cpu, i8080_dbl_word_t dbl_word) {
 	i8080_word_t upper_word = dbl_word_upper(dbl_word);
 	i8080_word_t lower_word = dbl_word_lower(dbl_word);
-	cpu->memory_write(--cpu->sp, upper_word);
-	cpu->memory_write(--cpu->sp, lower_word);
+	cpu->memory_write(cpu, --cpu->sp, upper_word);
+	cpu->memory_write(cpu, --cpu->sp, lower_word);
 }
 
 /* Pop two words from stack and increment stack pointer by 2.
  * (lower word before upper word) */
 static i8080_dbl_word_t i8080_pop(struct i8080 *const cpu) {
-	i8080_word_t lower_word = trim_to_word(cpu->memory_read(cpu->sp++));
-	i8080_word_t upper_word = trim_to_word(cpu->memory_read(cpu->sp++));
+	i8080_word_t lower_word = trim_to_word(cpu->memory_read(cpu, cpu->sp++));
+	i8080_word_t upper_word = trim_to_word(cpu->memory_read(cpu, cpu->sp++));
 	return concatenate(upper_word, lower_word);
 }
 
@@ -408,10 +408,10 @@ static inline void i8080_ret(struct i8080 *const cpu, int condition) {
 
 /* Exchange HL with top two words on the stack. */
 static inline void i8080_xthl(struct i8080 *const cpu) {
-	i8080_word_t prev_lower_word = trim_to_word(cpu->memory_read(cpu->sp++));
-	i8080_word_t prev_upper_word = trim_to_word(cpu->memory_read(cpu->sp));
-	cpu->memory_write(cpu->sp--, cpu->h);
-	cpu->memory_write(cpu->sp, cpu->l);
+	i8080_word_t prev_lower_word = trim_to_word(cpu->memory_read(cpu, cpu->sp++));
+	i8080_word_t prev_upper_word = trim_to_word(cpu->memory_read(cpu, cpu->sp));
+	cpu->memory_write(cpu, cpu->sp--, cpu->h);
+	cpu->memory_write(cpu, cpu->sp, cpu->l);
 	cpu->h = prev_upper_word;
 	cpu->l = prev_lower_word;
 }
@@ -431,7 +431,7 @@ static inline void i8080_xchg(struct i8080 *const cpu) {
 static inline int i8080_in(struct i8080 *const cpu) {
 	if (!cpu->io_read) return -1;
 	i8080_word_t port_addr = i8080_advance_read_word(cpu);
-	cpu->a = trim_to_word(cpu->io_read((i8080_addr_t)concatenate(port_addr, port_addr)));
+	cpu->a = trim_to_word(cpu->io_read(cpu, (i8080_addr_t)concatenate(port_addr, port_addr)));
 	if (cpu->exitcode) return -1;
 	return 0;
 }
@@ -440,7 +440,7 @@ static inline int i8080_in(struct i8080 *const cpu) {
 static inline int i8080_out(struct i8080 *const cpu) {
 	if (!cpu->io_write) return -1;
 	i8080_word_t port_addr = i8080_advance_read_word(cpu);
-	cpu->io_write((i8080_addr_t)concatenate(port_addr, port_addr), cpu->a);
+	cpu->io_write(cpu, (i8080_addr_t)concatenate(port_addr, port_addr), cpu->a);
 	if (cpu->exitcode) return -1;
 	return 0;
 }
@@ -468,7 +468,7 @@ int i8080_next(struct i8080 *const cpu) {
 
 	/* Service interrupt if pending request exists */
 	if (cpu->inte && cpu->intr) {
-		opcode = trim_to_word(cpu->interrupt_read());
+		opcode = trim_to_word(cpu->interrupt_read(cpu));
 		if (cpu->exitcode) return -1;
 		/* disable interrupts and bring out of halt */
 		cpu->inte = 0;
@@ -666,14 +666,14 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_LXI_SP: cpu->sp = i8080_advance_read_addr(cpu); break;
 
 		/* Load/store accumulator, immediate indirect */
-		case i8080_STA: cpu->memory_write(i8080_advance_read_addr(cpu), cpu->a); break;
-		case i8080_LDA: cpu->a = trim_to_word(cpu->memory_read(i8080_advance_read_addr(cpu))); break;
+		case i8080_STA: cpu->memory_write(cpu, i8080_advance_read_addr(cpu), cpu->a); break;
+		case i8080_LDA: cpu->a = trim_to_word(cpu->memory_read(cpu, i8080_advance_read_addr(cpu))); break;
 
 		/* Load/store accumulator, double register indirect */
-		case i8080_LDAX_B: cpu->a = trim_to_word(cpu->memory_read((i8080_addr_t)i8080_get_bc(cpu))); break;
-		case i8080_LDAX_D: cpu->a = trim_to_word(cpu->memory_read((i8080_addr_t)i8080_get_de(cpu))); break;
-		case i8080_STAX_B: cpu->memory_write((i8080_addr_t)i8080_get_bc(cpu), cpu->a); break;
-		case i8080_STAX_D: cpu->memory_write((i8080_addr_t)i8080_get_de(cpu), cpu->a); break;
+		case i8080_LDAX_B: cpu->a = trim_to_word(cpu->memory_read(cpu, (i8080_addr_t)i8080_get_bc(cpu))); break;
+		case i8080_LDAX_D: cpu->a = trim_to_word(cpu->memory_read(cpu, (i8080_addr_t)i8080_get_de(cpu))); break;
+		case i8080_STAX_B: cpu->memory_write(cpu, (i8080_addr_t)i8080_get_bc(cpu), cpu->a); break;
+		case i8080_STAX_D: cpu->memory_write(cpu, (i8080_addr_t)i8080_get_de(cpu), cpu->a); break;
 
 		/* Load/store double register, immediate indirect */
 		case i8080_SHLD: i8080_shld(cpu); break;
