@@ -98,14 +98,14 @@ static int libi8080_cpm_call(struct i8080* cpu) noexcept
 					while ((c = (char)cpu->memory_read(cpu, ptr)) != '$') {
 						strbuf[i++] = c;
 						if (i == 128) {
-							// buffer full, flush
+							// buffer full, flush to console
 							std::printf("%s", strbuf);
 							std::memset(strbuf, '\0', 128 * sizeof(char));
 							i = 0;
 						}
 						ptr++;
 					}
-					std::printf("%s", strbuf); // write to console
+					std::printf("%s", strbuf); // write remaining chars
 				} break;
 
 				default: {
@@ -230,9 +230,9 @@ static void libi8080_cpm_reset(struct cpm80_fake_vm& vm)
 }
 
 // default test paths to run if no path given
-static const char TST8080_COM[] = "tests/TST8080.COM";
-static const char CPUTEST_COM[] = "tests/CPUTEST.COM";
-static const char INTERRUPTS_COM[] = "tests/INTERRUPT.COM";
+static const char TST8080_COM[] = "bin/TST8080.COM";
+static const char CPUTEST_COM[] = "bin/CPUTEST.COM";
+static const char INTERRUPTS_COM[] = "bin/INTERRUPT.COM";
 
 static int libi8080_load_and_run(struct i8080& cpu, const char filepath[], int is_cpm_mode = 1, int ms_to_interrupt = -1)
 {
@@ -250,7 +250,7 @@ static int libi8080_load_and_run(struct i8080& cpu, const char filepath[], int i
 	if (ms_to_interrupt <= 0) err = i8080_run(cpu);
 	else err = i8080_interrupted_run(cpu, ms_to_interrupt);
 	std::cout << "\n--------------------------------------------\n";
-	std::cout << ">> Run lasted " << cpu.cycles << " cycles.\n\n";
+	std::cout << ">> Ran for " << cpu.cycles << " cycles.\n\n";
 
 	return err;
 }

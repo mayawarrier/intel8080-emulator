@@ -3,7 +3,7 @@
 #define FRONTEND_TEST_H
 
 #include <cstddef>
-#include "i8080_types.h"
+#include "i8080.h"
 
 struct i8080;
 

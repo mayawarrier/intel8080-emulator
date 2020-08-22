@@ -4,7 +4,6 @@
 #include <iostream>
 #include <algorithm>
 #include <test.hpp>
-#include "i8080.h"
 
 int i8main(int argc, char** argv)
 {
