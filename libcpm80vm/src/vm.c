@@ -21,22 +21,31 @@ static inline unsigned vmstrlen(const char *str)
 	return l;
 }
 
-/* strcpy, but returns ptr to end of dest and also sets length. */
+/* strcpy */
 static inline char *vmstrcpy(char *dest, const char *src, unsigned *length)
 {
 	unsigned l = 0;
+	char *odest = dest;
 	while (*src != '\0') {
 		*dest = *src;
 		src++; dest++; l++;
 	}
 	*dest = '\0';
 	if (length) *length = l;
-	return dest;
+	return odest;
 }
 
-/* utoa (unsigned value to string) but also sets length */
+/* utoa (unsigned value to string) */
 static inline char *vmutoa(unsigned value, char *dest, const int base, unsigned *length)
 {
+	/* special case */
+	if (value == 0) {
+		*dest = '0';
+		*(dest + 1) = '\0';
+		if (length) *length = 1;
+		return dest;
+	}
+
 	char *odest = dest;
 	/* Extract each digit (units first)
 	   and append to string as ascii */
@@ -65,14 +74,14 @@ static inline char *vmutoa(unsigned value, char *dest, const int base, unsigned 
 }
 
 #define STRBUF_SIZE (128)
-static const char vmsprintf_buf[STRBUF_SIZE], VM_strbuf[STRBUF_SIZE];
+static char vmsprintf_buf[STRBUF_SIZE], VM_strbuf[STRBUF_SIZE];
 
 /* Supports %u, %s and %x, width, and 0-padding.
  * Non-string args are treated as a pointer to an integer type
  * (as ANSI C doesn't guarantee that void * can hold all integer
  *  values. though it can certainly point to them)
  * Bounds are not checked on the args -> should only be as many args as format specifiers! */
-static int vmsprintf(char *dest, const char *format, void const *const *args)
+static int vmsprintf(char *dest, const char *format, const void *const *args)
 {
 	unsigned arglen, width, nchars = 0;
 
@@ -140,7 +149,8 @@ static int vmsprintf(char *dest, const char *format, void const *const *args)
 				}
 			}
 
-			dest = vmstrcpy(dest, vmsprintf_buf, 0);
+			vmstrcpy(dest, vmsprintf_buf, 0);
+			dest += arglen;
 			nchars += arglen;
 		} else {
 			/* no formatting */
@@ -153,7 +163,7 @@ static int vmsprintf(char *dest, const char *format, void const *const *args)
 	return (int)nchars;
 }
 
-static inline void vmputs(struct cpm80_serial_ldevice *con, char *msg)
+static inline void vmputs(struct cpm80_serial_ldevice *const con, char *msg)
 {
 	char c;
 	while ((c = *msg) != '\0') {
@@ -207,16 +217,16 @@ int cpm80_vm_init(struct cpm80_vm *const vm)
 	/* monitor calls are made on RST 7 */
 	int i; cpm80_addr_t ptr = bios_jmp_table_ptr;
 	for (i = 0; i < 17; ++i) {
-		vm->cpu->memory_write(ptr, i8080_RST_7);
+		vm->cpu->memory_write(vm->cpu, ptr, i8080_RST_7);
 		ptr += 0x0003;
 	}
 
 	/* JMP to cold boot on reset */
 	i8080_word_t boot_ptr_lo = (i8080_word_t)(bios_jmp_table_ptr & 0xff);
 	i8080_word_t boot_ptr_hi = (i8080_word_t)((bios_jmp_table_ptr >> 8) & 0xff);
-	vm->cpu->memory_write(0x0000, i8080_JMP);
-	vm->cpu->memory_write(0x0001, boot_ptr_lo);
-	vm->cpu->memory_write(0x0002, boot_ptr_hi);
+	vm->cpu->memory_write(vm->cpu, 0x0000, i8080_JMP);
+	vm->cpu->memory_write(vm->cpu, 0x0001, boot_ptr_lo);
+	vm->cpu->memory_write(vm->cpu, 0x0002, boot_ptr_hi);
 
 	return 0;
 }
@@ -276,14 +286,13 @@ int cpm80_vm_poweron(struct cpm80_vm *const vm)
 {
 	/* check for bad configuration */
 	if (!vm || !is_serial_device_initialized(vm->con) || !vm->bios_call ||
-		!vm->disks || vm->ndisks < 1 || !is_disk_device_initialized(vm->disks[0]) ||
+		!vm->disks || vm->ndisks < 1 || !is_disk_device_initialized(vm->disks) ||
 		!vm->cpu || !vm->cpu->memory_read || !vm->cpu->memory_write || vm->cpu->exitcode != 0) {
 		return -1;
 	}
 
-	/* If these handlers don't exist we can't substitute them with anything
-	 * reasonable as the program may misbehave after calling them and fail to exit.
-	 * Catch this attempt and quit the VM */
+	/* If these handlers are NULL, calling them fails silently.
+	 * Instead, catch any attempt to do so and print debug info */
 	if (!vm->cpu->io_read) vm->cpu->io_read = fatal_io_read;
 	if (!vm->cpu->io_write) vm->cpu->io_write = fatal_io_write;
 	if (!vm->cpu->interrupt_read) vm->cpu->interrupt_read = fatal_interrupt_read;
@@ -297,17 +306,20 @@ int cpm80_vm_poweron(struct cpm80_vm *const vm)
 static i8080_word_t poweroff_handler(const struct i8080 *cpu)
 {
 	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
+	vm->cpu->interrupt_read = vm->prev_ih; /* restore original */
 	vm->cpu->exitcode = VM80_POWEROFF;
+	vm->is_poweron = 0;
 	return 0;
 }
 
 void cpm80_vm_poweroff(struct cpm80_vm *const vm)
 {
-	i8080_word_t(*old_handler)(void) = vm->cpu->interrupt_read;
+	if (vm->cpu->interrupt_read != fatal_interrupt_read)
+		vm->prev_ih = vm->cpu->interrupt_read;
+	else vm->prev_ih = 0; /* no handler was assigned initially */
+
 	vm->cpu->interrupt_read = poweroff_handler;
 	i8080_interrupt(vm->cpu);
-	vm->cpu->interrupt_read = old_handler;
-	vm->is_poweron = 0;
 }
 
 #define lsbit(buf) (buf & (unsigned)1) 
@@ -316,36 +328,31 @@ void cpm80_vm_poweroff(struct cpm80_vm *const vm)
 #define get_bios_args_bc(cpu) concatenate((cpu)->b, (cpu)->c)
 #define get_bios_args_de(cpu) concatenate((cpu)->d, (cpu)->e)
 
-static inline void set_bios_return_hl(struct i8080 *const cpu, unsigned val)
+static inline void set_bios_retval_hl(struct i8080 *const cpu, unsigned val)
 {
 	cpu->h = (i8080_word_t)((val & 0xff00) >> 8);
 	cpu->l = (i8080_word_t)(val & 0xff);
 }
 
-#define cpm80_serial_ldevice_init(ldev)     ((ldev)->init((ldev)->dev))
-#define cpm80_serial_ldevice_in(cpu, ldev)  ((cpu)->a = (i8080_word_t)((ldev)->in((ldev)->dev)))
-#define cpm80_serial_ldevice_out(cpu, ldev) ((ldev)->out((ldev)->dev, (char)((cpu)->c)))
+#define cpm80_serial_ldevice_init(ldev) ((ldev)->init((ldev)->dev))
+#define cpm80_serial_ldevice_in(cpu, ldev) ((cpu)->a = (i8080_word_t)((ldev)->in((ldev)->dev)))
+#define cpm80_serial_ldevice_out(cpu, ldev)	((ldev)->out((ldev)->dev, (char)((cpu)->c)))
+#define cpm80_serial_ldevice_status(cpu, ldev) ((cpu)->a = ((ldev)->status((ldev)->dev)) ? 0xff : 0x00)
+#define cpm80_disk_ldevice_set_sector(ldev, sector) ((ldev)->set_sector((ldev)->dev, sector))
+#define cpm80_disk_ldevice_set_track(ldev, track) ((ldev)->set_track((ldev)->dev, track))
 
-static inline void cpm80_serial_ldevice_status(struct i8080 *const cpu, struct cpm80_serial_ldevice *const ldev)
+static inline void set_disk_exitcode(struct i8080 *const cpu, int exitcode)
 {
-	int status = ldev->status(ldev->dev);
-	if (status) cpu->a = 0xff;
-	else cpu->a = 0x00;
-}
-
-static inline void set_exitcode(struct i8080 *const cpu, int exitcode)
-{
-	switch (exitcode)
-	{
+	switch (exitcode) {
 		case -1: cpu->a = 0xff; break;
 		default: cpu->a = (i8080_word_t)exitcode;
 	}
 }
 
-static inline void cpm80_disk_select(struct cpm80_vm *const vm, int disknum)
+static inline void cpm80_disk_ldevice_select(struct cpm80_vm *const vm, int disknum)
 {
 	int err;
-	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
+	struct cpm80_disk_ldevice *const disk = vm->disks + disknum;
 
 	if (!lsbit(vm->cpu->e)) {
 		/* this will determine and generate the disk format, if possible */
@@ -353,61 +360,84 @@ static inline void cpm80_disk_select(struct cpm80_vm *const vm, int disknum)
 	}
 
 	if (err) {
-		set_bios_return_hl(vm->cpu, 0);
+		set_bios_retval_hl(vm->cpu, 0);
 		return;
 	}
 
-	set_bios_return_hl(vm->cpu, disk->dph_addr);
+	set_bios_retval_hl(vm->cpu, disk->dph_addr);
 	vm->sel_disk = disknum;
 }
 
-static inline void cpm80_disk_set_track(struct cpm80_vm *const vm, int disknum, unsigned track)
+static int quit_on_dma_out_of_bounds(int memsize,
+	cpm80_addr_t dma_addr, struct cpm80_serial_ldevice *const con)
 {
-	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
-	disk->set_track(disk->dev, track);
+	unsigned space;
+	if (memsize >= 64) {
+		space = 65535 - (unsigned)dma_addr;
+		space++;
+	} else {
+		space = (unsigned)memsize * 1024 - (unsigned)dma_addr;
+	}
+
+	if (space < 128) {
+		void *fargs[] = { &dma_addr };
+		vmsprintf(VM_strbuf + 64, "Disk DMA out of bounds: 0x%04x", fargs);
+		fargs[0] = VM_strbuf + 64;
+		vmsprintf(VM_strbuf, VM_fatal_fmt, fargs);
+		vmputs(con, VM_strbuf);
+
+		return VM80_DMA_OUT_OF_BOUNDS;
+	}
+	return 0;
 }
 
-static inline void cpm80_disk_set_sector(struct cpm80_vm *const vm, int disknum, unsigned sector)
-{
-	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
-	disk->set_sector(disk->dev, sector);
-}
-
-static inline void cpm80_disk_read(struct cpm80_vm *const vm, int disknum)
+static inline void cpm80_disk_ldevice_read(struct cpm80_vm *const vm, int disknum)
 {
 	int err;
-	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
+	struct cpm80_disk_ldevice *const disk = vm->disks + disknum;
 
 	char buf[128];
 	err = disk->readl(disk->dev, buf);
 
-	set_exitcode(vm->cpu, err);
+	set_disk_exitcode(vm->cpu, err);
 	if (err) return;
 
-	unsigned long i;
-	unsigned long start = (unsigned long)vm->dma_addr, end = start + 128;
+	err = quit_on_dma_out_of_bounds(vm->memsize, vm->dma_addr, vm->con);
+	if (err) {
+		vm->cpu->exitcode = err;
+		return;
+	}
+
+	unsigned i;
+	const unsigned start = (unsigned)vm->dma_addr, end = start + 128;
 	for (i = start; i < end; ++i) {
-		vm->cpu->memory_write((i8080_addr_t)i, buf[i]);
+		vm->cpu->memory_write(vm->cpu, (i8080_addr_t)i, buf[i]);
 	}
 }
 
-static inline void cpm80_disk_write(struct cpm80_vm *vm, int disknum)
+static inline void cpm80_disk_ldevice_write(struct cpm80_vm *const vm, int disknum)
 {
 	int err;
-	struct cpm80_disk_ldevice *disk = &vm->disks[disknum];
+	struct cpm80_disk_ldevice *const disk = vm->disks + disknum;
+
+	err = quit_on_dma_out_of_bounds(vm->memsize, vm->dma_addr, vm->con);
+	if (err) {
+		vm->cpu->exitcode = err;
+		return;
+	}
 
 	char buf[128];
-	unsigned long i;
-	unsigned long start = (unsigned long)vm->dma_addr, end = start + 128;
+	unsigned i;
+	const unsigned start = (unsigned)vm->dma_addr, end = start + 128;
 	for (i = start; i < end; ++i) {
-		buf[i] = (char)vm->cpu->memory_read((i8080_addr_t)i);
+		buf[i] = (char)vm->cpu->memory_read(vm->cpu, (i8080_addr_t)i);
 	}
 
 	err = disk->writel(disk->dev, buf, (int)vm->cpu->c);
-	set_exitcode(vm->cpu, err);
+	set_disk_exitcode(vm->cpu, err);
 }
 
-static inline void cpm80_disk_sectran(struct cpm80_vm *vm)
+static inline void cpm80_disk_ldevice_sectran(struct cpm80_vm *const vm)
 {
 	unsigned lsector = get_bios_args_bc(vm->cpu);
 	unsigned sectran_table_ptr = get_bios_args_de(vm->cpu);
@@ -419,10 +449,10 @@ static inline void cpm80_disk_sectran(struct cpm80_vm *vm)
 		 * Return without translation. */
 		psector = lsector;
 	} else {
-		psector = (unsigned)vm->cpu->memory_read((i8080_addr_t)(sectran_table_ptr + lsector));
+		psector = (unsigned)vm->cpu->memory_read(vm->cpu, (i8080_addr_t)(sectran_table_ptr + lsector));
 	}
 
-	set_bios_return_hl(vm->cpu, psector);
+	set_bios_retval_hl(vm->cpu, psector);
 }
 
 static const char BOOT_signon_fmt[] = "github.com/mayawarrier/intel8080-emulator\r\n%uK CP/M VERS %s\r\n\n";
@@ -431,9 +461,10 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno)
 {
 	int err = 0;
 	struct i8080 *const cpu = vm->cpu; 
-	struct cpm80_disk_ldevice *const disks = vm->disks;
 	struct cpm80_serial_ldevice *const con = vm->con,
 		*const lst = vm->lst, *const pun = vm->pun, *const rdr = vm->rdr;
+
+	struct cpm80_disk_ldevice *const sel_disk_ldev = vm->disks + vm->sel_disk;
 
 	switch (callno)
 	{
@@ -460,13 +491,13 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno)
 		{
 			/* Create wboot and bdos entry points at 0x0 and 0x5 for user code */
 			cpm80_addr_t wboot_entry = vm->cpm_origin + 0x1603;
-			cpu->memory_write(0x0000, i8080_JMP);
-			cpu->memory_write(0x0001, (i8080_word_t)(wboot_entry & 0xff));
-			cpu->memory_write(0x0002, (i8080_word_t)((wboot_entry & 0xff00) >> 8));
+			cpu->memory_write(vm->cpu, 0x0000, i8080_JMP);
+			cpu->memory_write(vm->cpu, 0x0001, (i8080_word_t)(wboot_entry & 0xff));
+			cpu->memory_write(vm->cpu, 0x0002, (i8080_word_t)((wboot_entry & 0xff00) >> 8));
 			cpm80_addr_t bdos_entry = vm->cpm_origin + 0x0806;
-			cpu->memory_write(0x0005, i8080_JMP);
-			cpu->memory_write(0x0006, (i8080_word_t)(bdos_entry & 0xff));
-			cpu->memory_write(0x0007, (i8080_word_t)((bdos_entry & 0xff00) >> 8));
+			cpu->memory_write(vm->cpu, 0x0005, i8080_JMP);
+			cpu->memory_write(vm->cpu, 0x0006, (i8080_word_t)(bdos_entry & 0xff));
+			cpu->memory_write(vm->cpu, 0x0007, (i8080_word_t)((bdos_entry & 0xff00) >> 8));
 
 			/* jump to CP/M command processor */
 			cpu->pc = (i8080_addr_t)vm->cpm_origin;
@@ -483,16 +514,16 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno)
 		case BIOS_PUNCH:  cpm80_serial_ldevice_out(cpu, pun); break;
 		case BIOS_READER: cpm80_serial_ldevice_in(cpu, rdr); break;
 
-		case BIOS_SELDSK: cpm80_disk_select(vm, cpu->c); break;
-		case BIOS_HOME:   cpm80_disk_set_track(vm, vm->sel_disk, 0); break;
-		case BIOS_SETTRK: cpm80_disk_set_track(vm, vm->sel_disk, get_bios_args_bc(cpu)); break;
-		case BIOS_SETSEC: cpm80_disk_set_sector(vm, vm->sel_disk, get_bios_args_bc(cpu)); break;
+		case BIOS_SELDSK: cpm80_disk_ldevice_select(vm, (int)cpu->c); break;
+		case BIOS_HOME:   cpm80_disk_ldevice_set_track(sel_disk_ldev, 0); break;
+		case BIOS_SETTRK: cpm80_disk_ldevice_set_track(sel_disk_ldev, get_bios_args_bc(cpu)); break;
+		case BIOS_SETSEC: cpm80_disk_ldevice_set_sector(sel_disk_ldev, get_bios_args_bc(cpu)); break;
 
 		case BIOS_SETDMA: vm->dma_addr = (cpm80_addr_t)get_bios_args_bc(cpu); break;
 
-		case BIOS_READ:    cpm80_disk_read(vm, vm->sel_disk); break;
-		case BIOS_WRITE:   cpm80_disk_write(vm, vm->sel_disk); break;
-		case BIOS_SECTRAN: cpm80_disk_sectran(vm); break;
+		case BIOS_READ:    cpm80_disk_ldevice_read(vm, vm->sel_disk); break;
+		case BIOS_WRITE:   cpm80_disk_ldevice_write(vm, vm->sel_disk); break;
+		case BIOS_SECTRAN: cpm80_disk_ldevice_sectran(vm); break;
 
 		default: err = -1; /* unrecognized BIOS call */
 	}
@@ -500,20 +531,20 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno)
 	return err;
 }
 
-static inline void write_zeros(struct cpm80_vm *const vm, cpm80_addr_t buf, unsigned long buflen)
+static inline void write_zeros(struct cpm80_vm *const vm, cpm80_addr_t start, unsigned len)
 {
-	unsigned long i;
-	const unsigned long end = (unsigned long)buf + buflen;
-	for (i = (unsigned long)buf; i < end; ++i) {
-		vm->cpu->memory_write((i8080_addr_t)i, 0x00);
+	unsigned i;
+	const unsigned end = (unsigned)start + len;
+	for (i = (unsigned)start; i < end; ++i) {
+		vm->cpu->memory_write(vm->cpu, (i8080_addr_t)i, 0x00);
 	}
 }
 
-static inline void write_word(void(*write_byte)(i8080_addr_t, i8080_word_t), cpm80_addr_t addr, cpm80_word_t word)
+static inline void write_word(struct i8080 *const cpu, cpm80_addr_t addr, cpm80_word_t word)
 {
 	i8080_word_t lo = (i8080_word_t)(word & 0x00ff), hi = (i8080_word_t)((word & 0xff00) >> 8);
-	write_byte((i8080_addr_t)addr++, hi);
-	write_byte((i8080_addr_t)addr, lo);
+	cpu->memory_write(cpu, (i8080_addr_t)addr++, hi);
+	cpu->memory_write(cpu, (i8080_addr_t)addr, lo);
 }
 
 /* see cpm80_bios.h */
@@ -612,36 +643,35 @@ static void get_disk_parameter_block(struct disk_params *params, struct disk_par
 }
 
 /* Written in order: spt, bsh, blm, exm, dsm, drm, al0, al1, cks, off. */
-static void write_disk_param_block(struct cpm80_vm *vm, struct disk_param_block *param_block, cpm80_addr_t buf_ptr)
+static void write_disk_param_block(struct cpm80_vm *const vm, struct disk_param_block *param_block, cpm80_addr_t buf_ptr)
 {
-	void(*write_byte)(i8080_addr_t, i8080_word_t) = vm->cpu->memory_write;
-	write_word(write_byte, buf_ptr, param_block->spt); buf_ptr += 2;
-	write_byte(buf_ptr, param_block->bsh); buf_ptr += 1;
-	write_byte(buf_ptr, param_block->blm); buf_ptr += 1;
-	write_byte(buf_ptr, param_block->exm); buf_ptr += 1;
-	write_word(write_byte, buf_ptr, param_block->dsm); buf_ptr += 2;
-	write_word(write_byte, buf_ptr, param_block->drm); buf_ptr += 2;
-	write_byte(buf_ptr, param_block->al0); buf_ptr += 1;
-	write_byte(buf_ptr, param_block->al1); buf_ptr += 1;
-	write_word(write_byte, buf_ptr, param_block->cks); buf_ptr += 2;
-	write_word(write_byte, buf_ptr, param_block->off);
+	write_word(vm->cpu, buf_ptr, param_block->spt); buf_ptr += 2;
+	vm->cpu->memory_write(vm->cpu, buf_ptr, param_block->bsh); buf_ptr += 1;
+	vm->cpu->memory_write(vm->cpu, buf_ptr, param_block->blm); buf_ptr += 1;
+	vm->cpu->memory_write(vm->cpu, buf_ptr, param_block->exm); buf_ptr += 1;
+	write_word(vm->cpu, buf_ptr, param_block->dsm); buf_ptr += 2;
+	write_word(vm->cpu, buf_ptr, param_block->drm); buf_ptr += 2;
+	vm->cpu->memory_write(vm->cpu, buf_ptr, param_block->al0); buf_ptr += 1;
+	vm->cpu->memory_write(vm->cpu, buf_ptr, param_block->al1); buf_ptr += 1;
+	write_word(vm->cpu, buf_ptr, param_block->cks); buf_ptr += 2;
+	write_word(vm->cpu, buf_ptr, param_block->off);
 }
 
 /* Returns total vector size (als + css) */
-static unsigned write_alv_csv_with_size(struct cpm80_vm *vm, 
+static unsigned write_alv_csv_with_size(struct cpm80_vm *const vm, 
 	struct disk_header *headers, int disknum, unsigned als, unsigned css, cpm80_addr_t buf)
 {
 	unsigned vtotal_size = als + css;
 
 	headers[disknum].alv = buf;
 	headers[disknum].csv = buf + (cpm80_addr_t)als;
-	write_zeros(vm, buf, (unsigned long)vtotal_size);
+	write_zeros(vm, buf, vtotal_size);
 
 	return vtotal_size;
 }
 
 /* Returns total vector size (als + css) */
-static unsigned write_alv_csv(struct cpm80_vm *vm, struct disk_params *params, 
+static unsigned write_alv_csv(struct cpm80_vm *const vm, struct disk_params *params, 
 	struct disk_shared_params *shared_params, struct disk_header *headers, int disknum, cpm80_addr_t buf)
 {
 	unsigned csv_size = params->cks / 4;
@@ -675,8 +705,6 @@ static unsigned greatest_common_divisor(unsigned a, unsigned b)
 static unsigned
 write_sector_translate_table(struct cpm80_vm *const vm, struct disk_params *params, struct disk_param_block *param_block, cpm80_addr_t buf_ptr)
 {
-	void(*write_byte)(i8080_addr_t, i8080_word_t) = vm->cpu->memory_write;
-
 	unsigned skew = params->skf;
 	unsigned sectors = param_block->spt;
 	unsigned sector_offset = params->fsc;
@@ -699,10 +727,10 @@ write_sector_translate_table(struct cpm80_vm *const vm, struct disk_params *para
 		unsigned sector_alloc = next_sector + sector_offset;
 
 		if (sectors < 256) {
-			write_byte(buf_ptr, sector_alloc);
+			vm->cpu->memory_write(vm->cpu, buf_ptr, sector_alloc);
 			buf_ptr += 1;
 		} else {
-			write_word(write_byte, buf_ptr, sector_alloc);
+			write_word(vm->cpu, buf_ptr, sector_alloc);
 			buf_ptr += 2;
 		}
 
@@ -725,15 +753,14 @@ write_sector_translate_table(struct cpm80_vm *const vm, struct disk_params *para
 /* Written in order: xlt, 0, 0, 0, dirbuf, dpb, csv, alv */
 static void write_disk_header(struct cpm80_vm *const vm, struct disk_header *header, cpm80_addr_t buf_ptr)
 {
-	void(*write_byte)(i8080_addr_t, i8080_word_t) = vm->cpu->memory_write;
-	write_word(write_byte, buf_ptr, (cpm80_word_t)header->xlt); buf_ptr += 2;
-	write_word(write_byte, buf_ptr, 0x0000); buf_ptr += 2;
-	write_word(write_byte, buf_ptr, 0x0000); buf_ptr += 2; /* 3 blank words, used as a workspace by CP/M */
-	write_word(write_byte, buf_ptr, 0x0000); buf_ptr += 2;
-	write_word(write_byte, buf_ptr, (cpm80_word_t)header->dirbuf); buf_ptr += 2;
-	write_word(write_byte, buf_ptr, (cpm80_word_t)header->dpb); buf_ptr += 2;
-	write_word(write_byte, buf_ptr, (cpm80_word_t)header->csv); buf_ptr += 2;
-	write_word(write_byte, buf_ptr, (cpm80_word_t)header->alv);
+	write_word(vm->cpu, buf_ptr, (cpm80_word_t)header->xlt); buf_ptr += 2;
+	write_word(vm->cpu, buf_ptr, 0x0000); buf_ptr += 2;
+	write_word(vm->cpu, buf_ptr, 0x0000); buf_ptr += 2; /* 3 blank words, used as a workspace by CP/M */
+	write_word(vm->cpu, buf_ptr, 0x0000); buf_ptr += 2;
+	write_word(vm->cpu, buf_ptr, (cpm80_word_t)header->dirbuf); buf_ptr += 2;
+	write_word(vm->cpu, buf_ptr, (cpm80_word_t)header->dpb); buf_ptr += 2;
+	write_word(vm->cpu, buf_ptr, (cpm80_word_t)header->csv); buf_ptr += 2;
+	write_word(vm->cpu, buf_ptr, (cpm80_word_t)header->alv);
 }
 
 /* Returns 0 if parameter list if complete i.e. no defns are shared, 1 if defns are shared, and -1 for a invalid parameter list. */

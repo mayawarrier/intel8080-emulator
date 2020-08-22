@@ -48,9 +48,11 @@ enum cpm80_vm_exitcode
 	 * This should almost never happen. If it does, there might
 	 * be a fault in the 8080 binary. */
 	VM80_UNEXPECTED_MONITOR_CALL,
+	/* Disk direct memory access was out of bounds. */
+	VM80_DMA_OUT_OF_BOUNDS,
 	/* The VM quit normally i.e. on poweroff. */
 	VM80_POWEROFF
-}
+};
 
 struct cpm80_vm 
 {
@@ -63,7 +65,7 @@ struct cpm80_vm
 	 * at cpm_origin (see below). */
 	struct i8080 *cpu;
 
-	/* Memory size in KB (up to 64) */
+	/* Memory size in KB (max 64) */
 	int memsize;
 
 	/* Starting address of CP/M in memory.
@@ -86,8 +88,8 @@ struct cpm80_vm
 	struct cpm80_disk_ldevice *disks;
 
 	/* Set automatically by cpm80_vm_init(). 
-	 * Re-assign to override certain bios
-	 * calls if required. See vm_callno.h.
+	 * Re-assign to override one or more bios
+	 * calls if necessary. See vm_callno.h.
 	 * Return 0 on success, -1 otherwise. */
 	int(*bios_call)(struct cpm80_vm *const, int);
 
@@ -100,6 +102,7 @@ struct cpm80_vm
 	cpm80_addr_t dma_addr;
 	int is_poweron;
 	struct i8080_monitor cpu_mon;
+	i8080_word_t(*prev_ih)(const struct i8080 *);
 };
 
 /*
@@ -121,10 +124,10 @@ int cpm80_vm_poweron(struct cpm80_vm *const vm);
 
 /*
  * Power off the VM.
- * Sends an interrupt to the CPU and makes it quit immediately.
- * The next call to i8080_next() exits with -1.
- * If called asynchronously, ensure mutual exclusion 
- * between calls to this and i8080_next().
+ * Sends an interrupt to the CPU, setting cpu->exitcode 
+ * to VM80_POWEROFF. The next call to i8080_next() will
+ * exit with -1. If called asynchronously, mutually exclude 
+ * calls to this and i8080_next().
  */
 void cpm80_vm_poweroff(struct cpm80_vm *const vm);
 

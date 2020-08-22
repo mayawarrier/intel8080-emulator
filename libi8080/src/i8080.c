@@ -468,6 +468,7 @@ int i8080_next(struct i8080 *const cpu) {
 
 	/* Service interrupt if pending request exists */
 	if (cpu->inte && cpu->intr) {
+		if (!cpu->interrupt_read) return -1;
 		opcode = trim_to_word(cpu->interrupt_read(cpu));
 		if (cpu->exitcode) return -1;
 		/* disable interrupts and bring out of halt */
