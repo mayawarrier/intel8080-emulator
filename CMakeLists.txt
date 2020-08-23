@@ -1,26 +1,22 @@
 
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 3.1.3)
 project(intel8080-emulator)
 set(EXE_NAME i8080cpm)
 
-set(ADDITIONAL_CFLAGS "Wall" "Wextra" "Werror")
-
-if(NOT MSVC)
-	include(CheckCCompilerFlag)
-	foreach(ADD_CFLAG IN LISTS ADDITIONAL_CFLAGS)
-		set(HYPHEN_ADD_CFLAG "-${ADD_CFLAG}")
-		check_c_compiler_flag(${HYPHEN_ADD_CFLAG} SUPPORTS_${ADD_CFLAG})
-		if(SUPPORTS_${ADD_CFLAG})
-			set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${HYPHEN_ADD_CFLAG}")
-		endif()
-	endforeach()
+if (MSVC)
+	set(ADDITIONAL_FLAGS CACHE INTERNAL "/WX")
+else()
+	# These work on most compilers
+	set(ADDITIONAL_FLAGS CACHE INTERNAL "-Wall -Wextra -pedantic -Werror")
 endif()
+add_compile_options(${ADDITIONAL_FLAGS})
 
-option(BUILD_FRONTEND "Build command line frontend. Needs C++11 compiler or above." ON)
-
+option(BUILD_FRONTEND "Build command line frontend. Needs C++11 compiler or above." ON) # set this off by default eventually
+	
 if (BUILD_FRONTEND)
 	set(CMAKE_CXX_STANDARD 11)
 	set(CMAKE_CXX_STANDARD_REQUIRED ON)
+	set(BUILD_CPM80_SIMPLE_VM ON)
 endif()
 
 add_subdirectory(libi8080)
@@ -32,9 +28,7 @@ if (BUILD_FRONTEND)
 							   frontend/test_utils.cpp
 							   frontend/main.cpp)
 	target_include_directories(${EXE_NAME} PRIVATE frontend)
-	#target_include_directories(${EXE_NAME} PRIVATE libcpm80vm/examples)
 
-	target_link_libraries(${EXE_NAME} cpm80vm)
-	target_link_libraries(${EXE_NAME} i8080)
+	target_link_libraries(${EXE_NAME} cpm80vm i8080 $<TARGET_OBJECTS:simple_vm>)
 	file(COPY libi8080/bin DESTINATION ${CMAKE_BINARY_DIR})
 endif()

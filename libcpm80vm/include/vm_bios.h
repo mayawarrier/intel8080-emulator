@@ -19,6 +19,10 @@
 #define CPM80_MAX_DISKS (16)
 #define CPM80_BIOS_VERSION "2.2"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct cpm80_vm;
 
 /*
@@ -74,5 +78,9 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno);
  */
 int cpm80_bios_redefine_disks(struct cpm80_vm *const vm, const int num_disks,
 	const unsigned *const *disk_params, cpm80_addr_t disk_defns_begin, cpm80_addr_t disk_ram_begin, cpm80_addr_t *disk_dph_out);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CPM80_BIOS_H */

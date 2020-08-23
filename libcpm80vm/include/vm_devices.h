@@ -1,13 +1,15 @@
 /*
  * Abstractions of CP/M serial and disk devices.
- * 
  */
-
 
 #ifndef CPM80_DEVICES_H
 #define CPM80_DEVICES_H
 
 #include "vm_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* CP/M logical serial device */
 struct cpm80_serial_ldevice 
@@ -56,5 +58,9 @@ struct cpm80_disk_ldevice
 	 */
 	int(*writel)(void *dev, char buf[128], int deblock_code);
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CPM80_DEVICES_H */

@@ -4,15 +4,14 @@
 
 #include "i8080.h"
 #include "vm.h"
-#include "vm_types.h"
 #include "vm_bios.h"
 #include "vm_devices.h"
-#include "simple_vm_ansi_noalloc.h"
+#include "simple_vm_c90_noalloc.h"
 
 #define VM_243K (248832)
 
 /* always succeeds; does nothing */
-static int vm_vdev_noinit(void *) { return 0; }
+static int vm_vdev_noinit(void *dev) { (void)dev; return 0; }
 
 /* 
  * Virtual console.
@@ -66,8 +65,9 @@ static int vm_vdisk_readl(void *dev, char buf[128])
 	/* always succeeds */
 	return 0;
 }
-static int vm_vdisk_writel(void *dev, char buf[128], int /* deblock_code */)
+static int vm_vdisk_writel(void *dev, char buf[128], int deblock_code)
 {
+	(void)deblock_code;
 	/* don't bother de-blocking - we're writing to memory which is
 	 * bound to be many times faster than disk access anyway */
 	struct vm_vibm3740 *ddev = (struct vm_vibm3740 *)dev;
@@ -168,7 +168,7 @@ static int simple_vm_init_all_disks(struct cpm80_vm_simple *const svm, i8080_add
 	/* Define disk parameter headers for CP/M.
 	 * This is a port of the CP/M 2.0 disk re-definition library to C.
 	 * See vm_bios.h for more details */
-	int err = cpm80_bios_redefine_disks(svm->base_vm, ndisks,
+	int err = cpm80_bios_redefine_disks(&svm->base_vm, ndisks,
 		vm_disk_params, disk_defns_begin, disk_bdos_ram_begin, dph_addrs);
 	if (err) return err;
 

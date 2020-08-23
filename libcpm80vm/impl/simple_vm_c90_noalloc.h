@@ -1,26 +1,23 @@
 /*
  * A barebones implementation of cpm80_vm.
- * Should compile cleanly in most environments.
+ * Depends on: stdio.h, string.h.
  *
  * Emulates a console device and up to 4 IBM 3740 floppy disks (each 243K).
  * Floppy disks are emulated in memory.
  */
 
+#include "i8080.h"
+#include "vm.h"
+#include "vm_devices.h"
+
 #ifndef CPM80_VM_SIMPLE_H
 #define CPM80_VM_SIMPLE_H
 
-#include "i8080_types.h"
+#define SIMPLEVM_MAX_DISKS (4)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define SIMPLEVM_MAX_DISKS (4)
-
-struct i8080;
-struct cpm80_vm;
-struct cpm80_serial_ldevice;
-struct cpm80_disk_ldevice;
 
 struct cpm80_vm_simple
 {
