@@ -1,7 +1,7 @@
 
 cmake_minimum_required(VERSION 3.1.3)
 
-# Target is ANSI C or higher, depends on: libi8080
+# Target is ANSI C or higher, depends on libi8080
 add_library(cpm80vm src/vm.c)
 target_include_directories(cpm80vm
 	PUBLIC
@@ -11,9 +11,10 @@ target_include_directories(cpm80vm
 )
 target_link_libraries(cpm80vm PUBLIC i8080)
 
-if (BUILD_CPM80_SIMPLE_VM)
-	add_library(simple_vm OBJECT impl/simple_vm_c90_noalloc.h impl/simple_vm_c90_noalloc.c)
-	target_link_libraries(simple_vm PRIVATE i8080)
-	# needs libcpm80vm's private includes
-	target_include_directories(simple_vm PRIVATE include include/cpm80vm)
-endif()
+#if (BUILD_CPM80_SIMPLE_VM)
+#	add_library(simple_vm OBJECT impl/simple_vm_c90_noalloc.c impl/simple_vm_c90_noalloc.h)
+#
+#	target_link_libraries(simple_vm PRIVATE i8080)
+#	# needs libcpm80vm's private includes
+#	target_include_directories(simple_vm PRIVATE include include/cpm80vm)
+#endif()

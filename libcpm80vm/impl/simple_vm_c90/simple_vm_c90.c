@@ -6,7 +6,7 @@
 #include "vm.h"
 #include "vm_bios.h"
 #include "vm_devices.h"
-#include "simple_vm_c90_noalloc.h"
+#include "simple_vm_c90.h"
 
 #define VM_243K (248832)
 

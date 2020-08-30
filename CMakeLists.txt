@@ -29,6 +29,6 @@ if (BUILD_FRONTEND)
 							   frontend/main.cpp)
 	target_include_directories(${EXE_NAME} PRIVATE frontend)
 
-	target_link_libraries(${EXE_NAME} cpm80vm i8080 $<TARGET_OBJECTS:simple_vm>)
+	target_link_libraries(${EXE_NAME} cpm80vm i8080) #$<TARGET_OBJECTS:simple_vm>
 	file(COPY libi8080/bin DESTINATION ${CMAKE_BINARY_DIR})
 endif()
