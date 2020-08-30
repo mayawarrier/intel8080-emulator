@@ -130,10 +130,9 @@ static int libi8080_cpm_call(struct i8080* cpu) noexcept
 }
 
 static i8080_word_t libi8080_cpm_interrupt_read(const struct i8080 *) {
-	/* For the interrupts test, RST 0 causes
-	   a call to CP/M WBOOT which we can catch later
-	   to detect when the program exits. */
-	return i8080_RST_0;
+	/* INTERRUPTS.COM waits until A is a non-zero value to detect
+	 * an interrupt, following which the program exits. See libi8080/src/interrupt.asm. */
+	return i8080_DCR_A;
 }
 
 static void libi8080_setup_cpm_environment(struct cpm80_fake_vm& vm)
@@ -181,6 +180,37 @@ static void libi8080_setup_usual_environment(struct i8080& cpu)
 	cpu.interrupt_read = fatal_interrupt_read;
 }
 
+// print debug stats
+static void on_i8080_fatal_dump_stats(void)
+{
+	i8080_fatal_error err_type = i8080_fatal_context.err_type;
+	i8080_word_t io_port = i8080_fatal_context.io_port;
+	i8080_word_t io_word = i8080_fatal_context.io_word;
+	int bdos_callno = i8080_fatal_context.bdos_callno;
+	i8080_addr_t at_addr = i8080_fatal_context.at_addr;
+
+	switch (err_type)
+	{
+		case i8080_fatal_error::UnhandledIOWrite:
+			std::printf("\nUnhandled write 0x%02x to port 0x%02x\n", io_word, io_port);
+			break;
+		case i8080_fatal_error::UnhandledIORead:
+			std::printf("\nUnhandled read from port 0x%02x\n", io_port);
+			break;
+		case i8080_fatal_error::UnhandledInterrupt:
+			std::cout << "\nUnhandled interrupt\n";
+			break;
+		case i8080_fatal_error::UnhandledCPMBDOSCall:
+			std::printf("\nUnhandled CP/M BDOS call, code: %d\n", bdos_callno);
+			break;
+		case i8080_fatal_error::UnhandledCPMBIOSCall:
+			std::printf("\nUnhandled CP/M BIOS call, address: 0x%04x\n", at_addr);
+			break;
+	}
+
+	i8080_dump_stats_to_console(i8080_fatal_context.get_i8080());
+}
+
 static int i8080_run(struct i8080& cpu)
 {
 	while (!i8080_next(&cpu));
@@ -205,6 +235,14 @@ static int i8080_interrupted_run(struct i8080& cpu, int ms_to_interrupt)
 		i8080_interrupt(&cpu);
 		lock.clear(std::memory_order_release);
 	});
+
+	// Must handle here so we can join with thread on failure
+	if (setjmp(on_i8080_fatal) != 0) {
+		lock.clear(std::memory_order_release); // allow thread to exit
+		on_i8080_fatal_dump_stats();
+		intgen_thread.join();
+		return -1;
+	}
 
 	while (1) {
 		while (lock.test_and_set(std::memory_order_acquire));
@@ -253,37 +291,6 @@ static int libi8080_load_and_run(struct i8080& cpu, const char filepath[], int i
 	std::cout << ">> Ran for " << cpu.cycles << " cycles.\n\n";
 
 	return err;
-}
-
-// print debug stats
-static void on_i8080_fatal_dump_stats(void)
-{
-	i8080_fatal_error err_type = i8080_fatal_context.err_type;
-	i8080_word_t io_port = i8080_fatal_context.io_port;
-	i8080_word_t io_word = i8080_fatal_context.io_word;
-	int bdos_callno = i8080_fatal_context.bdos_callno;
-	i8080_addr_t at_addr = i8080_fatal_context.at_addr;
-
-	switch (err_type)
-	{
-		case i8080_fatal_error::UnhandledIOWrite:
-			std::printf("\nUnhandled write 0x%02x to port 0x%02x\n", io_word, io_port);
-			break;
-		case i8080_fatal_error::UnhandledIORead:
-			std::printf("\nUnhandled read from port 0x%02x\n", io_port);
-			break;
-		case i8080_fatal_error::UnhandledInterrupt:
-			std::cout << "\nUnhandled interrupt\n";
-			break;
-		case i8080_fatal_error::UnhandledCPMBDOSCall:
-			std::printf("\nUnhandled CP/M BDOS call, code: %d\n", bdos_callno);
-			break;
-		case i8080_fatal_error::UnhandledCPMBIOSCall:
-			std::printf("\nUnhandled CP/M BIOS call, address: 0x%04x\n", at_addr);
-			break;
-	}
-
-	i8080_dump_stats_to_console(i8080_fatal_context.get_i8080());
 }
 
 int libi8080_default_tests(void)
