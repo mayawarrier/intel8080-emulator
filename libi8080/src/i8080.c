@@ -514,7 +514,8 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_MOV_L_H: cpu->l = cpu->h; break; case i8080_MOV_L_B: cpu->l = cpu->b; break; case i8080_MOV_L_A: cpu->l = cpu->a; break;
 		case i8080_MOV_A_C: cpu->a = cpu->c; break; case i8080_MOV_A_D: cpu->a = cpu->d; break; case i8080_MOV_A_E: cpu->a = cpu->e; break;
 		case i8080_MOV_A_H: cpu->a = cpu->h; break; case i8080_MOV_A_L: cpu->a = cpu->l; break; case i8080_MOV_A_B: cpu->a = cpu->b; break;
-		case i8080_MOV_C_C: case i8080_MOV_D_D: case i8080_MOV_E_E: case i8080_MOV_H_H: case i8080_MOV_L_L: case i8080_MOV_A_A: break;
+		case i8080_MOV_A_A: case i8080_MOV_B_B: case i8080_MOV_C_C: case i8080_MOV_D_D:
+		case i8080_MOV_E_E: case i8080_MOV_H_H: case i8080_MOV_L_L: break;
 
 		/* Move from memory to registers */
 		case i8080_MOV_B_M: cpu->b = i8080_memory_read_indirect(cpu); break;
