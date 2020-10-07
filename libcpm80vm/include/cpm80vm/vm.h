@@ -1,5 +1,5 @@
 /*
- * 8-bit virtual machine for CP/M 2.2 based on the Intel 8080.
+ * 8-bit virtual machine for CP/M 2.2.
  *
  * To get the machine running:
  * - implement its serial and disk devices,
@@ -44,24 +44,23 @@ enum cpm80_vm_exitcode
 	/* The cpu received an interrupt but cpu->interrupt_read()
 	 * is NULL. */
 	VM80_UNHANDLED_INTR,
-	/* A bios call was made from an unexpected memory location.
+	/* RST 7 was received from an unexpected memory location.
 	 * This should almost never happen. If it does, there might
 	 * be a fault in the 8080 binary. */
 	VM80_UNEXPECTED_MONITOR_CALL,
-	/* Disk direct memory access was out of bounds. */
-	VM80_DMA_OUT_OF_BOUNDS,
+	/* Direct memory access was out of bounds. */
+	VM80_DMA_FATAL,
 	/* The VM quit normally i.e. on poweroff. */
 	VM80_POWEROFF
 };
 
 struct cpm80_vm 
 {
-	/* CPU.
-	 * The usage of cpu->udata,
-	 * cpu->monitor and RST 7 is 
-	 * reserved for the VM.
-	 * A valid CP/M 2.2 CCP + BDOS binary
-	 * should be loaded into the CPU's memory
+	/* Intel 8080.
+	 * cpu->udata, cpu->monitor, and
+	 * RST 7 is used by cpm80_vm.
+	 * A CP/M 2.2 binary must be 
+	 * loaded into cpu's memory
 	 * at cpm_origin (see below). */
 	struct i8080 *cpu;
 
@@ -73,7 +72,6 @@ struct cpm80_vm
 	cpm80_addr_t cpm_origin;
 
 	/* Serial devices.
-	 * Set device to NULL if not used.
 	 * CP/M requires at least a console device. */
 	struct cpm80_serial_ldevice *con; /* console */
 	struct cpm80_serial_ldevice *lst; /* printer/list */
@@ -106,10 +104,10 @@ struct cpm80_vm
 };
 
 /*
- * Call after initializing cpu, memsize and cpm_origin.
- * - initializes cpu_mon and sets bios_call() handler
- * - binds BIOS entry points in i8080 memory to bios_call()
- * - writes a JMP to cold boot at 0x0
+ * Call after setting cpu, memsize and cpm_origin.
+ * - sets bios_call() and binds BIOS entry points 
+     in i8080 memory to bios_call()
+ * - writes JMP to cold boot at address 0
  * Returns 0 if successful.
  */
 int cpm80_vm_init(struct cpm80_vm *const vm);

@@ -4,12 +4,11 @@
 
 #if defined (__STDC__) && !defined(__STDC_VERSION__)
 	#define inline
-	#define volatile
 #endif
 
 /*
- * Sourced from https://github.com/superzazu/8080/blob/master/i8080.c, with corrections.
- * Indexed by opcode. For conditional RETs and CALLs, add 6 if true.
+ * Indexed by opcode.
+ * For conditional RETs and CALLs, add 6 if condition is true.
  */
 static const unsigned int OPCODES_CYCLES[] = {
 /*  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F */
@@ -30,109 +29,100 @@ static const unsigned int OPCODES_CYCLES[] = {
 	5,  10, 10, 18, 11, 11, 7,  11, 5,  5,  10, 5,  11, 17, 7,  11, /* E */
 	5,  10, 10, 4,  11, 11, 7,  11, 5,  5,  10, 4,  11, 17, 7,  11  /* F */
 };
-#define SUBROUTINE_CYCLES_OFFSET (6)
 
-enum i8080_flags
-{
-	CARRY_BIT = 0,
-	PARITY_BIT = 2,
-	AUX_CARRY_BIT = 4,
-	ZERO_BIT = 6,
-	SIGN_BIT = 7
-};
+#define F_CARRY_BIT     (0)
+#define F_PARITY_BIT    (2)
+#define F_AUX_CARRY_BIT (4)
+#define F_ZERO_BIT      (6)
+#define F_SIGN_BIT      (7)
 
-#define I8080_WORD_SIZE (8)
-#define I8080_WORD_MAX (255)
-#define I8080_ADDR_MAX (65535)
+#define WORD_SIZE (8)
+#define WORD_MAX (255)
+#define ADDR_MAX (65535)
 
-static const i8080_word_t WORD_LO_F = ((i8080_word_t)1 << (I8080_WORD_SIZE / 2)) - (i8080_word_t)1;
-static const i8080_word_t WORD_HI_F = (((i8080_word_t)1 << (I8080_WORD_SIZE / 2)) - (i8080_word_t)1) << (I8080_WORD_SIZE / 2);
-static const i8080_dbl_word_t DBL_WORD_UPPER_MAX = (i8080_dbl_word_t)I8080_WORD_MAX << I8080_WORD_SIZE;
+static const i8080_word_t HEX0F = ((i8080_word_t)1 << (WORD_SIZE / 2)) - (i8080_word_t)1;
+static const i8080_word_t HEXF0 = (((i8080_word_t)1 << (WORD_SIZE / 2)) - (i8080_word_t)1) << (WORD_SIZE / 2);
+static const i8080_dbl_word_t HEXFF00 = (i8080_dbl_word_t)WORD_MAX << WORD_SIZE;
 
 #define i8080_min(a,b) (((a) < (b)) ? (a) : (b))
 
-/* Concatenate two words and return a double word. */
-#define concatenate(word1, word2) ((i8080_dbl_word_t)(word1) << I8080_WORD_SIZE | (word2))
+#define concatenate(word1, word2) ((i8080_dbl_word_t)(word1) << WORD_SIZE | (word2))
 
-#define word_lo_nibble(word) ((i8080_word_t)(word) & WORD_LO_F)
-#define word_hi_nibble(word) ((i8080_word_t)(word) & WORD_HI_F)
+#define word_lo_nibble(word) ((i8080_word_t)(word) & HEX0F)
+#define word_hi_nibble(word) (((i8080_word_t)(word) & HEXF0) >> (WORD_SIZE / 2))
 
-#define trim_to_addr(dbl_word) ((i8080_dbl_word_t)(dbl_word) & I8080_ADDR_MAX)
-#define trim_to_word(word) ((i8080_word_t)(word) & I8080_WORD_MAX)
+#define trim_to_addr(dbl_word) ((i8080_dbl_word_t)(dbl_word) & ADDR_MAX)
+#define trim_to_word(word) ((i8080_word_t)(word) & WORD_MAX)
 
-#define dbl_word_upper(dbl_word) ((i8080_word_t)(((i8080_dbl_word_t)(dbl_word) & DBL_WORD_UPPER_MAX) >> I8080_WORD_SIZE))
-#define dbl_word_lower(dbl_word) ((i8080_word_t)((i8080_dbl_word_t)(dbl_word) & I8080_WORD_MAX))
+#define dbl_hi_word(dbl_word) ((i8080_word_t)(((i8080_dbl_word_t)(dbl_word) & HEXFF00) >> WORD_SIZE))
+#define dbl_lo_word(dbl_word) ((i8080_word_t)((i8080_dbl_word_t)(dbl_word) & WORD_MAX))
 
 /* Get a bit from a bit buffer. */
 #define get_bit(buf, bit) ((int)(((buf) >> (bit)) & (unsigned)1))
 
 /* Set a bit in a word. */
-static inline void set_word_bit(i8080_word_t *word_ptr, int bit, int val) {
-	if (val) {
-		*word_ptr |= ((i8080_word_t)1 << bit);
-	} else {
-		*word_ptr &= ~((i8080_word_t)1 << bit);
-	}
+static inline void set_bit(i8080_word_t *ptr, int bit, int val) {
+	if (val) *ptr |= ((i8080_word_t)1 << bit);
+	else *ptr &= ~((i8080_word_t)1 << bit);
 }
 
-/* Perform 2's complement on lower nibble of a word. */
+/* Get 2's complement of lower nibble of a word. */
 static inline i8080_word_t twos_comp_lo_word(i8080_word_t word) {
-	return (word ^ WORD_LO_F) + (i8080_word_t)1;
+	return (word ^ HEX0F) + (i8080_word_t)1;
 }
 
 /*
- * Perform 2's complement on a word.
+ * Get 2's complement of a word.
  * i8080_dbl_word_t preserves carry on CPI 0:
  * https://retrocomputing.stackexchange.com/questions/6407/intel-8080-behaviour-of-the-carry-bit-when-comparing-a-value-with-0
  */
 static inline i8080_dbl_word_t twos_comp_word(i8080_word_t word) {
-	return (word ^ (i8080_word_t)I8080_WORD_MAX) + (i8080_word_t)1;
+	return (word ^ (i8080_word_t)WORD_MAX) + (i8080_word_t)1;
 }
 
 /* Get auxiliary carry resulting from adding two words. */
 static inline int aux_carry(i8080_word_t word1, i8080_word_t word2) {
-	return get_bit(word_lo_nibble(word1) + word_lo_nibble(word2), I8080_WORD_SIZE / 2);
+	return get_bit(word_lo_nibble(word1) + word_lo_nibble(word2), WORD_SIZE / 2);
 }
 
 /* Calculate parity of a word. */
 static inline int parity(i8080_word_t word) {
 	unsigned p = word;
-	p ^= (p >> (I8080_WORD_SIZE / 2));
-	p ^= (p >> (I8080_WORD_SIZE / 4));
-	p ^= (p >> (I8080_WORD_SIZE / 8));
-	p &= (unsigned)1;
+	p ^= (p >> (WORD_SIZE / 2));
+	p ^= (p >> (WORD_SIZE / 4));
+	p ^= (p >> (WORD_SIZE / 8));
+	p &= 1;
 	return !(int)p;
 }
 
 /* Update Z, S, P flags from a word. */
 static inline void update_ZSP(struct i8080 *const cpu, i8080_word_t word) {
 	cpu->z = (word == 0);
-	/* signed numbers are -127 to 127. bit 7 of the accumulator is used for signing */
-	cpu->s = get_bit(word, I8080_WORD_SIZE - 1);
+	/* signed numbers are -127 to 127. bit 7 is the sign bit */
+	cpu->s = get_bit(word, WORD_SIZE - 1);
 	cpu->p = parity(word);
 }
 
-/* Get flags register from emulator bool values. */
-static i8080_word_t i8080_get_flags_reg(struct i8080 *const cpu) {
-	i8080_word_t flags = 0;
-	set_word_bit(&flags, (int)CARRY_BIT, cpu->cy);
-	set_word_bit(&flags, (int)PARITY_BIT, cpu->p);
-	set_word_bit(&flags, (int)AUX_CARRY_BIT, cpu->acy);
-	set_word_bit(&flags, (int)ZERO_BIT, cpu->z);
-	set_word_bit(&flags, (int)SIGN_BIT, cpu->s);
+/* Get flags register from emulator bools. */
+static inline i8080_word_t i8080_get_flags(struct i8080 *const cpu) {
 	/* Bit 1 is always 1:
 	 * http://pastraiser.com/cpu/i8080/i8080_opcodes.html */
-	set_word_bit(&flags, 1, 1);
+	i8080_word_t flags = 0x02;
+	set_bit(&flags, F_CARRY_BIT, cpu->cy);
+	set_bit(&flags, F_PARITY_BIT, cpu->p);
+	set_bit(&flags, F_AUX_CARRY_BIT, cpu->acy);
+	set_bit(&flags, F_ZERO_BIT, cpu->z);
+	set_bit(&flags, F_SIGN_BIT, cpu->s);
 	return flags;
 }
 
-/* Set emulator bool values from a flags register. */
-static void i8080_set_flags_reg(struct i8080 *const cpu, i8080_word_t flags_reg) {
-	cpu->cy = get_bit(flags_reg, (int)CARRY_BIT);
-	cpu->p = get_bit(flags_reg, (int)PARITY_BIT);
-	cpu->acy = get_bit(flags_reg, (int)AUX_CARRY_BIT);
-	cpu->z = get_bit(flags_reg, (int)ZERO_BIT);
-	cpu->s = get_bit(flags_reg, (int)SIGN_BIT);
+/* Set emulator bools from flags register. */
+static inline void i8080_set_flags(struct i8080 *const cpu, i8080_word_t flags) {
+	cpu->cy = get_bit(flags, F_CARRY_BIT);
+	cpu->p = get_bit(flags, F_PARITY_BIT);
+	cpu->acy = get_bit(flags, F_AUX_CARRY_BIT);
+	cpu->z = get_bit(flags, F_ZERO_BIT);
+	cpu->s = get_bit(flags, F_SIGN_BIT);
 }
 
 /* Get {BC} */
@@ -149,28 +139,28 @@ static inline i8080_dbl_word_t i8080_get_hl(struct i8080 *const cpu) {
 }
 /* Get program status word {A, flags} */
 static inline i8080_dbl_word_t i8080_get_psw(struct i8080 *const cpu) {
-	return concatenate(cpu->a, i8080_get_flags_reg(cpu));
+	return concatenate(cpu->a, i8080_get_flags(cpu));
 }
 
 /* Set {BC} */
 static inline void i8080_set_bc(struct i8080 *const cpu, i8080_dbl_word_t dbl_word) {
-	cpu->b = dbl_word_upper(dbl_word);
-	cpu->c = dbl_word_lower(dbl_word);
+	cpu->b = dbl_hi_word(dbl_word);
+	cpu->c = dbl_lo_word(dbl_word);
 }
 /* Set {DE} */
 static inline void i8080_set_de(struct i8080 *const cpu, i8080_dbl_word_t dbl_word) {
-	cpu->d = dbl_word_upper(dbl_word);
-	cpu->e = dbl_word_lower(dbl_word);
+	cpu->d = dbl_hi_word(dbl_word);
+	cpu->e = dbl_lo_word(dbl_word);
 }
 /* Set {HL} */
 static inline void i8080_set_hl(struct i8080 *const cpu, i8080_dbl_word_t dbl_word) {
-	cpu->h = dbl_word_upper(dbl_word);
-	cpu->l = dbl_word_lower(dbl_word);
+	cpu->h = dbl_hi_word(dbl_word);
+	cpu->l = dbl_lo_word(dbl_word);
 }
-/* Set accumulator and flags from program status word. */
+/* Set A, flags from program status word. */
 static inline void i8080_set_psw(struct i8080 *const cpu, i8080_dbl_word_t dbl_word) {
-	cpu->a = dbl_word_upper(dbl_word);
-	i8080_set_flags_reg(cpu, dbl_word_lower(dbl_word));
+	cpu->a = dbl_hi_word(dbl_word);
+	i8080_set_flags(cpu, dbl_lo_word(dbl_word));
 }
 
 /* Read word at [HL] */
@@ -189,7 +179,7 @@ static inline i8080_word_t i8080_advance_read_word(struct i8080 *const cpu) {
 }
 
 /* Read address and advance PC by 2.
- * Address is read backwards as assembler inverts the words upon assembly:
+ * Assembler inverts the words on assembly:
  * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 84 */
 static inline i8080_addr_t i8080_advance_read_addr(struct i8080 *const cpu) {
 	i8080_word_t lo_addr = i8080_advance_read_word(cpu);
@@ -197,60 +187,58 @@ static inline i8080_addr_t i8080_advance_read_addr(struct i8080 *const cpu) {
 	return (i8080_addr_t)concatenate(hi_addr, lo_addr);
 }
 
-/* Perform an add to accumulator and update flags. */
+/* Add to accumulator and update flags. */
 static void i8080_add(struct i8080 *const cpu, i8080_word_t word) {
-	/* Do the addition in a larger type to preserve carry */
 	i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + word;
 	cpu->acy = aux_carry(cpu->a, word);
-	cpu->cy = get_bit(acc_buf, I8080_WORD_SIZE);
-	cpu->a = dbl_word_lower(acc_buf);
-	/* Update remaining flags */
+	cpu->cy = get_bit(acc_buf, WORD_SIZE);
+	cpu->a = dbl_lo_word(acc_buf);
 	update_ZSP(cpu, cpu->a);
 }
 
-/* Perform an add with carry to accumulator and update flags. */
+/* Add with carry to accumulator and update flags. */
 static inline void i8080_adc(struct i8080 *const cpu, i8080_word_t word) {
 	i8080_add(cpu, word + (i8080_word_t)cpu->cy);
 }
 
-/* Perform a subtraction from accumulator and update flags */
+/* Subtract from accumulator and update flags. */
 static void i8080_sub(struct i8080 *const cpu, i8080_word_t word) {
 	i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + twos_comp_word(word);
 	cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
 	/* carry is the borrow flag for SUB, SBB etc, invert. */
-	cpu->cy = !get_bit(acc_buf, I8080_WORD_SIZE);
-	cpu->a = dbl_word_lower(acc_buf);
+	cpu->cy = !get_bit(acc_buf, WORD_SIZE);
+	cpu->a = dbl_lo_word(acc_buf);
 	update_ZSP(cpu, cpu->a);
 }
 
-/* Perform a subtraction with borrow from the accumulator, and update flags. */
+/* Subtract with borrow from accumulator, and update flags. */
 static inline void i8080_sbb(struct i8080 *const cpu, i8080_word_t word) {
 	i8080_sub(cpu, word + (i8080_word_t)cpu->cy);
 }
 
-/* Perform bitwise AND with accumulator and update flags. */
+/* Do bitwise AND with accumulator and update flags. */
 static void i8080_ana(struct i8080 *const cpu, i8080_word_t word) {
-	/* AND logical instructions always set auxiliary carry to logical OR of bit 3 of the values involved:
+	/* AND instructions set aux carry to logical OR of bit 3 of each value:
 	 * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 24 */
-	cpu->acy = get_bit(cpu->a, (I8080_WORD_SIZE / 2) - 1) | get_bit(word, (I8080_WORD_SIZE / 2) - 1);
+	cpu->acy = get_bit(cpu->a, (WORD_SIZE / 2) - 1) | get_bit(word, (WORD_SIZE / 2) - 1);
 	cpu->a &= word;
 	update_ZSP(cpu, cpu->a);
-	/* AND logical instructions always reset carry:
+	/* AND instructions always reset carry:
 	 * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 63 */
 	cpu->cy = 0;
 }
 
-/* Perform bitwise exclusive OR with accumulator and update flags. */
+/* Do bitwise exclusive OR with accumulator and update flags. */
 static void i8080_xra(struct i8080 *const cpu, i8080_word_t word) {
 	cpu->a ^= word;
 	update_ZSP(cpu, cpu->a);
-	/* OR logical instructions always reset carry and auxiliary carry:
+	/* OR instructions always reset carry and auxiliary carry:
 	 * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 122 */
 	cpu->acy = 0;
 	cpu->cy = 0;
 }
 
-/* Perform bitwise inclusive OR with accumulator and update flags. */
+/* Do bitwise inclusive OR with accumulator and update flags. */
 static void i8080_ora(struct i8080 *const cpu, i8080_word_t word) {
 	cpu->a |= word;
 	update_ZSP(cpu, cpu->a);
@@ -258,12 +246,12 @@ static void i8080_ora(struct i8080 *const cpu, i8080_word_t word) {
 	cpu->cy = 0;
 }
 
-/* Perform i8080_sub() but without modifying the accumulator. */
+/* Do i8080_sub() but without modifying the accumulator. */
 static void i8080_cmp(struct i8080 *const cpu, i8080_word_t word) {
 	i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + twos_comp_word(word);
 	cpu->acy = aux_carry(cpu->a, twos_comp_lo_word(word));
-	cpu->cy = !get_bit(acc_buf, I8080_WORD_SIZE);
-	update_ZSP(cpu, dbl_word_lower(acc_buf));
+	cpu->cy = !get_bit(acc_buf, WORD_SIZE);
+	update_ZSP(cpu, dbl_lo_word(acc_buf));
 }
 
 /* Increment word and update flags. */
@@ -282,13 +270,13 @@ static i8080_word_t i8080_dcr(struct i8080 *const cpu, i8080_word_t word) {
 	return word;
 }
 
-/* Add double register to HL and update flags. */
-static void i8080_dad(struct i8080 *const cpu, i8080_dbl_word_t reg_pair) {
+/* Add double word to HL and update flags. */
+static void i8080_dad(struct i8080 *const cpu, i8080_dbl_word_t dbl_word) {
 	i8080_dbl_word_t hl = i8080_get_hl(cpu);
-	i8080_dbl_word_t hl_new = trim_to_addr(hl + reg_pair);
+	i8080_dbl_word_t hl_new = trim_to_addr(hl + dbl_word);
 	i8080_set_hl(cpu, hl_new);
-	/* If addition overflowed, result must be lower than the addands */
-	cpu->cy = (hl_new < i8080_min(hl, reg_pair)) ? 1 : 0;
+	/* If addition overflowed, result must be lower than addands */
+	cpu->cy = (hl_new < i8080_min(hl, dbl_word)) ? 1 : 0;
 }
 
 /* Store HL to immediate address. */
@@ -307,9 +295,9 @@ static inline void i8080_lhld(struct i8080 *const cpu) {
 
 /* Circular shift accumulator left, set carry to old MSB. */
 static void i8080_rlc(struct i8080 *const cpu) {
-	int msb = get_bit(cpu->a, I8080_WORD_SIZE - 1);
+	int msb = get_bit(cpu->a, WORD_SIZE - 1);
 	cpu->a <<= 1;
-	set_word_bit(&cpu->a, 0, msb);
+	set_bit(&cpu->a, 0, msb);
 	cpu->cy = msb;
 }
 
@@ -317,17 +305,17 @@ static void i8080_rlc(struct i8080 *const cpu) {
 static void i8080_rrc(struct i8080 *const cpu) {
 	int lsb = get_bit(cpu->a, 0);
 	cpu->a >>= 1;
-	set_word_bit(&cpu->a, I8080_WORD_SIZE - 1, lsb);
+	set_bit(&cpu->a, WORD_SIZE - 1, lsb);
 	cpu->cy = lsb;
 }
 
 /* Circular shift accumulator left through carry. */
 static void i8080_ral(struct i8080 *const cpu) {
 	int prev_cy = cpu->cy;
-	int msb = get_bit(cpu->a, I8080_WORD_SIZE - 1);
+	int msb = get_bit(cpu->a, WORD_SIZE - 1);
 	cpu->a <<= 1;
 	cpu->cy = msb;
-	set_word_bit(&cpu->a, 0, prev_cy);
+	set_bit(&cpu->a, 0, prev_cy);
 }
 
 /* Circular shift accumulator right through carry. */
@@ -336,38 +324,38 @@ static void i8080_rar(struct i8080 *const cpu) {
 	int lsb = get_bit(cpu->a, 0);
 	cpu->a >>= 1;
 	cpu->cy = lsb;
-	set_word_bit(&cpu->a, I8080_WORD_SIZE - 1, prev_cy);
+	set_bit(&cpu->a, WORD_SIZE - 1, prev_cy);
 }
 
-/* Perform decimal adjust on the accumulator and update flags. */
+/* Decimal adjust the accumulator (convert to 4-bit BCD) and update flags. */
 static void i8080_daa(struct i8080 *const cpu) {
-	i8080_word_t lo_acc = word_lo_nibble(cpu->a);
-	/* overflow lo nibble if required - add 0x6 */
-	if ((lo_acc > (i8080_word_t)9) || cpu->acy) {
+	/* adjust lo nibble */
+	i8080_word_t lo = word_lo_nibble(cpu->a);
+	if (lo > 9 || cpu->acy) {
 		cpu->acy = aux_carry(cpu->a, 0x6);
-		cpu->a += (i8080_word_t)0x6;
+		cpu->a += 0x6;
 	}
-	/* overflow hi nibble if required - add 0x60 */
-	i8080_word_t hi_acc = word_hi_nibble(cpu->a) >> (I8080_WORD_SIZE / 2);
-	if ((hi_acc > (i8080_word_t)9) || cpu->cy) {
-		i8080_dbl_word_t acc_buf = (i8080_dbl_word_t)cpu->a + (i8080_word_t)0x60;
-		cpu->cy = get_bit(acc_buf, I8080_WORD_SIZE);
-		cpu->a = dbl_word_lower(acc_buf);
+	/* adjust hi nibble */
+	i8080_word_t hi = word_hi_nibble(cpu->a);
+	if (hi > 9 || cpu->cy) {
+		i8080_dbl_word_t a = (i8080_dbl_word_t)cpu->a + 0x60;
+		cpu->cy = get_bit(a, WORD_SIZE);
+		cpu->a = dbl_lo_word(a);
 	}
 	update_ZSP(cpu, cpu->a);
 }
 
 /* Push two words to stack and decrement stack pointer by 2.
- * (upper word before lower word) */
+ * (upper then lower word) */
 static void i8080_push(struct i8080 *const cpu, i8080_dbl_word_t dbl_word) {
-	i8080_word_t upper_word = dbl_word_upper(dbl_word);
-	i8080_word_t lower_word = dbl_word_lower(dbl_word);
+	i8080_word_t upper_word = dbl_hi_word(dbl_word);
+	i8080_word_t lower_word = dbl_lo_word(dbl_word);
 	cpu->memory_write(cpu, --cpu->sp, upper_word);
 	cpu->memory_write(cpu, --cpu->sp, lower_word);
 }
 
 /* Pop two words from stack and increment stack pointer by 2.
- * (lower word before upper word) */
+ * (lower then upper word) */
 static i8080_dbl_word_t i8080_pop(struct i8080 *const cpu) {
 	i8080_word_t lower_word = trim_to_word(cpu->memory_read(cpu, cpu->sp++));
 	i8080_word_t upper_word = trim_to_word(cpu->memory_read(cpu, cpu->sp++));
@@ -383,26 +371,26 @@ static inline void i8080_call_addr(struct i8080 *const cpu, i8080_addr_t addr) {
 }
 
 /* Jump to immediate address if condition is satisfied. */
-static inline void i8080_jmp(struct i8080 *const cpu, int condition) {
+static void i8080_jmp(struct i8080 *const cpu, int condition) {
 	if (condition) i8080_jmp_addr(cpu, i8080_advance_read_addr(cpu));
 	else cpu->pc += 2; /* advance to word after address */	 
 }
 
 /* Push PC and jump to immediate address if condition is satisfied.
  * (add 6 cycles if satisfied) */
-static inline void i8080_call(struct i8080 *const cpu, int condition) {
+static void i8080_call(struct i8080 *const cpu, int condition) {
 	if (condition) {
 		i8080_call_addr(cpu, i8080_advance_read_addr(cpu));
-		cpu->cycles += SUBROUTINE_CYCLES_OFFSET;
+		cpu->cycles += 6;
 	} else cpu->pc += 2;
 }
 
 /* Pop PC and jump to it if condition is satisfied.
  * (add 6 cycles if satisfied) */
-static inline void i8080_ret(struct i8080 *const cpu, int condition) {
+static void i8080_ret(struct i8080 *const cpu, int condition) {
 	if (condition) {
 		i8080_jmp_addr(cpu, (i8080_addr_t)i8080_pop(cpu));
-		cpu->cycles += SUBROUTINE_CYCLES_OFFSET;
+		cpu->cycles += 6;
 	}
 }
 
@@ -427,35 +415,49 @@ static inline void i8080_xchg(struct i8080 *const cpu) {
  * https://stackoverflow.com/questions/13551973/intel-8080-instruction-out
  * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 97 */
 
- /* I/O: Read input port into accumulator. */
+ /* Read input port into accumulator. */
 static inline int i8080_in(struct i8080 *const cpu) {
 	if (!cpu->io_read) return -1;
 	i8080_word_t port_addr = i8080_advance_read_word(cpu);
 	cpu->a = trim_to_word(cpu->io_read(cpu, (i8080_addr_t)concatenate(port_addr, port_addr)));
-	if (cpu->exitcode) return -1;
+	if (cpu->mexitcode) return -1;
 	return 0;
 }
 
-/* I/O: Write accumulator to output port. */
+/* Write accumulator to output port. */
 static inline int i8080_out(struct i8080 *const cpu) {
 	if (!cpu->io_write) return -1;
 	i8080_word_t port_addr = i8080_advance_read_word(cpu);
 	cpu->io_write(cpu, (i8080_addr_t)concatenate(port_addr, port_addr), cpu->a);
-	if (cpu->exitcode) return -1;
+	if (cpu->mexitcode) return -1;
 	return 0;
+}
+
+#define monitor_attached(cpu, fun) ((cpu)->monitor && (cpu)->monitor->fun)
+
+/* Set halt, signal monitor if state changed */
+static inline void set_notify_halt(struct i8080 *const cpu, int val) {
+	if (monitor_attached(cpu, on_halt_changed) &&
+		cpu->halt != val) cpu->monitor->on_halt_changed(cpu, val);
+	cpu->halt = val;
 }
 
 void i8080_init(struct i8080 *const cpu) {
 	cpu->cycles = 0;
 	cpu->intr = 0;
-	cpu->exitcode = 0;
+	cpu->halt = 0;
+	cpu->mexitcode = 0;
+	cpu->io_read = 0;
+	cpu->io_write = 0;
+	cpu->interrupt_read = 0;
 	cpu->monitor = 0;
 }
 
 void i8080_reset(struct i8080 *const cpu) {
 	cpu->pc = 0;
-	cpu->halt = 0;
 	cpu->inte = 0;
+	/* won't notify if called right after i8080_init */
+	set_notify_halt(cpu, 0);
 }
 
 void i8080_interrupt(struct i8080 *const cpu) {
@@ -463,35 +465,27 @@ void i8080_interrupt(struct i8080 *const cpu) {
 }
 
 int i8080_next(struct i8080 *const cpu) {
-	int intr_read = 0;
-	i8080_word_t opcode;
-
-	/* Service interrupt if pending request exists */
+	/* Service interrupt if pending */
 	if (cpu->inte && cpu->intr) {
 		if (!cpu->interrupt_read) return -1;
-		opcode = trim_to_word(cpu->interrupt_read(cpu));
-		if (cpu->exitcode) return -1;
+		i8080_word_t opcode = trim_to_word(cpu->interrupt_read(cpu));
+		if (cpu->mexitcode) return -1;
 		/* disable interrupts and bring out of halt */
 		cpu->inte = 0;
 		cpu->intr = 0;
-		cpu->halt = 0;
-		intr_read = 1;
+		set_notify_halt(cpu, 0);
+		return i8080_exec(cpu, opcode);
 	}
 
-	/* Execute opcode */
-	int err = 0;
-	if (!cpu->halt) {
-		if (!intr_read) opcode = i8080_advance_read_word(cpu);
-		err = i8080_exec(cpu, opcode);
-	}
+	if (cpu->halt) return 0; /* do nothing until cleared */
 
-	return err;
+	/* execute next opcode in memory */
+	return i8080_exec(cpu, i8080_advance_read_word(cpu));
 }
 
 int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 {
 	int err = 0;
-
 	switch (opcode)
 	{
 		/* Documented & undocumented NOPs. Does nothing. */
@@ -646,13 +640,13 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_DCR_A: cpu->a = i8080_dcr(cpu, cpu->a); break;
 
 		/* Double register increment/decrement */
-		case i8080_INX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) + (i8080_dbl_word_t)1); break;
-		case i8080_INX_D: i8080_set_de(cpu, i8080_get_de(cpu) + (i8080_dbl_word_t)1); break;
-		case i8080_INX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) + (i8080_dbl_word_t)1); break;
-		case i8080_INX_SP: cpu->sp += 1; break;
-		case i8080_DCX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) - (i8080_dbl_word_t)1); break;
-		case i8080_DCX_D: i8080_set_de(cpu, i8080_get_de(cpu) - (i8080_dbl_word_t)1); break;
-		case i8080_DCX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) - (i8080_dbl_word_t)1); break;
+		case i8080_INX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) + 1); break;
+		case i8080_INX_D: i8080_set_de(cpu, i8080_get_de(cpu) + 1); break;
+		case i8080_INX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) + 1); break;
+		case i8080_INX_SP: cpu->sp += 1; break;					
+		case i8080_DCX_B: i8080_set_bc(cpu, i8080_get_bc(cpu) - 1); break;
+		case i8080_DCX_D: i8080_set_de(cpu, i8080_get_de(cpu) - 1); break;
+		case i8080_DCX_H: i8080_set_hl(cpu, i8080_get_hl(cpu) - 1); break;
 		case i8080_DCX_SP: cpu->sp -= 1; break;
 
 		/* Double register add (16-bit addition) */
@@ -708,7 +702,8 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_POP_PSW: i8080_set_psw(cpu, i8080_pop(cpu)); break;
 
 		/* Subroutine calls */
-		case i8080_CALL: case i8080_ALT_CALL0: case i8080_ALT_CALL1: case i8080_ALT_CALL2:
+		case i8080_CALL: case i8080_ALT_CALL0:
+		case i8080_ALT_CALL1: case i8080_ALT_CALL2:
 			i8080_call(cpu, 1); break;
 		case i8080_CNZ: i8080_call(cpu, !cpu->z); break;
 		case i8080_CZ: i8080_call(cpu, cpu->z); break;
@@ -744,40 +739,40 @@ int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_JM: i8080_jmp(cpu, cpu->s); break;
 
 		/* Special instructions */
-		case i8080_DAA: i8080_daa(cpu); break;                                           /* Decimal adjust acc (convert acc to BCD) */
 		case i8080_CMA: cpu->a = ~cpu->a; break;                                         /* Complement accumulator */
 		case i8080_STC: cpu->cy = 1; break;                                              /* Set carry */
 		case i8080_CMC: cpu->cy = !cpu->cy; break;                                       /* Complement carry */
 		case i8080_PCHL: i8080_jmp_addr(cpu, (i8080_addr_t)i8080_get_hl(cpu)); break;    /* Move HL into PC */
 		case i8080_SPHL: cpu->sp = (i8080_addr_t)i8080_get_hl(cpu); break;               /* Move HL into SP */
-		case i8080_XTHL: i8080_xthl(cpu); break;                                         /* Exchange top of stack with H&L */
-		case i8080_XCHG: i8080_xchg(cpu); break;                                         /* Exchanges the contents of BC and DE */
+		case i8080_DAA: i8080_daa(cpu); break;
+		case i8080_XTHL: i8080_xthl(cpu); break;
+		case i8080_XCHG: i8080_xchg(cpu); break;
 
 		/* I/O, accumulator <-> word */
 		case i8080_IN: err = i8080_in(cpu); break;
 		case i8080_OUT: err = i8080_out(cpu); break;
 
 		/* Restart / soft interrupts */
-		case i8080_RST_0: i8080_call_addr(cpu, (i8080_addr_t)0x0000); break;
-		case i8080_RST_1: i8080_call_addr(cpu, (i8080_addr_t)0x0008); break;
-		case i8080_RST_2: i8080_call_addr(cpu, (i8080_addr_t)0x0010); break;
-		case i8080_RST_3: i8080_call_addr(cpu, (i8080_addr_t)0x0018); break;
-		case i8080_RST_4: i8080_call_addr(cpu, (i8080_addr_t)0x0020); break;
-		case i8080_RST_5: i8080_call_addr(cpu, (i8080_addr_t)0x0028); break;
-		case i8080_RST_6: i8080_call_addr(cpu, (i8080_addr_t)0x0030); break;
+		case i8080_RST_0: i8080_call_addr(cpu, 0x0000); break;
+		case i8080_RST_1: i8080_call_addr(cpu, 0x0008); break;
+		case i8080_RST_2: i8080_call_addr(cpu, 0x0010); break;
+		case i8080_RST_3: i8080_call_addr(cpu, 0x0018); break;
+		case i8080_RST_4: i8080_call_addr(cpu, 0x0020); break;
+		case i8080_RST_5: i8080_call_addr(cpu, 0x0028); break;
+		case i8080_RST_6: i8080_call_addr(cpu, 0x0030); break;
 		case i8080_RST_7:
-			if (cpu->monitor) {
-				cpu->exitcode = cpu->monitor->enter_monitor(cpu);
-				if (cpu->exitcode) err = -1;
-			} else i8080_call_addr(cpu, (i8080_addr_t)0x0038);
-			break;	
+			if (monitor_attached(cpu, on_rst7)) {
+				cpu->mexitcode = cpu->monitor->on_rst7(cpu);
+				err = cpu->mexitcode ? -1 : 0;
+			} else i8080_call_addr(cpu, 0x0038); 
+			break;
 
 		/* Enable / disable interrupts */
 		case i8080_EI: cpu->inte = 1; break;
 		case i8080_DI: cpu->inte = 0; break;
 
-		/* HALT cpu. Can only be brought out by interrupt or RESET. */
-		case i8080_HLT: cpu->halt = 1; break;
+		/* Halt. Brought out by interrupt or RESET. */
+		case i8080_HLT: set_notify_halt(cpu, 1); break;
 
 		default: err = -1; /* unrecognized opcode */
 	}

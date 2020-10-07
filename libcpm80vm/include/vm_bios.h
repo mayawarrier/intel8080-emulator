@@ -26,25 +26,21 @@ extern "C" {
 struct cpm80_vm;
 
 /*
- * BIOS implementation.
+ * Call a function in the BIOS.
  *
- * This does not implement any device drivers!
- * See vm.h; implement those before getting here.
- * cpm80_vm.bios_call() points to this function by default.
+ * See vm_devices.h, this must be implemented first.
  *
- * Call a BIOS function with a call number (0-16).
+ * Accepts a call number from 0-16. See vm_callno.h.
  * Returns 0 if successful.
  */
-int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno);
+int cpm80_bios_call(struct cpm80_vm *const vm, int callno);
 
 /*
- * Utlity function for disk device implementations.
- * vm->cpu must be initialized first.
- *
- * Generate disk definitions in BIOS memory.
+ * Util for disk device implementation.
+ * Generates disk definitions in BIOS memory.
  *
  * Adapted from the CP/M 2.0 disk re-definition library
- * (http://www.gaby.de/cpm/manuals/archive/cpm22htm/axf.asm)
+ * http://www.gaby.de/cpm/manuals/archive/cpm22htm/axf.asm
  *
  * Each element in disk_params is a disk parameter list with 10 params:
  * - dn: Disk number 0,1,2... num_disks-1
@@ -76,7 +72,7 @@ int cpm80_bios_call_function(struct cpm80_vm *const vm, int callno);
  * disk_dph_out will contain the addresses to the DPHs of the disk drives when done. The number of disks is capped at 16.
  * Returns 0 if successful.
  */
-int cpm80_bios_redefine_disks(struct cpm80_vm *const vm, const int num_disks,
+int cpm80_bios_define_disks(struct cpm80_vm *const vm, const int num_disks,
 	const unsigned *const *disk_params, cpm80_addr_t disk_defns_begin, cpm80_addr_t disk_ram_begin, cpm80_addr_t *disk_dph_out);
 
 #ifdef __cplusplus

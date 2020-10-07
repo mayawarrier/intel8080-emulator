@@ -2,8 +2,8 @@
  * libcpm80vm types.
  */
 
-#ifndef CPM80_TYPES_H
-#define CPM80_TYPES_H
+#ifndef CPM80_VM_TYPES_H
+#define CPM80_VM_TYPES_H
 
 #include "i8080_types.h"
 
@@ -19,4 +19,4 @@ typedef i8080_addr_t cpm80_addr_t;
 }
 #endif
 
-#endif
+#endif /* CPM80_VM_TYPES_H */

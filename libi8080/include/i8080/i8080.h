@@ -1,7 +1,7 @@
 /*
- * Emulate an i8080.
+ * Emulate an Intel 8080.
  *
- * - All instructions supported - documented and undocumented.
+ * All instructions (including undocumented ones) are emulated.
  */
 
 #ifndef I8080_H
@@ -13,7 +13,14 @@
 extern "C" {
 #endif
 
-struct i8080_monitor;
+struct i8080_monitor {
+	/* If assigned, is called on RST 7.
+	 * mexitcode is set to the return value. */
+	int(*on_rst7)(struct i8080 *);
+	/* If assigned, is called when
+	 * cpu enters or exits halt. */
+	void(*on_halt_changed)(struct i8080 *, int val);
+};
 
 struct i8080
 {
@@ -22,87 +29,79 @@ struct i8080
 	/* Stack pointer, program counter */
 	i8080_addr_t sp, pc;
 
-	/* Status flags:
-	 * sign, zero, auxiliary carry, carry, parity */
-	int s, z, acy, cy, p;
+	/* sign, zero, carry, aux carry, parity */
+	int s, z, cy, acy, p;
 
-	/* Interrupt enable. Set/cleared by IE/DE. */
-	int inte;
+	/* Interrupt enable, Interrupt pending */
+	int inte, intr;
 
-	/* If in HALT state (i.e. stopped execution).
-	 * Set by HLT. Can only be cleared by an interrupt/RESET. */
+	/* Flag for halt/idle mode.
+	 * Set by executing opcode HLT.
+	 * No instructions execute until
+	 * the next interrupt or RESET. */
 	int halt;
 
-	/* Set by i8080_interrupt() to indicate pending
-	 * interrupt request. Cleared when serviced. */
-	int intr;
+	i8080_word_t(*memory_read)(const struct i8080 *, i8080_addr_t addr);
+	void(*memory_write)(const struct i8080 *, i8080_addr_t addr, i8080_word_t word);
 
-	/* io_read(), io_write() and interrupt_read()
-	 * are optional. Set them to NULL if unused. */
-
-	i8080_word_t(*memory_read)(const struct i8080 *, i8080_addr_t mem_addr);
-	i8080_word_t(*io_read)(const struct i8080 *, i8080_addr_t port_addr);
-
-	void(*memory_write)(const struct i8080 *, i8080_addr_t mem_addr, i8080_word_t word);
-	void(*io_write)(const struct i8080 *, i8080_addr_t port_addr, i8080_word_t word);
-	
+	/* called on opcode IN */
+	i8080_word_t(*io_read)(const struct i8080 *, i8080_addr_t port);
+	/* called on opcode OUT */
+	void(*io_write)(const struct i8080 *, i8080_addr_t port, i8080_word_t word); 
+	/* called on i8080_interrupt() */
 	i8080_word_t(*interrupt_read)(const struct i8080 *);
+
+	/* optional monitor/debugger */
+	struct i8080_monitor *monitor; 
+
+	/* Monitor exit code.
+	 * Checked after io_read, io_write, interrupt_read
+	 * and monitor->on_rst7. If non-zero, execution
+	 * fails for one instruction cycle. */
+	int mexitcode;
 
 	/* Clock cycles since init */
 	unsigned long cycles;
-
-	/* optional, see i8080_monitor */
-	struct i8080_monitor *monitor;
-
-	/* If set to non-zero value by io_read(),
-	 * io_write(), interrupt_read() or i8080_monitor, 
-	 * i8080_next()/i8080_exec() will exit with -1. */
-	int exitcode;
 
 	/* User data */
 	void *udata;
 };
 
-struct i8080_monitor
-{
-	/* Attach a routine to be called on RST 7.
-	 * exitcode is set to the return value. */
-	int(*enter_monitor)(struct i8080 *);
-};
-
 /*
  * First-time initialization.
- * - Sets intr, exitcode and cycles to 0.
- * - Sets monitor to NULL.
+ * - Sets intr, mexitcode, halt and cycles to 0.
+ * - Sets io_read, io_write, interrupt_read
+ *   and monitor to NULL.
  */
 void i8080_init(struct i8080 *const cpu);
 
 /*
- * Reset the CPU.
- * PC is set to 0, interrupt enable is reset.
- * If halted, leaves the halted state.
+ * Reset i8080.
+ * Sets PC to 0, resets
+ * interrupt enable, clears halt.
  * No other registers or flags are affected.
- * Equivalent to pulling RESET pin low.
+ * Has the same effect as the RESET pin.
  */
 void i8080_reset(struct i8080 *const cpu);
 
 /*
- * Execute the next instruction in memory.
- * If an interrupt is pending, services it.
- * Returns 0 if execution is successful, -1 if not.
+ * Execute the next instruction in
+ * memory or service a pending interrupt.
+ * Returns 0 if successful, else -1.
  */
 int i8080_next(struct i8080 *const cpu);
 
 /*
  * Execute an opcode.
- * Updates cycle count, registers and flags.
- * Returns 0 if execution is successful, -1 if not.
+ * Returns 0 if successful, else -1.
  */
 int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode);
 
 /*
- * Send an interrupt to the CPU.
- * i8080 will call interrupt_read() and execute the returned opcode.
+ * Send an interrupt to the i8080.
+ * interrupt_read() will be called
+ * on the next instruction cycle.
+ * Clears halt if set.
  */
 void i8080_interrupt(struct i8080 *const cpu);
 
