@@ -6,74 +6,88 @@
 #include "vm.h"
 #include "vm_bios.h"
 #include "vm_devices.h"
-#include "simple_vm_c90.h"
+#include "test_vm.h"
+
+struct cpm80_vm_simple
+{
+	struct vconsole {
+		FILE *sin;
+		FILE *sout;
+	} vcon_device;
+
+	struct vdisk {
+		unsigned sector, track;
+		char *disk; /* 243KB */
+	}
+	vdisk_devices[SIMPLEVM_MAX_DISKS];
+
+	struct i8080 cpu;
+	struct cpm80_vm base_vm;
+	struct cpm80_serial_ldevice lcon;
+	struct cpm80_disk_ldevice ldisks[SIMPLEVM_MAX_DISKS];
+};
 
 #define VM_243K (248832)
 
-/* always succeeds; does nothing */
-static int vm_vdev_noinit(void *dev) { (void)dev; return 0; }
+/* does nothing. always succeeds. */
+static int vdev_noinit(void *dev) { (void)dev; return 0; }
 
 /* 
  * Virtual console.
- * This version just maps directly to stdin/stdout.
+ * This version maps directly to stdin/stdout.
  * Microcomputer-specific control sequences would best be handled here.
- * Note that CP/M 2.2 expects these functions to block.
+ * Note that CP/M 2.2 expects these functions to block until successful.
  */
-static int vm_vcon_status(void *dev)
+static int vcon_status(void *dev)
 {
-	struct vm_vconsole *cdev = (struct vm_vconsole *)dev;
-	return ferror((FILE *)cdev->sin) || ferror((FILE *)cdev->sout);
+	struct vconsole *vcon = (struct vconsole *)dev;
+	return ferror(vcon->sin) || ferror(vcon->sout);
 }
-static char vm_vcon_in(void *dev)
+static char vcon_in(void *dev)
 {
 	char c;
-	struct vm_vconsole *cdev = (struct vm_vconsole *)dev;
+	struct vconsole *vcon = (struct vconsole *)dev;
 	/* blocks until success */
-	do { c = (char)getc((FILE *)cdev->sin); } while (ferror((FILE *)cdev->sin));
+	do { c = (char)getc(vcon->sin); } while (ferror(vcon->sin));
 	return c;
 }
-static void vm_vcon_out(void *dev, char c)
+static void vcon_out(void *dev, char c)
 {
-	struct vm_vconsole *cdev = (struct vm_vconsole *)dev;
+	struct vconsole *vcon = (struct vconsole *)dev;
 	/* blocks until success */
-	do { putc(c, (FILE *)cdev->sout); } while (ferror((FILE *)cdev->sout));
+	do { putc(c, vcon->sout); } while (ferror(vcon->sout));
 }
 
 /*
  * Virtual disk(s).
- * This version just emulates the disks in memory.
+ * This version emulates the disks in memory.
  * CP/M requires each disk format/drive to have a
- * "Disk Parameter Header" (disk->dph_addr).
- * This is generated in simple_vm_init_all_disks().
- * See also vm_bios.h/cpm80_bios_redefine_disks().
+ * "Disk Parameter Header" (disk->dph_addr),
+ * See vm_bios.h/cpm80_bios_define_disks().
  */
-static void vm_vdisk_setsec(void *dev, unsigned sector)
+static void vdisk_setsec(void *dev, unsigned sector)
 {
-	struct vm_vibm3740 *ddev = (struct vm_vibm3740 *)dev;
-	ddev->sector = sector;
+	((struct vdisk *)dev)->sector = sector;
 }
-static void vm_vdisk_settrk(void *dev, unsigned track)
+static void vdisk_settrk(void *dev, unsigned track)
 {
-	struct vm_vibm3740 *ddev = (struct vm_vibm3740 *)dev;
-	ddev->track = track;
+	((struct vdisk *)dev)->track = track;
 }
-static int vm_vdisk_readl(void *dev, char buf[128])
+static int vdisk_readl(void *dev, char buf[128])
 {
-	struct vm_vibm3740 *ddev = (struct vm_vibm3740 *)dev;
+	struct vdisk *ddev = (struct vdisk *)dev;
 	const unsigned long bindex = (unsigned long)ddev->sector * ddev->track;
 	memcpy(buf, ddev->disk + bindex, 128 * sizeof(char));
-	/* always succeeds */
 	return 0;
 }
-static int vm_vdisk_writel(void *dev, char buf[128], int deblock_code)
+static int vdisk_writel(void *dev, char buf[128], int deblock_code)
 {
 	(void)deblock_code;
 	/* don't bother de-blocking - we're writing to memory which is
 	 * bound to be many times faster than disk access anyway */
-	struct vm_vibm3740 *ddev = (struct vm_vibm3740 *)dev;
+	struct vdisk *ddev = (struct vdisk *)dev;
 	const unsigned long bindex = (unsigned long)ddev->sector * ddev->track;
 	memcpy(ddev->disk + bindex, buf, 128 * sizeof(char));
-	/* always succeeds */
 	return 0;
 }
 
@@ -102,7 +116,7 @@ set_svm_disk_memory_bufs(struct cpm80_vm_simple *const svm, const struct cpm80_v
 	i8080_word_t *memory_buf = params->disk_memory;
 	if (ndisks < 1 || ndisks > SIMPLEVM_MAX_DISKS || !memory_buf) return -1;
 
-	struct vm_vibm3740 *vdisk_devs = svm->vdisk_devices;
+	struct vdisk *vdisk_devs = svm->vdisk_devices;
 
 	ndisks--;
 	while (ndisks > -1) {
@@ -118,10 +132,10 @@ static void simple_vm_init_console(struct cpm80_vm_simple *const svm)
 {
 	struct cpm80_serial_ldevice *const con = &svm->lcon;
 	con->dev = &svm->vcon_device;
-	con->init = vm_vdev_noinit;
-	con->status = vm_vcon_status;
-	con->in = vm_vcon_in;
-	con->out = vm_vcon_out;
+	con->init = vdev_noinit;
+	con->status = vcon_status;
+	con->in = vcon_in;
+	con->out = vcon_out;
 }
 
 static void simple_vm_init_disk(struct cpm80_vm_simple *const svm, int disknum, cpm80_addr_t dph_addr)
@@ -129,11 +143,11 @@ static void simple_vm_init_disk(struct cpm80_vm_simple *const svm, int disknum, 
 	struct cpm80_disk_ldevice *const disk = svm->ldisks + disknum;
 	disk->dev = svm->vdisk_devices + disknum;
 	disk->dph_addr = dph_addr;
-	disk->init = vm_vdev_noinit;
-	disk->set_sector = vm_vdisk_setsec;
-	disk->set_track = vm_vdisk_settrk;
-	disk->readl = vm_vdisk_readl;
-	disk->writel = vm_vdisk_writel;
+	disk->init = vdev_noinit;
+	disk->set_sector = vdisk_setsec;
+	disk->set_track = vdisk_settrk;
+	disk->readl = vdisk_readl;
+	disk->writel = vdisk_writel;
 }
 
 /* A list of parameters for 4 IBM 3740 SD 8" floppy disks. See vm_bios.h.

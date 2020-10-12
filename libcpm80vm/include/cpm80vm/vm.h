@@ -22,6 +22,8 @@
 
 #include "vm_types.h"
 
+#define CPM80_MAX_DISKS (16)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -81,7 +83,7 @@ struct cpm80_vm
 	/* Disk devices.
 	 * An array of up to 16 disks.
 	 * At least 1 disk is required (to boot from).
-	 * Disk 0 is always the boot disk. */
+	 * Disk 0 is the boot disk. */
 	int ndisks;
 	struct cpm80_disk_ldevice *disks;
 

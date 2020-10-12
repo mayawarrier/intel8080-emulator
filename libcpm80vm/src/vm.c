@@ -2,8 +2,8 @@
 #include "i8080.h"
 #include "i8080_opcodes.h"
 #include "vm_devices.h"
-#include "vm_callno.h"
 #include "vm_bios.h"
+#include "vm_callno.h"
 #include "vm_types.h"
 #include "vm.h"
 
@@ -11,143 +11,7 @@
 	#define inline
 #endif
 
-static inline unsigned vmstrlen(const char *str)
-{
-	unsigned l = 0;
-	while (*str != '\0') {
-		str++; l++;
-	}
-	return l;
-}
-
-static inline char *vmstrcpy(char *dest, const char *src, unsigned *length)
-{
-	unsigned l = 0;
-	char *odest = dest;
-	while (*src != '\0') {
-		*dest = *src;
-		src++; dest++; l++;
-	}
-	*dest = '\0';
-	if (length) *length = l;
-	return odest;
-}
-
-/* utoa (unsigned to string) */
-static inline char *vmutoa(unsigned value, char *dest, const int base, unsigned *length)
-{
-	/* special case! */
-	if (value == 0) {
-		*dest = '0';
-		*(dest + 1) = '\0';
-		if (length) *length = 1;
-		return dest;
-	}
-
-	char *odest = dest;
-	/* Compute digits (units first)
-	 * and append to string as ascii */
-	unsigned digit, l = 0;
-	while (value != 0) {
-		digit = value % base;
-		if (digit > 9) *dest = (digit - 9) + 'a'; /* hex */
-		else *dest = digit + '0';
-		value /= base;
-		dest++; l++;
-	}
-	*dest = '\0';
-
-	/* reverse so units is on the right */
-	char temp;
-	char *start = odest, *end = dest - 1;
-	while (start < end) {
-		temp = *start;
-		*start = *end;
-		*end = temp;
-		start++; end--;
-	}
-
-	if (length) *length = l;
-	return odest;
-}
-
-#define STRBUF_SIZE (128)
-static char vmsprintf_buf[STRBUF_SIZE], VM_strbuf[STRBUF_SIZE];
-
-/* Format string.
- * Has %u, %s, %x, width, and 0-padding.
- * Other than strings, all args are pointers to the
- * actual value (as no guarantee that sizeof(void*)>=sizeof(int)) */
-static int vmsprintf(char *dest, const char *format, const void *const *args)
-{
-	unsigned arglen, width, nchars = 0;
-	char fc, pad_char;
-
-	while ((fc = *format++) != '\0') {
-		if (fc == '%') {
-			width = 0; pad_char = ' ';
-
-			if (fc == '0') {
-				pad_char = '0';
-				fc = *format++;
-			}
-
-			while (fc >= '0' && fc <= '9') {
-				width = 10 * width + (fc - '0');
-				fc = *format++;
-			}
-
-			/* format specifiers */
-			switch (fc)
-			{
-				case '%': /* escapes itself */
-					vmsprintf_buf[0] = '%';
-					vmsprintf_buf[1] = '\0';
-					arglen = 1;
-					break;
-
-				case 'u':
-					vmutoa(*(unsigned *)(*args), vmsprintf_buf, 10, &arglen);
-					args++;
-					break;
-
-				case 'x':
-					vmutoa(*(unsigned *)(*args), vmsprintf_buf, 16, &arglen);
-					args++;
-					break;
-
-				case 's':
-					if (vmstrlen(*args) >= STRBUF_SIZE) 
-						return -1;
-					vmstrcpy(vmsprintf_buf, *args, &arglen);
-					args++;
-					break;
-
-				default: return -1; /* specifier missing */
-			}
-
-			if (arglen < width) {
-				unsigned num_to_pad = width - arglen;
-				nchars += num_to_pad;
-				while (num_to_pad > 0) {
-					*dest = pad_char;
-					dest++; num_to_pad--;
-				}
-			}
-
-			vmstrcpy(dest, vmsprintf_buf, 0);
-			dest += arglen;
-			nchars += arglen;
-		} else {
-			/* no formatting */
-			*dest = fc;
-			dest++; nchars++;
-		}
-	}
-	*dest = '\0';
-
-	return (int)nchars;
-}
+extern int vmsprintf(char *dest, const char *format, const void *const *args); /* strutil.c */
 
 static inline void vmputs(struct cpm80_serial_ldevice *const con, const char *str)
 {
@@ -158,6 +22,7 @@ static inline void vmputs(struct cpm80_serial_ldevice *const con, const char *st
 	}
 }
 
+static const char VM_strbuf[128];
 static const char VM_err_fmt[] = "\r\n>>VM error: %s\r\n";
 
 static int vm_monitor(struct i8080 *cpu)
@@ -301,6 +166,7 @@ void cpm80_vm_poweroff(struct cpm80_vm *const vm)
 {
 	vm->prev_ih = vm->cpu->interrupt_read; /* save original */
 	vm->cpu->interrupt_read = poweroff;
+	vm->cpu->inte = 1; /* force interrupts on */
 	i8080_interrupt(vm->cpu);
 }
 
@@ -329,9 +195,9 @@ static inline void disk_select(struct cpm80_vm *const vm)
 	int selected = (int)vm->cpu->c;
 	struct cpm80_disk_ldevice *const disk = vm->disks + selected;
 
-	if (!lsbit(vm->cpu->e)) {
-		int err = disk->init(disk->dev); /* generate disk param block if possible */
-		if (err) set_bios_returnval(vm->cpu, 0);
+	/* generate disk param block if possible */
+	if (!lsbit(vm->cpu->e) && disk->init(disk->dev)) {
+		set_bios_returnval(vm->cpu, 0);
 		return;
 	}
 
@@ -522,7 +388,7 @@ static inline void write_word(struct i8080 *const cpu, cpm80_addr_t addr, cpm80_
 	cpu->memory_write(cpu, (i8080_addr_t)addr, lo);
 }
 
-/* see vm_bios.h for details */
+/* described in vm_bios.h */
 struct disk_params
 {
 	unsigned dn, dm, fsc, lsc, skf,
@@ -549,7 +415,8 @@ struct disk_reference
 {
 	/* Refers to disk? */
 	int to;
-	/* allocation vector size, checksum vector size */
+	/* allocation vector size &
+	 * checksum vector size of referred disk */
 	unsigned als, css;
 };
 
@@ -585,7 +452,7 @@ static void get_disk_param_block(struct disk_params *params, struct disk_param_b
 	param_block->blm = (cpm80_byte_t)blk_mask;
 
 	/* Files consist of one or more logical "extents," each of which span 128 sectors (16K).
-	 * A directory/file entry can map up to 16 blocks (so 2K blocks => 2 extents/entry, 
+	 * A directory/file entry can map up to 16 blocks (i.e. 2K blocks => 2 extents/entry, 
 	 * 3K blocks => 3 extents/entry and so on). extent_mask limits an extent index to the 
 	 * maximum per entry (eg. 0-2 for 3K blocks). */
 	unsigned extent_mask = 0;
@@ -663,7 +530,7 @@ write_sector_translate_table(struct cpm80_vm *const vm, struct disk_params *para
 	 * for eg. with spt=72 and skf=10:
 	 * 0,10,20,...70,8,18,...68,6,16,...66,4,14,...64,2,12,...62,0,10...
 	 *                                                          ^^^
-	 * an overlap occurs every 5 rotations (or 36 sectors mapped)
+	 * an overlap occurs every 5 rotations (every 36 mapped sectors)
 	 */
 	const unsigned num_before_overlap = sectors / gcd(sectors, skew);
 

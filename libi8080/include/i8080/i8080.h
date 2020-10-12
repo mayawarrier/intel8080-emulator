@@ -1,7 +1,7 @@
 /*
  * Emulate an Intel 8080.
  *
- * All instructions (including undocumented ones) are emulated.
+ * All instructions (documented and undocumented) are emulated.
  */
 
 #ifndef I8080_H
@@ -13,7 +13,8 @@
 extern "C" {
 #endif
 
-struct i8080_monitor {
+struct i8080_monitor 
+{
 	/* If assigned, is called on RST 7.
 	 * mexitcode is set to the return value. */
 	int(*on_rst7)(struct i8080 *);

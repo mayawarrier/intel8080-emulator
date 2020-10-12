@@ -8,15 +8,14 @@
  * - https://www.seasip.info/Cpm/dph.html (the Disk Parameter Header, drive allocation and checksum vectors)
  * - http://www.gaby.de/cpm/manuals/archive/cpm22htm/axg.asm (sector de-blocking for CP/M 2.0 in 8080 assembly)
  * - http://manpages.ubuntu.com/manpages/xenial/man5/cpm.5.html (Ubuntu manpage on CP/M filesystem package)
- * - https://obsolescence.wixsite.com/obsolescence/cpm-internals (Detailed description of CP/M memory map, filesystem, and File Control Block)
+ * - https://obsolescence.wixsite.com/obsolescence/cpm-internals (CP/M memory map, filesystem, and File Control Block)
  */
 
-#ifndef CPM80_BIOS_H
-#define CPM80_BIOS_H
+#ifndef CPM80_VM_BIOS_H
+#define CPM80_VM_BIOS_H
 
 #include "vm_types.h"
 
-#define CPM80_MAX_DISKS (16)
 #define CPM80_BIOS_VERSION "2.2"
 
 #ifdef __cplusplus
@@ -79,4 +78,4 @@ int cpm80_bios_define_disks(struct cpm80_vm *const vm, const int num_disks,
 }
 #endif
 
-#endif /* CPM80_BIOS_H */
+#endif /* CPM80_VM_BIOS_H */
