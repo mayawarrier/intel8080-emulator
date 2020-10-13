@@ -6,17 +6,18 @@ set(EXE_NAME i8080cpm)
 if (MSVC)
 	set(ADDITIONAL_FLAGS CACHE INTERNAL "/WX")
 else()
-	# These work on most compilers
+	# Should work on most compilers
 	set(ADDITIONAL_FLAGS CACHE INTERNAL "-Wall -Wextra -pedantic -Werror")
 endif()
 add_compile_options(${ADDITIONAL_FLAGS})
 
-option(BUILD_FRONTEND "Build command line frontend. Needs C++11 compiler or above." ON) # set this off by default eventually
+option(BUILD_EXAMPLES "Build libcpm80vm examples." OFF)
+option(BUILD_FRONTEND "Build command line frontend. Requires >= C++11." ON) # set this off by default eventually
 	
 if (BUILD_FRONTEND)
 	set(CMAKE_CXX_STANDARD 11)
 	set(CMAKE_CXX_STANDARD_REQUIRED ON)
-	set(BUILD_CPM80_SIMPLE_VM ON)
+	set(BUILD_EXAMPLES ON)
 endif()
 
 add_subdirectory(libi8080)
@@ -28,7 +29,7 @@ if (BUILD_FRONTEND)
 							   frontend/test_utils.cpp
 							   frontend/main.cpp)
 	target_include_directories(${EXE_NAME} PRIVATE frontend)
+	target_link_libraries(${EXE_NAME} cpm80vm i8080 test_vm)
 
-	target_link_libraries(${EXE_NAME} cpm80vm i8080) #$<TARGET_OBJECTS:simple_vm>
 	file(COPY libi8080/bin DESTINATION ${CMAKE_BINARY_DIR})
 endif()

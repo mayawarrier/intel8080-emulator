@@ -1,57 +1,62 @@
 /*
  * A barebones implementation of cpm80_vm.
- * Depends on: stdio.h, string.h.
  *
- * Emulates a console device and up to 4 IBM 3740 floppy disks (each 243K).
- * Floppy disks are emulated in memory.
+ * Emulates the console device and up to 16 8" SSSD 250K
+ * IBM-PC compatible floppy disks.
+ *
+ * See https://jeffpar.github.io/kbarchive/kb/075/Q75131/
+ * for more details on the the disk format.
  */
 
 #ifndef CPM80_TEST_VM_H
 #define CPM80_TEST_VM_H
 
 #include "i8080_types.h"
-#define SIMPLEVM_MAX_DISKS (4)
+
+/* Actual size in bytes of the 
+ * 250K floppy disk (250.25K) */
+#define IBM_PC_250K (256256)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct cpm80_vm_simple_params
+struct cpm80_test_vm_params
 {
-	/* Ptr to 16K or more of memory to use as RAM (max 64K). */
-	i8080_word_t *working_memory;
-	/* Highest usable address value i.e. len(working_memory) - 1 */
-	i8080_addr_t maxaddr;
+	/* VM memory (max 64K) */
+	i8080_word_t *memory;
+	/* Max address value i.e. len(memory)-1 */
+	unsigned maxaddr;
 	int ndisks;
-	/* Ptr to 243K or more of memory to store disk data (max 972K).
-	 * ndisks should correspond to the length of the buffer i.e.
-	 * if ndisks = 2, the buffer should be 2 x 243K = 486K in length. */
-	char *disk_memory;
+	/* Array of up to 16 floppy disk buffers (250.25K each).
+	 * Indices correspond to CP/M drives i.e. disk 0 will be
+	 * CP/M drive A, disk 1 will be drive B and so on. */
+	char **disks;
+	/* CP/M 2.2 binary. Will be copied into its default
+	 * location (7K before the end of memory). */
+	i8080_word_t *cpmbin;
+	unsigned cpmbin_size;
 };
 
-struct cpm80_vm_simple;
+struct cpm80_test_vm;
+
+/* Create and initialize cpm80_test_vm. */
+struct cpm80_test_vm *test_vm_create(const struct cpm80_test_vm_params *);
+
+/* Free cpm80_test_vm. */
+void test_vm_destroy(struct cpm80_test_vm *);
 
 /*
- * Initialize the VM.
- * cpmbin is the CP/M 2.2 binary. The binary is loaded into 
- * its default location at 7K before the end of working memory.
- * Returns 0 if successful.
+ * Start cpm80_test_vm.
+ * If unsuccessful returns -1, else
+ * returns cpu->mexitcode once VM exits.
+ * Return value should be cpm80_vm_exitcode::VM80_POWEROFF
+ * if VM quit gracefully (i.e. no errors occured during runtime).
  */
-int simple_vm_init(struct cpm80_vm_simple *const,
-	const struct cpm80_vm_simple_params *, const i8080_word_t cpmbin[0x1633]);
-
-/*
- * Start the VM.
- * If unsuccessful, returns -1.
- * If successful, returns a cpm80_vm_exitcode once 
- * the VM is powered off or runs into a fatal error.
- * Check that the return value is VM80_POWEROFF
- * to verify that no errors occured during runtime.
- */
-int simple_vm_start(struct cpm80_vm_simple *const);
+int test_vm_start(struct cpm80_test_vm *const);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* CPM80_TEST_VM */
+#endif /* CPM80_TEST_VM_H */

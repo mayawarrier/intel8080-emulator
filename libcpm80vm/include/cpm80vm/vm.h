@@ -101,7 +101,6 @@ struct cpm80_vm
 	int sel_disk;
 	cpm80_addr_t dma_addr;
 	int is_poweron;
-	struct i8080_monitor cpu_mon;
 	i8080_word_t(*prev_ih)(const struct i8080 *);
 };
 

@@ -22,15 +22,15 @@ static inline void vmputs(struct cpm80_serial_ldevice *const con, const char *st
 	}
 }
 
-static const char VM_strbuf[128];
+static char VM_strbuf[128];
 static const char VM_err_fmt[] = "\r\n>>VM error: %s\r\n";
 
-static int vm_monitor(struct i8080 *cpu)
+static int bios_monitor(struct i8080 *cpu)
 {
 	struct cpm80_vm *vm = (struct cpm80_vm *)cpu->udata;
 	const cpm80_addr_t bios_table_begin = vm->cpm_origin + 0x1600;
 
-	/* Translate CP/M's bios jump table to VM's bios_call() */
+	/* Translate CP/M's bios table to VM bios_call() */
 	int callno = (int)(cpu->pc - bios_table_begin) / 3;
 
 	if (callno > 16 || callno < 0) {
@@ -46,6 +46,8 @@ static int vm_monitor(struct i8080 *cpu)
 	else return vm->bios_call(vm, callno);
 }
 
+static struct i8080_monitor vm_monitor = { .on_rst7 = bios_monitor,.on_halt_changed = 0 };
+
 int cpm80_vm_init(struct cpm80_vm *const vm)
 {
 	int okay = 0;
@@ -57,9 +59,7 @@ int cpm80_vm_init(struct cpm80_vm *const vm)
 	if (!okay) return -1;
 
 	vm->cpu->udata = vm;
-	vm->cpu_mon.on_halt_changed = 0;
-	vm->cpu_mon.on_rst7 = vm_monitor;
-	vm->cpu->monitor = &vm->cpu_mon;
+	vm->cpu->monitor = &vm_monitor;
 	vm->bios_call = cpm80_bios_call;
 	vm->is_poweron = 0;
 	
