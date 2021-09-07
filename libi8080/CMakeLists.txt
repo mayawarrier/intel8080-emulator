@@ -1,7 +1,6 @@
 
 cmake_minimum_required(VERSION 3.1.3)
 
-# No dependencies
 add_library(i8080 src/i8080.c)
 target_include_directories(i8080
 	PUBLIC

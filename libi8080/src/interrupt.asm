@@ -1,22 +1,20 @@
 ;
 ; Source for bin/INTERRUPT.COM
-; Waits for A to become non-zero then exits.
+; Halt until an interrupt is received, then exit.
 ;
 
-bdos  equ 05h
+bdos  equ 05h          ;basic DOS
       org 100h
       jmp start
 
 msg1  db 'Waiting for interrupt...',0dh,0ah,'$'
-msg2  db 'Received! Quit to CP/M.',0dh,0ah,'$'
+msg2  db 'Received! Exit to DOS.',0dh,0ah,'$'
 
 start ei
-      mvi c,9          ;set BDOS function 9 (print string)
-      xra a            ;clear A
+      mvi c,9          ;set function 9 (print string)
       lxi d,msg1
       call bdos
-loop  jnz done
-      jmp loop
+      hlt              ;wait for an interrupt
 done  lxi d,msg2
       call bdos
-      rst 0            ;exit to WBOOT
+      rst 0            ;exit
