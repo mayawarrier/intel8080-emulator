@@ -2,9 +2,6 @@
  * Provide a simple command processor as a frontend to libi8080emu.
  */
 
-#include "emu.h"
-#include "emu_consts.h"
-#include "i8080_consts.h"
 #include <cstdlib>
 
 #include <iostream>
@@ -13,10 +10,6 @@
 #include <vector>
 #include <tuple>
 #include <limits>
-
-// remove macros coming from C
-#undef max
-#undef min
 
 struct cmd_state {
     bool is_args_valid;
