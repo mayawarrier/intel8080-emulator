@@ -2,9 +2,9 @@
  * Provide a simple command processor as a frontend to libi8080emu.
  */
 
-#include "libi8080emu/include/emu.h"
-#include "libi8080emu/include/emu_consts.h"
-#include "libi8080emu/libi8080/include/i8080_consts.h"
+#include "emu.h"
+#include "emu_consts.h"
+#include "i8080_consts.h"
 #include <cstdlib>
 
 #include <iostream>

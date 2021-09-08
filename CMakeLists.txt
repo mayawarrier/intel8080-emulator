@@ -80,8 +80,8 @@ else()
 endif()
 
 # make static libaries of libi8080 and libi8080emu
-include_directories(libi8080emu/libi8080/include)
-add_library(i8080 STATIC libi8080emu/libi8080/src/i8080.c libi8080emu/libi8080/src/i8080_sync.c)
+include_directories(libi8080/include)
+add_library(i8080 STATIC libi8080/src/i8080.c libi8080/src/i8080_sync.c)
 include_directories(libi8080emu/include)
 add_library(i8080emu STATIC libi8080emu/src/emu.c libi8080emu/src/emu_debug.c)
 # compile both libraries
