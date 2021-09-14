@@ -6,22 +6,6 @@
 	#define inline
 #endif
 
-#define F_CARRY_BIT     (0)
-#define F_PARITY_BIT    (2)
-#define F_AUX_CARRY_BIT (4)
-#define F_ZERO_BIT      (6)
-#define F_SIGN_BIT      (7)
-
-#define WORD_SIZE (8)
-#define WORD_MAX (255)
-#define DBLWORD_MAX (65535)
-
-static const i8080_word_t HEX0F = ((i8080_word_t)1 << (WORD_SIZE / 2)) - (i8080_word_t)1;
-static const i8080_word_t HEXF0 = (((i8080_word_t)1 << (WORD_SIZE / 2)) - (i8080_word_t)1) << (WORD_SIZE / 2);
-static const i8080_dbl_word_t HEXFF00 = (i8080_dbl_word_t)WORD_MAX << WORD_SIZE;
-
-#define min2(a, b) (((a) < (b)) ? (a) : (b))
-
 #ifdef __builtin_expect
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
@@ -30,23 +14,35 @@ static const i8080_dbl_word_t HEXFF00 = (i8080_dbl_word_t)WORD_MAX << WORD_SIZE;
 #define unlikely(x) (x)
 #endif
 
-#define word_lo(word) ((i8080_word_t)(word) & HEX0F)
-#define word_hi(word) (((i8080_word_t)(word) & HEXF0) >> (WORD_SIZE / 2))
+#define min2(a, b) (((a) < (b)) ? (a) : (b))
 
-#define dblword_lo(dbl_word) ((i8080_word_t)((i8080_dbl_word_t)(dbl_word) & WORD_MAX))
-#define dblword_hi(dbl_word) ((i8080_word_t)(((i8080_dbl_word_t)(dbl_word) & HEXFF00) >> WORD_SIZE))
+#define F_CARRY_BIT     (0)
+#define F_PARITY_BIT    (2)
+#define F_AUX_CARRY_BIT (4)
+#define F_ZERO_BIT      (6)
+#define F_SIGN_BIT      (7)
 
-#define limit_to_word(word) ((i8080_word_t)(word) & WORD_MAX)
-#define limit_to_dblword(dblword) ((i8080_dbl_word_t)(dblword) & DBLWORD_MAX)
-#define limit_to_addr(addr) ((i8080_addr_t)(addr) & DBLWORD_MAX)
+#define WORD_SIZE (8)
+#define WORD_MAX (0xff)
+#define DBLWORD_MAX (0xffff)
 
-#define concatenate(word1, word2) ((i8080_dbl_word_t)(word1) << WORD_SIZE | (word2))
+#define word_lo(word) ((word) & 0x0f)
+#define word_hi(word) ((i8080_word_t)((word) & 0xf0) >> (WORD_SIZE / 2))
 
-#define get_bit(buf, bit) (((buf) >> (bit)) & (unsigned)1)
+#define dblword_lo(dblword) ((i8080_word_t)((dblword) & WORD_MAX))
+#define dblword_hi(dblword) ((i8080_word_t)((i8080_dbl_word_t)((dblword) & 0xff00) >> WORD_SIZE))
+
+#define limit_to_word(word) ((word) & WORD_MAX)
+#define limit_to_dblword(dblword) ((dblword) & DBLWORD_MAX)
+#define limit_to_addr(addr) limit_to_dblword(addr)
+
+#define concatenate(word1, word2) (((i8080_dbl_word_t)(word1) << WORD_SIZE) | (word2))
+
+#define get_bit(buf, bit) (((buf) >> (bit)) & 0x1)
 
 static inline void set_bit(i8080_word_t *ptr, unsigned bit, unsigned val) {
-	if (val) *ptr |= ((i8080_word_t)1 << bit);
-	else *ptr &= ~((i8080_word_t)1 << bit);
+	if (val) *ptr = limit_to_word(*ptr | (0x1 << bit));
+    else *ptr = limit_to_word(*ptr & ~(0x1 << bit));
 }
 
 /* Indexed by opcode. */
@@ -183,7 +179,7 @@ static void i8080_add(struct i8080 *const cpu, i8080_word_t word, i8080_word_t c
 /* Subtract from accumulator. */
 static void i8080_sub(struct i8080 *const cpu, i8080_word_t word, i8080_word_t cy) {
 	i8080_dbl_word_t res = (i8080_dbl_word_t)cpu->a + (word ^ WORD_MAX) + !cy;
-	cpu->ac = aux_carry(cpu->a, word ^ HEX0F, !cy);
+	cpu->ac = aux_carry(cpu->a, word ^ 0x0f, !cy);
 	/* carry is the borrow flag for SUB, SBB etc, invert. */
 	cpu->cy = !get_bit(res, WORD_SIZE);
 	cpu->a = dblword_lo(res);
@@ -224,7 +220,7 @@ static void i8080_ora(struct i8080 *const cpu, i8080_word_t word) {
 /* (i8080_sub() but without modifying the accumulator) */
 static void i8080_cmp(struct i8080 *const cpu, i8080_word_t word) {
 	i8080_dbl_word_t res = (i8080_dbl_word_t)cpu->a + (word ^ WORD_MAX) + 1;
-	cpu->ac = aux_carry(cpu->a, word ^ HEX0F, 1);
+	cpu->ac = aux_carry(cpu->a, word ^ 0x0f, 1);
 	cpu->cy = !get_bit(res, WORD_SIZE);
 	update_zsp(cpu, dblword_lo(res));
 }
@@ -239,7 +235,7 @@ static i8080_word_t i8080_inr(struct i8080 *const cpu, i8080_word_t word) {
 
 /* Decrement word. */
 static i8080_word_t i8080_dcr(struct i8080 *const cpu, i8080_word_t word) {
-	cpu->ac = aux_carry(word, 0xf /* (1 ^ HEX0F) + 1 */, 0);
+	cpu->ac = aux_carry(word, 0xf /* (1 ^ 0x0f) + 1 */, 0);
 	word = limit_to_word(word - 1);
 	update_zsp(cpu, word);
 	return word;
@@ -393,8 +389,7 @@ static inline void i8080_xchg(struct i8080 *const cpu) {
 #define RES_SUCCESS (0)
 #define RES_FAILURE (-1)
 
-static int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
-{
+static int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode) {
 	switch (opcode)
 	{
 		/* Documented & undocumented NOPs. Do nothing. */
@@ -657,19 +652,19 @@ static int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 		case i8080_XTHL: i8080_xthl(cpu); break;
 		case i8080_XCHG: i8080_xchg(cpu); break;
 
-		/* I/O, accumulator <-> word
-		 * Port address is duplicated over 16-bit address bus
+		/* I/O port address is duplicated over 16-bit address bus
 		 * https://stackoverflow.com/questions/13551973/intel-8080-instruction-out
 		 * https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel, pg 97 */
-		case i8080_IN: 
-		{
+
+        /* Set accumulator to input word. */
+		case i8080_IN: {
 			if (unlikely(!cpu->io_read)) return RES_FAILURE;
 			i8080_word_t port = read_word_advance(cpu);
 			cpu->a = limit_to_word(cpu->io_read(cpu, (i8080_addr_t)concatenate(port, port)));
 			break;
-		} 
-		case i8080_OUT: 
-		{
+		}
+        /* Set output word to accumulator. */
+		case i8080_OUT: {
 			if (unlikely(!cpu->io_write)) return RES_FAILURE;				
 			i8080_word_t port = read_word_advance(cpu);
 			cpu->io_write(cpu, (i8080_addr_t)concatenate(port, port), cpu->a);
@@ -700,8 +695,7 @@ static int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode)
 	return RES_SUCCESS;
 }
 
-void i8080_reset(struct i8080 *const cpu)
-{
+void i8080_reset(struct i8080 *const cpu) {
     cpu->pc = 0;
     cpu->inte = 0;
     cpu->intr = 0;
@@ -711,8 +705,7 @@ void i8080_reset(struct i8080 *const cpu)
 
 void i8080_interrupt(struct i8080 *const cpu) { cpu->intr = cpu->inte; }
 
-int i8080_next(struct i8080 *const cpu)
-{
+int i8080_next(struct i8080 *const cpu) {
     if (unlikely(!cpu->enable)) return RES_FAILURE;
 
     if (cpu->intr) {
@@ -726,7 +719,7 @@ int i8080_next(struct i8080 *const cpu)
         /* process interrupt */
         return i8080_exec(cpu, limit_to_word(cpu->interrupt_read(cpu)));
     }
-    if (cpu->halt) return RES_SUCCESS;
+    if (unlikely(cpu->halt)) return RES_SUCCESS;
 
     /* execute next instruction */
     return i8080_exec(cpu, read_word_advance(cpu));
