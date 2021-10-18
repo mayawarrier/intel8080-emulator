@@ -1,0 +1,3 @@
+[submodule "frontend/include/ascii-json"]
+	path = frontend/include/ascii-json
+	url = https://github.com/mayawarrier/ascii-json
