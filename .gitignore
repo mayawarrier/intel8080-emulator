@@ -10,8 +10,6 @@ CMakeFiles/
 CMakeCache.txt
 Makefile
 
-# custom clean script
-clean_build
 
 # Prerequisites
 *.d

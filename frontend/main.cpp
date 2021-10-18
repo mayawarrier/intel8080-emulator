@@ -1,230 +1,126 @@
-/*
- * Provide a simple command processor as a frontend to libi8080emu.
- */
 
 #include <cstdlib>
-
-#include <iostream>
-#include <fstream>
-#include <functional>
+#include <cstring>
+#include <cassert>
+#include <array>
+#include <string>
 #include <vector>
-#include <tuple>
-#include <limits>
+#include <algorithm>
+#include <iostream>
+#include <run.hpp>
+#include <util.hpp>
 
-struct cmd_state {
-    bool is_args_valid;
-    cmd_state() : is_args_valid(false) {}
-};
+using namespace run8080;
 
-struct emu_cmd_state : cmd_state {
-    bool is_cpm_env;
-    bool is_runnable;
-    bool is_testing;
-    bool is_showing_help;
-    std::string bin_file;
-    emu_cmd_state() : cmd_state(),
-        is_cpm_env(false),
-        is_runnable(false),
-        is_testing(false),
-        is_showing_help(false),
-        bin_file("") {}
-};
+#define EXE_NAME "i8080emu"
 
-const std::string cmdline_help_msg = 
-"\ni8080-emu, an emulator for the INTEL 8080 microprocessor with some CP/M 2.2 BIOS support.\n"
-"Supports async interrupts, CPM 2.2 BDOS ops 2 and 9, and a simple command processor at CP/M WBOOT.\n\n"
-"Usage: i8080-emu [options]\n"
-"Options:\n"
-"   -h\t--help\t\t\tPrint this help message.\n"
-"   -e\t--env ENV\t\tSet the environment. \"default\" or \"cpm\".\n"
-"   -f\t--file FILE\t\tExecute the file as i8080 binary.\n"
-"   --run-all-tests\t\tRun all the test files under tests/.\n";
+static bool on_run_tests(void)
+{
+    bool success = true;
+    //success &= test::run("bin/CPUTEST.COM", run_params(true, true, false));
+    //success &= test::run("bin/TST8080.COM", test::run_params(true, true, false));
+    //success &= test::run("bin/INTERRUPT.COM", test::run_params(true, true, true));
+    return success;
+}
 
-// Prints the help message and returns EXIT failure
-int cmd_print_help_msg_and_exit(cmd_state & cmd_state, std::vector<std::string>::iterator &) {
-    emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
-    // if args were valid, return normally i.e. came here from --help/-h
-    if (emu_cmd_state.is_args_valid) {
-        emu_cmd_state.is_showing_help = true;
-        std::cout << cmdline_help_msg.c_str();
-        return 1;
-    } else {
-        std::cerr << cmdline_help_msg.c_str();
+int main(int argc, char** argv)
+{
+    const char NO_INPUT_FILES_MSG[] = "";
+
+    if (!argv || argc < 2)
+    {
+        
         return 0;
     }
-}
 
-int cmd_set_emu_env(cmd_state & cmd_state, std::vector<std::string>::iterator & opt_args_itr) {
-    int success = 1;
-    emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
-    if (*opt_args_itr == "0" || *opt_args_itr == "DEFAULT" || *opt_args_itr == "default") {
-        emu_cmd_state.is_cpm_env = false;
-    } else if (*opt_args_itr == "1" || *opt_args_itr == "CPM" || *opt_args_itr == "cpm") {
-        emu_cmd_state.is_cpm_env = true;
-    } else {
-        std::cout << "--env value invalid. Try --env cpm or --env default." << std::endl;
-        success = 0;
-    }
-    return success;
-}
+    const char HELP_MSG[] = "\n"
+        "Emulate an INTEL 8080 microprocessor.\n\n"
+        "Usage: " EXE_NAME " [options] [file]\n"
+        "Options:\n"
+        "   --help\t\t\tDisplay this message.\n"
+        "   --cpm\t\t\tTreat file as a CP/M 2.2 binary.\n"
+        "   --cpm-console\t\t\tEmulate a CP/M 2.2 console (WIP).\n"
+        "   --intercept-sigint\t\t\tConvert SIGINTs into 8080 interrupts.\n"
+        "   --run-tests\t\t\tRun all tests.\n";
 
-int cmd_set_bin_file(cmd_state & cmd_state, std::vector<std::string>::iterator & opt_args_itr) {
-    int success = 0;
-    emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
-    std::string & filename = *opt_args_itr;
-    // Check if file exists and if it is at most 64KB in size
-    std::ifstream bin_fstream(filename, std::ios::in | std::ios::binary);
-    if (bin_fstream.is_open()) {
-        // Extract all characters
-        bin_fstream.ignore(std::numeric_limits<std::streamsize>::max());
-        // check file read failure or too large
-        if (!bin_fstream.fail() && bin_fstream.eof()) {
-            std::streamsize length = bin_fstream.gcount();
-            if (length > ADDR_T_MAX + 1) {
-                std::cout << "File too large." << std::endl;
-            } else {
-                // success, file is readable and within size limits
-                emu_cmd_state.bin_file = filename;
-                emu_cmd_state.is_runnable = true;
-                success = 1;
-            }
-        } else {
-            std::cout << "File read error." << std::endl;
-        }
-        bin_fstream.close();
-    } else {
-        std::cout << "File could not be opened." << std::endl;
-    }
-    return success;
-}
+    bool is_cpm80_binary = false;
+    bool use_cpm80_console = false;
+    bool intercept_sigint = false;
+    bool require_file = false;
 
-int cmd_set_test_run(cmd_state & cmd_state, std::vector<std::string>::iterator &) {
-    emu_cmd_state & emu_cmd_state = *(struct emu_cmd_state *)(&cmd_state);
-    emu_cmd_state.is_runnable = true;
-    emu_cmd_state.is_testing = true;
-    return 1;
-}
+    const std::array<util::opt_info, 5> opts = {
+        util::opt_info("--help", "-h", util::make_opt_callback(
+            [&] { std::cout << HELP_MSG; })),
+        util::opt_info("--cpm", nullptr, util::make_opt_callback(
+            [&] { is_cpm80_binary = true; require_file = true; })),
+        util::opt_info("--cpm-console", nullptr, util::make_opt_callback(
+            [&] { use_cpm80_console = true; require_file = true; })),
+        util::opt_info("--intercept-sigint", nullptr, util::make_opt_callback(
+            [&] { intercept_sigint = true; require_file = true; })),
+        util::opt_info("--tests", "-t", util::make_opt_callback(on_run_tests)),
+    };
 
-using cmd_callback_fn = std::function<int(cmd_state & cmd_state, std::vector<std::string>::iterator & cmdline_args)>;
-using cmd_handle = std::tuple<std::string, std::string, bool, cmd_callback_fn>;
+    util::do_opts_info do_opts_outinfo;
+    bool success = util::do_opts(argc, argv, opts.data(), (int)opts.size(), nullptr, do_opts_outinfo);
 
-// {<fullname>, <alias>, <has_args>, <callback>}
-const std::vector<cmd_handle> CMDLINE_COMMANDS {
-    cmd_handle("--help", "-h", false, cmd_callback_fn(cmd_print_help_msg_and_exit)),
-    cmd_handle("--env", "-e", true, cmd_callback_fn(cmd_set_emu_env)),
-    cmd_handle("--file", "-f", true, cmd_callback_fn(cmd_set_bin_file)),
-    cmd_handle("--run-all-tests", "", false, cmd_callback_fn(cmd_set_test_run))
-};
+    if (require_file)
+    {
+        int fname_index = do_opts_outinfo.last_extracted_arg_index + 1;
+        auto& rem_arg_indices = do_opts_outinfo.remaining_arg_indices;
+        // binary search
+        auto fname_itr = std::lower_bound(rem_arg_indices.begin(), rem_arg_indices.end(), fname_index);
+        bool fname_index_found = fname_itr != rem_arg_indices.end() && *fname_itr == fname_index;
 
-int process_cmdline(int argc, char ** argv, cmd_state & cmd_state) {
+        if (fname_index_found) {
+            char* filename = argv[fname_index];
 
-    std::vector<std::string> CMDLINE_ARGS;
-    CMDLINE_ARGS.reserve(3);
-    std::vector<std::string>::iterator args_itr;
+            //test::run_params tparams(is_cpm80_binary, use_cpm80_console, intercept_sigint);
 
-    // if the last command exec was successful
-    int exec_success = 0;
 
-    if (argc < 2) {
-        // not enough args, print help message and exit
-        cmd_state.is_args_valid = false;
-        return cmd_print_help_msg_and_exit(cmd_state, args_itr);
-    } else {
-        cmd_state.is_args_valid = true;
-
-        // copy the cmd line args in argv
-        for (int i = 1; i < argc; ++i) {
-            CMDLINE_ARGS.push_back(std::string(argv[i]));
         }
 
-        // Function that is called when command is identified
-        cmd_callback_fn cmd_callback;
-        bool cmd_has_args;
-
-        args_itr = CMDLINE_ARGS.begin();
-        while (args_itr != CMDLINE_ARGS.end()) {
-            cmd_callback = nullptr;
-            cmd_has_args = false;
-
-            std::string & arg = *args_itr;
-            // Check against all commands
-            for (std::size_t j = 0; j < CMDLINE_COMMANDS.size(); ++j) {
-                const cmd_handle & cmd_handle = CMDLINE_COMMANDS[j];
-                // check if matches full name or alias
-                const std::string & cmd_name = std::get<0>(cmd_handle);
-                const std::string & cmd_alias = std::get<1>(cmd_handle);
-                if (arg == cmd_name || (!cmd_alias.empty() && arg == cmd_alias)) {
-                    cmd_has_args = std::get<2>(cmd_handle);
-                    cmd_callback = std::get<3>(cmd_handle);
-                }
-            }
-
-            if (cmd_callback) {
-                // check if cmd args are past end of cmdline args
-                args_itr++;
-                if (cmd_has_args && args_itr == CMDLINE_ARGS.end()) {
-                    std::cout << arg.c_str() << ": Missing arguments. See \"--help\" for usage." << std::endl;
-                    exec_success = 0;
-                } else {
-                    exec_success = cmd_callback(cmd_state, args_itr);
-                    // if the cmd had args, move past its last arg
-                    if (cmd_has_args) args_itr++;
-                }
-            } else {
-                std::cout << arg.c_str() << " is not a command. See \"--help\" for usage." << std::endl;
-                exec_success = 0;
-            }
-
-            // if any command execution fails, quit
-            if (!exec_success) break;
-        }
     }
 
-    return exec_success;
-}
+    
 
-/* The following are externed from run.cpp.
-   See run_tests.cpp for examples on how to use libi8080emu,
-   and how to configure the emulator before it is ready to run. */
+    
 
-// Shows example usage of libi8080emu.
-extern int run_all_tests(); 
-// Loads memory and calls emu_runtime.
-extern int run_generic_test(i8080 * const cpu, const std::string & file_loc, emu_addr_t prog_start_loc);
-// Initializes the CP/M 2.2 environment to run tests in.
-extern i8080 init_i8080_emu_cpm();
-// Initializes the default environment to run tests in.
-extern i8080 init_i8080_emu_default();
+    //if (!fname_index_found) {
+    //
+    //}
+    //
+    //if (fname_index_found)
+    //{
+    //    
+    //    rem_arg_indices.erase(fname_itr);
+    //}
+    //
+    //
+    //if (rem_arg_indices.size() > 0) {
+    //    //for
+    //    std::cout << EXE_NAME " error: Unrecognized argument " << argv[unreco]
+    //}
 
-// Loads and executes the file at bin_file_loc, as i8080 binary.
-int run_i8080_bin(const std::string & bin_file_loc, bool is_cpm_env) {
-    std::cout << std::endl;
-    i8080 cpu = is_cpm_env ? init_i8080_emu_cpm() : init_i8080_emu_default();
-    emu_addr_t program_start_loc = is_cpm_env ? CPM_START_OF_TPA : DEFAULT_START_PA;
-    int success = run_generic_test(&cpu, bin_file_loc, program_start_loc);
-    i8080_destroy(&cpu);
-    std::cout << std::endl;
-    return success;
-}
+    
 
-int main(int argc, char ** argv) {
-    int exit_success = EXIT_FAILURE;
-    emu_cmd_state EMU_CMD_STATE;
+    
 
-    int cmd_success = process_cmdline(argc, argv, EMU_CMD_STATE);
 
-    if (cmd_success && EMU_CMD_STATE.is_runnable) {
-        if (EMU_CMD_STATE.is_testing) {
-            run_all_tests();
-        } else {
-            run_i8080_bin(EMU_CMD_STATE.bin_file, EMU_CMD_STATE.is_cpm_env);
-        }
-        exit_success = EXIT_SUCCESS;
-    }
-    // not runnable, no file provided
-    if (!EMU_CMD_STATE.is_runnable && !EMU_CMD_STATE.is_showing_help && cmd_success) {
-        std::cout << "Use --file to specify source of i8080 binary." << std::endl;
-        exit_success = EXIT_FAILURE;
-    }
-    return exit_success;
+
+    return 0;
+
+
+
+    //const char* arg;
+    //if (argc > 1 && argv && (arg = argv[1]))
+    //{
+    //    run_params tparms; // default ok
+    //    success = run(arg, tparms);
+    //} else {
+    //    // run all tests in bin/
+    //    
+    //}
+    //
+    //if (success) return EXIT_SUCCESS;
+    //else return EXIT_FAILURE;
 }

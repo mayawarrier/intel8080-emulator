@@ -5,6 +5,7 @@ set(EXE_NAME i8080emu)
 
 if (MSVC)
 	set(ADDITIONAL_FLAGS CACHE INTERNAL "/WX")
+	add_definitions(-D_CRT_SECURE_NO_WARNINGS) # frontend only
 else()
 	# Should work on most compilers
 	set(ADDITIONAL_FLAGS CACHE INTERNAL "-Wall -Wextra -pedantic -Werror")
@@ -22,12 +23,10 @@ add_subdirectory(libi8080)
 
 if (BUILD_FRONTEND)
 	add_executable(${EXE_NAME} 
-		#frontend/test.cpp
-		#frontend/util.cpp
-		#frontend/cpm80vm.cpp
-		#frontend/i8080_exts.cpp
-		frontend/main.cpp
-		frontend/run_tests.cpp)
+		frontend/run.cpp
+		frontend/util.cpp
+		frontend/cpm80vm.cpp
+		frontend/main.cpp)
 	target_include_directories(${EXE_NAME} PRIVATE frontend/include)
 
 	target_link_libraries(${EXE_NAME} i8080)
