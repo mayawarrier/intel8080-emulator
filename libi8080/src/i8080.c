@@ -168,8 +168,8 @@ static inline i8080_addr_t read_addr_advance(struct i8080 *const cpu) {
 }
 
 /* Add to accumulator. */
-static void i8080_add(struct i8080 *const cpu, i8080_word_t word, i8080_word_t cy) {
-    i8080_dbl_word_t res = (i8080_dbl_word_t)cpu->a + word + cy;
+static void i8080_add(struct i8080 *const cpu, i8080_word_t word, unsigned cy) {
+    i8080_dbl_word_t res = (i8080_dbl_word_t)cpu->a + word + (i8080_word_t)cy;
     cpu->ac = aux_carry(cpu->a, word, cy);
     cpu->cy = get_bit(res, WORD_SIZE);
     cpu->a = dblword_lo(res);
@@ -177,8 +177,8 @@ static void i8080_add(struct i8080 *const cpu, i8080_word_t word, i8080_word_t c
 }
 
 /* Subtract from accumulator. */
-static void i8080_sub(struct i8080 *const cpu, i8080_word_t word, i8080_word_t cy) {
-	i8080_dbl_word_t res = (i8080_dbl_word_t)cpu->a + (word ^ WORD_MAX) + !cy;
+static void i8080_sub(struct i8080 *const cpu, i8080_word_t word, unsigned cy) {
+	i8080_dbl_word_t res = (i8080_dbl_word_t)cpu->a + (word ^ WORD_MAX) + (i8080_word_t)(!cy);
 	cpu->ac = aux_carry(cpu->a, word ^ 0x0f, !cy);
 	/* carry is the borrow flag for SUB, SBB etc, invert. */
 	cpu->cy = !get_bit(res, WORD_SIZE);
@@ -346,13 +346,13 @@ static inline void i8080_call_addr(struct i8080 *const cpu, i8080_addr_t addr) {
 }
 
 /* Conditional jump to immediate address. */
-static void i8080_jmp(struct i8080 *const cpu, int condition) {
+static void i8080_jmp(struct i8080 *const cpu, unsigned condition) {
 	if (condition) i8080_jmp_addr(cpu, read_addr_advance(cpu));
 	else cpu->pc += 2; /* skip address */	 
 }
 
 /* Conditional call (push PC + jump) to immediate address. */
-static void i8080_call(struct i8080 *const cpu, int condition) {
+static void i8080_call(struct i8080 *const cpu, unsigned condition) {
 	if (condition) {
 		i8080_call_addr(cpu, read_addr_advance(cpu));
 		cpu->cycles += 6;
@@ -360,7 +360,7 @@ static void i8080_call(struct i8080 *const cpu, int condition) {
 }
 
 /* Conditional return to last address on the stack. */
-static void i8080_ret(struct i8080 *const cpu, int condition) {
+static void i8080_ret(struct i8080 *const cpu, unsigned condition) {
 	if (condition) {
 		i8080_jmp_addr(cpu, (i8080_addr_t)i8080_pop(cpu));
 		cpu->cycles += 6;
@@ -454,14 +454,14 @@ static int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode) {
 		case i8080_ADD_A: i8080_add(cpu, cpu->a, 0); break;
 
 		/* Addition with carry */
-		case i8080_ADC_B: i8080_add(cpu, cpu->b, (i8080_word_t)cpu->cy); break;
-		case i8080_ADC_C: i8080_add(cpu, cpu->c, (i8080_word_t)cpu->cy); break;
-		case i8080_ADC_D: i8080_add(cpu, cpu->d, (i8080_word_t)cpu->cy); break;
-		case i8080_ADC_E: i8080_add(cpu, cpu->e, (i8080_word_t)cpu->cy); break;
-		case i8080_ADC_H: i8080_add(cpu, cpu->h, (i8080_word_t)cpu->cy); break;
-		case i8080_ADC_L: i8080_add(cpu, cpu->l, (i8080_word_t)cpu->cy); break;
-		case i8080_ADC_M: i8080_add(cpu, read_word_indirect(cpu), (i8080_word_t)cpu->cy); break;
-		case i8080_ADC_A: i8080_add(cpu, cpu->a, (i8080_word_t)cpu->cy); break;
+		case i8080_ADC_B: i8080_add(cpu, cpu->b, cpu->cy); break;
+		case i8080_ADC_C: i8080_add(cpu, cpu->c, cpu->cy); break;
+		case i8080_ADC_D: i8080_add(cpu, cpu->d, cpu->cy); break;
+		case i8080_ADC_E: i8080_add(cpu, cpu->e, cpu->cy); break;
+		case i8080_ADC_H: i8080_add(cpu, cpu->h, cpu->cy); break;
+		case i8080_ADC_L: i8080_add(cpu, cpu->l, cpu->cy); break;
+		case i8080_ADC_M: i8080_add(cpu, read_word_indirect(cpu), cpu->cy); break;
+		case i8080_ADC_A: i8080_add(cpu, cpu->a, cpu->cy); break;
 
 		/* Subtraction */
 		case i8080_SUB_B: i8080_sub(cpu, cpu->b, 0); break;
@@ -474,14 +474,14 @@ static int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode) {
 		case i8080_SUB_A: i8080_sub(cpu, cpu->a, 0); break;
 
 		/* Subtraction with borrowed carry */
-		case i8080_SBB_B: i8080_sub(cpu, cpu->b, (i8080_word_t)cpu->cy); break;
-		case i8080_SBB_C: i8080_sub(cpu, cpu->c, (i8080_word_t)cpu->cy); break;
-		case i8080_SBB_D: i8080_sub(cpu, cpu->d, (i8080_word_t)cpu->cy); break;
-		case i8080_SBB_E: i8080_sub(cpu, cpu->e, (i8080_word_t)cpu->cy); break;
-		case i8080_SBB_H: i8080_sub(cpu, cpu->h, (i8080_word_t)cpu->cy); break;
-		case i8080_SBB_L: i8080_sub(cpu, cpu->l, (i8080_word_t)cpu->cy); break;
-		case i8080_SBB_M: i8080_sub(cpu, read_word_indirect(cpu), (i8080_word_t)cpu->cy); break;
-		case i8080_SBB_A: i8080_sub(cpu, cpu->a, (i8080_word_t)cpu->cy); break;
+		case i8080_SBB_B: i8080_sub(cpu, cpu->b, cpu->cy); break;
+		case i8080_SBB_C: i8080_sub(cpu, cpu->c, cpu->cy); break;
+		case i8080_SBB_D: i8080_sub(cpu, cpu->d, cpu->cy); break;
+		case i8080_SBB_E: i8080_sub(cpu, cpu->e, cpu->cy); break;
+		case i8080_SBB_H: i8080_sub(cpu, cpu->h, cpu->cy); break;
+		case i8080_SBB_L: i8080_sub(cpu, cpu->l, cpu->cy); break;
+		case i8080_SBB_M: i8080_sub(cpu, read_word_indirect(cpu), cpu->cy); break;
+		case i8080_SBB_A: i8080_sub(cpu, cpu->a, cpu->cy); break;
 
 		/* Logical AND with accumulator */
 		case i8080_ANA_B: i8080_ana(cpu, cpu->b); break;
@@ -587,9 +587,9 @@ static int i8080_exec(struct i8080 *const cpu, i8080_word_t opcode) {
 
 		/* Arithmetic / logical / compare immediate */
 		case i8080_ADI: i8080_add(cpu, read_word_advance(cpu), 0); break;
-		case i8080_ACI: i8080_add(cpu, read_word_advance(cpu), (i8080_word_t)cpu->cy); break;
+		case i8080_ACI: i8080_add(cpu, read_word_advance(cpu), cpu->cy); break;
 		case i8080_SUI: i8080_sub(cpu, read_word_advance(cpu), 0); break;
-		case i8080_SBI: i8080_sub(cpu, read_word_advance(cpu), (i8080_word_t)cpu->cy); break;
+		case i8080_SBI: i8080_sub(cpu, read_word_advance(cpu), cpu->cy); break;
 		case i8080_ANI: i8080_ana(cpu, read_word_advance(cpu)); break;
 		case i8080_XRI: i8080_xra(cpu, read_word_advance(cpu)); break;
 		case i8080_ORI: i8080_ora(cpu, read_word_advance(cpu)); break;
