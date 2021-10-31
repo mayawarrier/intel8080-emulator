@@ -1,8 +1,19 @@
 # VS Project files
-*.vs/
-CMakeSettings.json
-*.dep.inc
-*.mk
+.vs/
+Debug/
+Release/
+/out/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.psess
+*.vspx
+*.vsp
+*.diagsession
+*.hint
+/out/build/
+/CMakeSettings.json
 
 # CMake
 cmake_install.cmake
