@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-add_executable(i8080emu src/cpm80vm.cpp src/main.cpp)
+add_executable(i8080emu src/emu.cpp src/keyintr.cpp src/main.cpp)
 	
 if (${CMAKE_VERSION} VERSION_GREATER "3.8.0" OR ${CMAKE_VERSION} VERSION_EQUAL "3.8.0")
 	target_compile_features(i8080emu PRIVATE cxx_std_11)

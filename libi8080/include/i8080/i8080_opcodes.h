@@ -1,10 +1,7 @@
-/*
- * All opcodes in the INTEL 8080.
- */
 
 #ifndef I8080_OPCODES_H
 #define I8080_OPCODES_H
-								/*    size       flags       details                           cycles  */
+                                /*    size       flags       details                           cycles  */
 #define i8080_NOP 0x00          /*      1                    no operation                         4    */
 #define i8080_LXI_B 0x01        /*      3                    B <- byte 3, C <- byte 2             10   */
 #define i8080_STAX_B 0x02       /*      1                    [BC] <- A                            7    */
@@ -49,8 +46,8 @@
 #define i8080_DCR_H 0x25        /*      1       Z,S,P,AC     H <- H - 1                           5    */
 #define i8080_MVI_H 0x26        /*      2                    H <- byte 2                          7    */
 #define i8080_DAA 0x27          /*      1       Z,S,P,AC     A to decimal. add 6 to lower nibble      
-															 if > 9 or AC set, add 6 to higher
-															 nibble if > 9 or CY set              4    */
+                                                             if > 9 or AC set, add 6 to higher
+                                                             nibble if > 9 or CY set              4    */
 #define i8080_ALT_NOP4 0x28
 
 #define i8080_DAD_H 0x29        /*      1       CY           HL <- HL + HL                        10   */
@@ -134,7 +131,7 @@
 #define i8080_MOV_M_E 0x73      /*      1                    [HL] <- E                            7    */
 #define i8080_MOV_M_H 0x74      /*      1                    [HL] <- H                            7    */
 #define i8080_MOV_M_L 0x75      /*      1                    [HL] <- L                            7    */
-#define i8080_HLT 0x76          /*      1                    halt execution                       7    */
+#define i8080_HLT 0x76          /*      1                    halt, cleared by interrupt/reset     7    */
 
 #define i8080_MOV_M_A 0x77      /*      1                    [HL] <- A                            7    */
 #define i8080_MOV_A_B 0x78      /*      1                    A <- B                               5    */
@@ -266,7 +263,7 @@
 #define i8080_RPE 0xe8          /*      1                    if P even, perform RET               11/5 */
 #define i8080_PCHL 0xe9         /*      1                    PC <- HL                             5    */
 #define i8080_JPE 0xea          /*      3                    if P even, perform JMP               10   */
-#define i8080_XCHG 0xeb         /*      1                    HL <-> DE                            5    */
+#define i8080_XCHG 0xeb         /*      1                    HL <-> DE                            4    */
 #define i8080_CPE 0xec          /*      3                    if P even, CALL adr                  17/11*/
 #define i8080_ALT_CALL1 0xed
 #define i8080_XRI 0xee          /*      2       Z,S,P,CY,AC  A <- A ^ byte 2                      7    */
@@ -289,4 +286,4 @@
 #define i8080_CPI 0xfe          /*      2       Z,S,P,CY,AC  A - byte 2                           7    */
 #define i8080_RST_7 0xff        /*      1                    CALL interrupt handler at 0x38       11   */
 
-#endif /* I8080_OPCODES_H */
+#endif

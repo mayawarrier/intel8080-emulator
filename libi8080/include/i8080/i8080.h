@@ -15,59 +15,70 @@ extern "C" {
 
 struct i8080
 {
-	/* Working register */
-	i8080_word_t a, b, c, d, e, h, l;
-	
-	i8080_addr_t sp; /* Stack pointer */
-	i8080_addr_t pc; /* Program counter */
+    /* Working register */
+    i8080_word_t a, b, c, d, e, h, l;
+
+    i8080_addr_t sp; /* Stack pointer */
+    i8080_addr_t pc; /* Program counter */
 
     unsigned s : 1;  /* Sign flag */
-	unsigned z : 1;  /* Zero flag */
-	unsigned cy : 1; /* Carry flag */
-	unsigned ac : 1; /* Aux carry flag */
-	unsigned p : 1;  /* Parity flag */
+    unsigned z : 1;  /* Zero flag */
+    unsigned cy : 1; /* Carry flag */
+    unsigned ac : 1; /* Aux carry flag */
+    unsigned p : 1;  /* Parity flag */
 
-	unsigned inte : 1; /* Interrupt enable */
-	unsigned intr : 1; /* Interrupt pending */
+    unsigned inte : 1; /* Interrupt enable */
+    unsigned intr : 1; /* Interrupt pending */
 
-	/* True if in WAIT state. See opcode HLT. */
-	/* Cleared by next interrupt or reset. */
-	unsigned halt : 1;
+    /* See HLT. */
+    unsigned halt : 1;
 
-	unsigned long /* long */ cycles; /* Clock cycles */
+    /* Clock cycles */
+    i8080_cycles_t cycles;
 
-	/* ---------- user-defined ---------- */
-	
-	unsigned enable : 1; /* Enable/disable */
+    /* ---------- user-defined ---------- */
 
-	i8080_word_t(*memory_read)(const struct i8080 *, i8080_addr_t addr);
-	void(*memory_write)(const struct i8080 *, i8080_addr_t addr, i8080_word_t word);
-	
+    i8080_word_t(*mem_read)(const struct i8080*, i8080_addr_t addr);
+    void(*mem_write)(const struct i8080*, i8080_addr_t addr, i8080_word_t word);
+
     /* Handles opcode IN. */
-	i8080_word_t(*io_read)(const struct i8080 *, i8080_addr_t port);
+    i8080_word_t(*io_read)(const struct i8080*, i8080_word_t port);
     /* Handles opcode OUT. */
-	void(*io_write)(const struct i8080 *, i8080_addr_t port, i8080_word_t word); 
+    void(*io_write)(const struct i8080*, i8080_word_t port, i8080_word_t word);
 
-	/* Handles an interrupt. */
-	i8080_word_t(*interrupt_read)(const struct i8080 *);
+    /* Handles an interrupt. */
+    i8080_word_t(*intr_read)(const struct i8080*);
 
-	/* User data */
-	void *udata;
+    /* User data */
+    void* udata;
 };
 
-/* Reset chip (low on RESET pin). */
-/* PC is set to 0, interrupts are */
-/* disabled, halt is cleared, and */
-/* cycles set to 0. */
-void i8080_reset(struct i8080 *const cpu);
+enum i8080_err
+{
+    /* Missing I/O or interrupt handler. */
+    i8080_EHNDLR = 1,
+    /* Unrecognized opcode.
+     * Only possible if opcode can be > 0xff. */
+    i8080_EOPCODE = 2
+};
 
-/* Execute the next instruction in */
-/* memory or process a pending interrupt. */
-/* Returns 0 on success, else -1. */
-int i8080_next(struct i8080 *const cpu);
+/* Reset chip. */
+/* PC <= 0, interrupts are disabled, */
+/* halt cleared, and cycles set to 0. */
+void i8080_reset(struct i8080* const cpu);
+
+/* Run the next instruction in memory */
+/* or service a pending interrupt. */
+/* Returns 0 on success. */
+int i8080_next(struct i8080* const cpu);
 
 /* Send an interrupt. */
-void i8080_interrupt(struct i8080 *const cpu);
+/* If interrupts are enabled, intr_read() is called */
+/* shortly after to acknowledge the interrupt.*/
+void i8080_interrupt(struct i8080* const cpu);
+
+/* Get description of error code. */
+const char* i8080_strerror(int err);
 
 #ifdef __cplusplus
 }
