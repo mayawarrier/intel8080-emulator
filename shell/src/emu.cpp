@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <climits>
+#include <string>
 #include <memory>
 
 #include "i8080/i8080.h"
@@ -51,7 +52,6 @@ static void io_write(const i8080*, i8080_word_t port, i8080_word_t word) noexcep
 {
     emu_printerr("Unhandled I/O write to "
         "port %d w/ data: 0x%02x", port, word);
-
     EMU.quit = true;
     EMU.err = EMU_EHNDLR;
 }
@@ -60,7 +60,6 @@ static i8080_word_t io_read(const i8080* cpu, i8080_word_t port) noexcept
 {
     emu_printerr("Unhandled I/O read from "
         "port %d, clobbered acc: 0x%02x", port, cpu->a);
-
     EMU.quit = true;
     EMU.err = EMU_EHNDLR;
     return 0;
@@ -110,7 +109,7 @@ static bool emu_cpm80_call(const i8080* cpu, i8080_addr_t addr) noexcept
             break;
         }
         default:
-            emu_printerr("Unknown BDOS call %d", callno);
+            emu_printerr("Unimplemented BDOS call %d", callno);
             EMU.quit = true;
             EMU.err = EMU_EBDOS;
             break;
@@ -138,9 +137,9 @@ static void cpm80_io_write(const i8080* cpu, i8080_word_t port, i8080_word_t wor
 }
 
 // https://obsolescence.wixsite.com/obsolescence/cpm-internals  
-static constexpr std::size_t cpm80_lowsize = 0x100;
+static constexpr auto cpm80_lowsize = 0x100u;
 // minimum possible size = CCP + BDOS
-static constexpr std::size_t cpm80_highsize = 0x1600;
+static constexpr auto cpm80_highsize = 0x1600u;
 
 // Injected at operating system call locations.
 static constexpr i8080_word_t emu_call[] = { i8080_OUT, 0xff, i8080_RET };
@@ -160,7 +159,7 @@ int emu_init(emu_opts opts)
     if (opts.use_cpm_con)
     {
         // CP/M reserved RST 7 for debuggers like DDT!
-        // we can intercept this to detect if the CPU is executing garbage memory
+        // can intercept this to detect if the CPU is executing garbage memory
         std::memset(EMU.mem.get(), i8080_RST_7, 65536 * sizeof(i8080_word_t));
         std::memcpy(&EMU.mem[0x0038], emu_call, sizeof(emu_call));
 
@@ -176,40 +175,25 @@ int emu_init(emu_opts opts)
     EMU.opts = opts;
     // testing
     EMU.rcrd_con = false;
-    EMU.conout.clear();
-
-    if (opts.conv_key_intr && !keyintr_sigsset)
-    {
-        if (!keyintr_initlzd)
-        {
-            if (!keyintr_init())
-                return EMU_EKEYINTR;
-        }
-        if (!keyintr_setsigs())
-            return EMU_EKEYINTR;
-    }
-    else if (!opts.conv_key_intr && keyintr_sigsset)
-        keyintr_resetsigs();
-        
+    EMU.conout.clear();    
     return 0;
 }
 
 void emu_destroy(void)
 {
-    keyintr_destroy();
     EMU.mem.reset();
     std::string().swap(EMU.conout);
 }
 
-int emu_load(const char* binfile)
+int emu_load(const char* filepath)
 {
-    auto* fs = std::fopen(binfile, "rb");
+    std::FILE* fs = std::fopen(filepath, "rb");
     if (!fs) {
-        emu_printerr("%s could not be opened.", binfile);
+        emu_printerr("%s could not be opened.", filepath);
         return EMU_EFILE;
     }
 
-    unsigned long max_binsize = 65536; // 64K
+    auto max_binsize = 65536u; // 64K
     i8080_word_t* binp = EMU.mem.get();
     if (EMU.opts.use_cpm_con)
     {
@@ -217,20 +201,21 @@ int emu_load(const char* binfile)
         binp += cpm80_lowsize;
     }
 
-    if (sizeof(i8080_word_t) == 1)
+    constexpr bool word_is_uchar = sizeof(i8080_word_t) == 1; // VS C4127
+    if (word_is_uchar)
     {
         auto n = std::fread(binp, 1, max_binsize, fs);
         (void)n; // Werror=unused-result
     }
-    else {
-        i8080_word_t* p = binp; int c;
-        while ((c = std::fgetc(fs)) != EOF)
-            *p++ = i8080_word_t(c);
+    else { 
+        decltype(max_binsize) i = 0; int c;
+        while ((c = std::fgetc(fs)) != EOF && i < max_binsize)
+            binp[i++] = i8080_word_t(c);
     }
     if (std::ferror(fs))
     {
         std::fclose(fs);
-        emu_printerr("%s could not be read.", binfile);
+        emu_printerr("%s could not be read.", filepath);
         return EMU_EFILE;
     }
     else if (!std::feof(fs))
@@ -239,7 +224,7 @@ int emu_load(const char* binfile)
         if (!std::feof(fs))
         {
             std::fclose(fs);
-            emu_printerr("%s is too large.", binfile);
+            emu_printerr("%s is too large.", filepath);
             return EMU_EFILE;
         }
     }
@@ -248,38 +233,38 @@ int emu_load(const char* binfile)
     return 0;
 }
 
-template <std::size_t Bufsz = 64, typename T>
-static inline void addfmtstr(std::string& str, const char* format, T value)
+template <std::size_t Bufsz, typename T>
+static inline void addfmt(std::string& str, char (&buf)[Bufsz], const char* format, T value)
 {
-    char buf[Bufsz];
     std::snprintf(buf, Bufsz, format, value);
     str += buf;
 }
 
 static std::string i8080_dbginfo(const i8080* cpu)
 {
+    char buf[32];
     std::string ret;
-    addfmtstr(ret, "a=0x%02x\n", cpu->a);
-    addfmtstr(ret, "b=0x%02x\n", cpu->b);
-    addfmtstr(ret, "c=0x%02x\n", cpu->c);
-    addfmtstr(ret, "d=0x%02x\n", cpu->d);
-    addfmtstr(ret, "e=0x%02x\n", cpu->e);
-    addfmtstr(ret, "h=0x%02x\n", cpu->h);
-    addfmtstr(ret, "l=0x%02x\n", cpu->l);
-    addfmtstr(ret, "bc=0x%04x\n", wordconcat(cpu->b, cpu->c));
-    addfmtstr(ret, "de=0x%04x\n", wordconcat(cpu->d, cpu->e));
-    addfmtstr(ret, "hl=0x%04x\n", wordconcat(cpu->h, cpu->l));
-    addfmtstr(ret, "sp=0x%04x\n", cpu->sp);
-    addfmtstr(ret, "pc=0x%04x\n", cpu->pc);
-    addfmtstr(ret, "sign=%u\n", cpu->s);
-    addfmtstr(ret, "zero=%u\n", cpu->z);
-    addfmtstr(ret, "carry=%u\n", cpu->cy);
-    addfmtstr(ret, "aux-carry=%u\n", cpu->ac);
-    addfmtstr(ret, "parity=%u\n", cpu->p);
-    addfmtstr(ret, "inte=%u\n", cpu->inte);
-    addfmtstr(ret, "intr=%u\n", cpu->intr);
-    addfmtstr(ret, "halt=%u\n", cpu->halt);
-    addfmtstr(ret, "cycles=%llu", cpu->cycles);   
+    addfmt(ret, buf, "a=0x%02x\n", cpu->a);
+    addfmt(ret, buf, "b=0x%02x\n", cpu->b);
+    addfmt(ret, buf, "c=0x%02x\n", cpu->c);
+    addfmt(ret, buf, "d=0x%02x\n", cpu->d);
+    addfmt(ret, buf, "e=0x%02x\n", cpu->e);
+    addfmt(ret, buf, "h=0x%02x\n", cpu->h);
+    addfmt(ret, buf, "l=0x%02x\n", cpu->l);
+    addfmt(ret, buf, "bc=0x%04x\n", wordconcat(cpu->b, cpu->c));
+    addfmt(ret, buf, "de=0x%04x\n", wordconcat(cpu->d, cpu->e));
+    addfmt(ret, buf, "hl=0x%04x\n", wordconcat(cpu->h, cpu->l));
+    addfmt(ret, buf, "sp=0x%04x\n", cpu->sp);
+    addfmt(ret, buf, "pc=0x%04x\n", cpu->pc);
+    addfmt(ret, buf, "sign=%u\n", cpu->s);
+    addfmt(ret, buf, "zero=%u\n", cpu->z);
+    addfmt(ret, buf, "carry=%u\n", cpu->cy);
+    addfmt(ret, buf, "aux-carry=%u\n", cpu->ac);
+    addfmt(ret, buf, "parity=%u\n", cpu->p);
+    addfmt(ret, buf, "inte=%u\n", cpu->inte);
+    addfmt(ret, buf, "intr=%u\n", cpu->intr);
+    addfmt(ret, buf, "halt=%u\n", cpu->halt);
+    addfmt(ret, buf, "cycles=%llu", cpu->cycles);   
     return ret;
 }
 
@@ -313,6 +298,12 @@ static int check_err(int i80err)
 
 static int emu_do_run_with_intr(void)
 {
+    if (!keyintr_initlzd && !keyintr_init())
+        return EMU_EKEYINTR;
+
+    if (!keyintr_start())
+        return EMU_EKEYINTR;
+
     int i80err = 0;
     while (!EMU.quit)
     {
@@ -322,11 +313,14 @@ static int emu_do_run_with_intr(void)
         if (EMU.cpu.halt)
         {
             if (!keyintr_wait())
+            {
+                keyintr_end();
                 return EMU_EKEYINTR;
-
+            }
             i8080_interrupt(&EMU.cpu);
         }
     }
+    keyintr_end();
     return check_err(i80err);
 }
 

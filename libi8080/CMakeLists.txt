@@ -10,7 +10,7 @@ target_include_directories(i8080 PUBLIC
 )
 
 if (MSVC)
-	target_compile_options(i8080 PRIVATE /WX)
+	target_compile_options(i8080 PRIVATE /W3 /WX)
 else()
 	target_compile_options(i8080 PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()

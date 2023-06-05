@@ -3,18 +3,15 @@
 #define KEYINTR_HPP
 
 extern bool keyintr_initlzd;
-extern bool keyintr_sigsset;
 
 // First-time init.
 bool keyintr_init(void);
 
-void keyintr_destroy(void);
+// Start listening for keyboard interrupts.
+bool keyintr_start(void);
 
-// Start intercepting keyboard interrupts.
-bool keyintr_setsigs(void);
-
-// Stop intercepting keyboard interrupts.
-void keyintr_resetsigs(void);
+// Stop listening for keyboard interrupts.
+void keyintr_end(void);
 
 // Wait for a keyboard interrupt.
 // Returns true on success.

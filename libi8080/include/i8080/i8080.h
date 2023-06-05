@@ -21,17 +21,15 @@ struct i8080
     i8080_addr_t sp; /* Stack pointer */
     i8080_addr_t pc; /* Program counter */
 
-    unsigned s : 1;  /* Sign flag */
-    unsigned z : 1;  /* Zero flag */
-    unsigned cy : 1; /* Carry flag */
-    unsigned ac : 1; /* Aux carry flag */
-    unsigned p : 1;  /* Parity flag */
+    i8080_word_t s : 1;  /* Sign flag */
+    i8080_word_t z : 1;  /* Zero flag */
+    i8080_word_t cy : 1; /* Carry flag */
+    i8080_word_t ac : 1; /* Aux carry flag */
+    i8080_word_t p : 1;  /* Parity flag */
 
-    unsigned inte : 1; /* Interrupt enable */
-    unsigned intr : 1; /* Interrupt pending */
-
-    /* See HLT. */
-    unsigned halt : 1;
+    i8080_word_t inte : 1; /* Interrupt enable */
+    i8080_word_t intr : 1; /* Interrupt pending */
+    i8080_word_t halt : 1; /* See HLT. */
 
     /* Clock cycles */
     i8080_cycles_t cycles;
@@ -76,9 +74,6 @@ int i8080_next(struct i8080* const cpu);
 /* If interrupts are enabled, intr_read() is called */
 /* shortly after to acknowledge the interrupt.*/
 void i8080_interrupt(struct i8080* const cpu);
-
-/* Get description of error code. */
-const char* i8080_strerror(int err);
 
 #ifdef __cplusplus
 }

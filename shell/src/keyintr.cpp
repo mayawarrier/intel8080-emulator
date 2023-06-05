@@ -39,12 +39,12 @@ static inline ::ssize_t do_write(int fd, const char(&msg)[N])
 template <std::size_t N>
 static void safe_fatal(const char(&msg)[N]) noexcept
 {
-    do_write(STDERR_FILENO, "\n\033[1;31mi8080emu: fatal: ");
+    do_write(STDERR_FILENO, "\n\033[1;33mi8080emu: fatal: ");
     do_write(STDERR_FILENO, msg);
     do_write(STDERR_FILENO, "\033[0m\n");
     std::abort();
 }
-#else
+#endif
 static void fatal(const char* format, ...) noexcept
 {
     std::va_list args;
@@ -55,7 +55,6 @@ static void fatal(const char* format, ...) noexcept
     va_end(args);
     std::abort();
 }
-#endif
 
 #if defined(EMU_USING_POSIX_KEYINTR)
 static const int keyintr_sigs[] = { SIGINT, SIGTSTP };
@@ -64,7 +63,7 @@ static const int keyintr_sigs[] = { SIGINT, SIGTSTP };
 static sem_t keyintr_sem;
 static struct sigaction keyintr_sa;
 
-static inline bool signals(const int* sigs, int nsigs, void(*handler)(int))
+static bool signals(const int* sigs, int nsigs, void(*handler)(int))
 {
     for (int i = 0; i < nsigs; ++i)
         if (std::signal(sigs[i], handler) == SIG_ERR)
@@ -82,7 +81,7 @@ static bool sigactions(const int* sigs, int nsigs,
         {
             for (int j = 0; j < i; ++j)
                 if (::sigaction(sigs[j], &old_sas[j], NULL) == -1)
-                    safe_fatal("sigaction revert");
+                    fatal("sigaction revert errno %d", errno);
             return false;
         }
     }
@@ -92,14 +91,25 @@ static bool sigactions(const int* sigs, int nsigs,
 // Silently fails if a thread is already waiting.
 static void sem_reset(sem_t* sem)
 {
-    errno = 0;
-    while (::sem_trywait(sem) == -1 && errno == EINTR)
-        errno = 0;
-    if (!(errno == 0 || errno == EAGAIN))
-        safe_fatal("sem_reset");
+    while (true)
+    {
+        int value;
+        if (::sem_getvalue(sem, &value) == -1)
+            fatal("sem_getvalue errno %d", errno);
+
+        if (value > 0)
+        {
+            errno = 0;
+            while (::sem_trywait(sem) == -1 && errno == EINTR)
+                errno = 0;
+            if (!(errno == 0 || errno == EAGAIN))
+                fatal("sem_trywait errno %d", errno);
+        }
+        else break;
+    }
 }
 
-extern "C" void keyintr_handler(int sig)
+extern "C" void keyintr_handler(int sig) noexcept
 {
     (void)sig;
     if (!signals(keyintr_sigs, NUM_KEYINTR_SIGS, SIG_IGN))
@@ -120,10 +130,10 @@ bool keyintr_wait(void)
     while (::sem_wait(&keyintr_sem) == -1 && errno == EINTR)
         errno = 0;
     if (errno)
-        safe_fatal("sem_wait");
+        fatal("sem_wait errno %d", errno);
 
-    // just in case, since there can be a race
-    // between multiple invokes of signal/sigaction
+    // just in case, as there can be a race between
+    // signal types before all are set to SIG_IGN
     sem_reset(&keyintr_sem);
     return true;
 }
@@ -131,12 +141,12 @@ bool keyintr_wait(void)
 #elif defined(EMU_USING_WIN32_KEYINTR)
 static HANDLE keyintr_sem;
 
-static BOOL WINAPI keyintr_handler(DWORD event)
+static BOOL WINAPI keyintr_handler(DWORD event) noexcept
 {
     if (event == CTRL_C_EVENT)
     {
         if (!SetConsoleCtrlHandler(NULL, TRUE))
-            fatal("disable Ctrl+C error %d", GetLastError());
+            fatal("win32 disable Ctrl+C error %d", GetLastError());
 
         if (!ReleaseSemaphore(keyintr_sem, 1, NULL))
             fatal("ReleaseSemaphore error %d", GetLastError());
@@ -152,14 +162,13 @@ bool keyintr_wait(void)
 
     if (WaitForSingleObject(keyintr_sem, INFINITE) != WAIT_OBJECT_0)
         fatal("WaitForSingleObject error %d", GetLastError());
-
     return true;
 }
 
 #else
 static volatile std::sig_atomic_t keyintr;
 
-extern "C" void keyintr_handler(int sig)
+extern "C" void keyintr_handler(int sig) noexcept
 {
     std::signal(sig, SIG_IGN);
     keyintr = 1;
@@ -177,12 +186,33 @@ bool keyintr_wait(void)
 }
 #endif
 
-
 bool keyintr_initlzd = false;
+static bool keyintr_active = false;
+
+static void keyintr_atexit() noexcept
+{
+    if (keyintr_initlzd)
+    {
+#if defined(EMU_USING_POSIX_KEYINTR)
+        sem_reset(&keyintr_sem);
+        if (::sem_destroy(&keyintr_sem) == -1)
+            fatal("sem_destroy errno %d", errno);
+
+#elif defined(EMU_USING_WIN32_KEYINTR)
+        if (!CloseHandle(keyintr_sem))
+            fatal("CloseHandle error %d", GetLastError());
+#endif
+    }
+}
 
 bool keyintr_init(void)
 {
-    assert(!keyintr_initlzd);
+    assert(!keyintr_initlzd && !keyintr_active);
+
+    // failing to destroy a semaphore on Linux
+    // can lead to a system-wide resource leak!
+    if (std::atexit(keyintr_atexit) != 0)
+        return false;
 
 #if defined(EMU_USING_POSIX_KEYINTR)
     if (::sem_init(&keyintr_sem, 0, 0) == -1)
@@ -191,13 +221,15 @@ bool keyintr_init(void)
     keyintr_sa.sa_flags = 0;
     keyintr_sa.sa_handler = keyintr_handler;
 
-    ::sigemptyset(&keyintr_sa.sa_mask);
+    if (::sigemptyset(&keyintr_sa.sa_mask) == -1)
+        fatal("sigemptyset errno %d", errno);
+
     for (int i = 0; i < NUM_KEYINTR_SIGS; ++i)
     {
         if (::sigaddset(&keyintr_sa.sa_mask, keyintr_sigs[i]) == -1)
         {
             if (::sem_destroy(&keyintr_sem) == -1)
-                safe_fatal("sem_destroy");
+                fatal("sem_destroy errno %d", errno);
             return false;
         }
     }
@@ -212,33 +244,13 @@ bool keyintr_init(void)
     return true;
 }
 
-void keyintr_destroy(void)
+bool keyintr_start(void)
 {
-    assert(keyintr_initlzd);
-    if (keyintr_sigsset)
-        keyintr_resetsigs();
-
-#if defined(EMU_USING_POSIX_KEYINTR)
-    if (::sem_destroy(&keyintr_sem) == -1)
-        safe_fatal("sem_destroy");
-
-#elif defined(EMU_USING_WIN32_KEYINTR)
-    if (!CloseHandle(keyintr_sem))
-        fatal("CloseHandle error %d", GetLastError());
-#else
-    keyintr = 0;
-#endif
-}
-
-bool keyintr_sigsset = false;
-
-bool keyintr_setsigs(void)
-{
-    assert(keyintr_initlzd && !keyintr_sigsset);
+    assert(keyintr_initlzd && !keyintr_active);
 
 #if defined(EMU_USING_POSIX_KEYINTR)
     if (!signals(keyintr_sigs, NUM_KEYINTR_SIGS, SIG_IGN)) {
-        keyintr_resetsigs();
+        keyintr_end();
         return false;
     }
 #elif defined(EMU_USING_WIN32_KEYINTR)
@@ -248,34 +260,34 @@ bool keyintr_setsigs(void)
     // add the handler once. resetting the handler after each signal
     // is not possible as the handler runs on a new thread
     if (!SetConsoleCtrlHandler(keyintr_handler, TRUE)) {
-        keyintr_resetsigs();
+        keyintr_end();
         return false;
     }
 #else
     if (std::signal(SIGINT, SIG_IGN) == SIG_ERR)
         return false;
 #endif
-    keyintr_sigsset = true;
+    keyintr_active = true;
     return true;
 }
 
-void keyintr_resetsigs(void)
+void keyintr_end(void)
 {
-    assert(keyintr_initlzd && keyintr_sigsset);
+    assert(keyintr_initlzd && keyintr_active);
 
 #if defined(EMU_USING_POSIX_KEYINTR)
     if (!signals(keyintr_sigs, NUM_KEYINTR_SIGS, SIG_DFL))
-        safe_fatal("signals SIG_DFL");
+        fatal("signals SIG_DFL errno %d", errno);
 
 #elif defined(EMU_USING_WIN32_KEYINTR)
     if (!SetConsoleCtrlHandler(keyintr_handler, FALSE))
-        fatal("remove handler error %d", GetLastError());
+        fatal("win32 remove keyintr_handler error %d", GetLastError());
 
     if (!SetConsoleCtrlHandler(NULL, FALSE))
-        fatal("enable Ctrl+C error %d", GetLastError());
+        fatal("win32 enable Ctrl+C error %d", GetLastError());
 #else
     if (std::signal(SIGINT, SIG_DFL) == SIG_ERR)
         fatal("signal SIG_DFL");
 #endif
-    keyintr_sigsset = false;
+    keyintr_active = false;
 }

@@ -102,6 +102,6 @@ int main(int argc, char** argv)
         if (emu_run() != 0)
             return bail("fail run");
 
-        emu_destroy();
+        //emu_destroy();
     }
 }

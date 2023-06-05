@@ -2,7 +2,7 @@
 #ifndef I8080_TYPES_H
 #define I8080_TYPES_H
 
-#if !defined(I8080_NO_STDLIB)
+#ifndef I8080_NO_STDLIB
 #include <limits.h>
 #endif
 
