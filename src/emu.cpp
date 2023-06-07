@@ -1,6 +1,7 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <cstdarg>
 #include <cstring>
 #include <climits>
 #include <string>
@@ -20,10 +21,6 @@ static struct emu
     bool quit;
     int err;
     emu_opts opts;
-
-    // testing
-    bool rcrd_con;
-    std::string conout;
 }
 EMU;
 
@@ -31,9 +28,17 @@ EMU;
 
 void emu_vprinterr(const char* format, std::va_list vlist) noexcept
 {
-    std::fputs("\n\033[1;31mi8080emu: error: ", stderr);
+    std::fputs("i8080emu: \033[1;31merror:\033[0m ", stderr);
     std::vfprintf(stderr, format, vlist);
-    std::fputs("\033[0m\n", stderr);
+    std::fputs("\n", stderr);
+}
+
+void emu_printerr(const char* format, ...) noexcept
+{
+    std::va_list args;
+    va_start(args, format);
+    emu_vprinterr(format, args);
+    va_end(args);
 }
 
 static i8080_word_t intr_read(const i8080*) noexcept { return i8080_NOP; }
@@ -65,23 +70,6 @@ static i8080_word_t io_read(const i8080* cpu, i8080_word_t port) noexcept
     return 0;
 }
 
-static void emu_putchar(i8080_word_t c) noexcept
-{
-    std::putchar(c);
-
-    if (EMU.rcrd_con) {
-        // try-catch, just in case
-        try {
-            EMU.conout.push_back(char(c));
-        }
-        catch (...) {
-            emu_printerr("Out of memory");
-            EMU.quit = true;
-            EMU.err = EMU_EEXC;
-        }
-    }
-}
-
 static bool emu_cpm80_call(const i8080* cpu, i8080_addr_t addr) noexcept
 {
     switch (addr)
@@ -97,7 +85,7 @@ static bool emu_cpm80_call(const i8080* cpu, i8080_addr_t addr) noexcept
         switch (callno)
         {          
         case 2: // print char
-            emu_putchar(cpu->e);
+            std::putchar(cpu->e);
             break;
     
         case 9: // print $-terminated string
@@ -105,7 +93,7 @@ static bool emu_cpm80_call(const i8080* cpu, i8080_addr_t addr) noexcept
             i8080_word_t c;
             i8080_addr_t ptr = wordconcat(cpu->d, cpu->e);
             while ((c = EMU.mem[ptr++]) != '$')
-                emu_putchar(c);
+                std::putchar(c);
             break;
         }
         default:
@@ -138,8 +126,8 @@ static void cpm80_io_write(const i8080* cpu, i8080_word_t port, i8080_word_t wor
 
 // https://obsolescence.wixsite.com/obsolescence/cpm-internals  
 static constexpr auto cpm80_lowsize = 0x100u;
-// minimum possible size = CCP + BDOS
-static constexpr auto cpm80_highsize = 0x1600u;
+static constexpr auto emu_memsize = 65536u;  // 64K
+using memsize_t = decltype(65536u);
 
 // Injected at operating system call locations.
 static constexpr i8080_word_t emu_call[] = { i8080_OUT, 0xff, i8080_RET };
@@ -149,7 +137,7 @@ int emu_init(emu_opts opts)
 {
     if (!EMU.mem)
     {
-        EMU.mem.reset(new i8080_word_t[65536]); // 64K
+        EMU.mem.reset(new i8080_word_t[emu_memsize]);
         EMU.cpu.mem_read = mem_read;
         EMU.cpu.mem_write = mem_write;
         EMU.cpu.io_read = io_read;
@@ -160,7 +148,7 @@ int emu_init(emu_opts opts)
     {
         // CP/M reserved RST 7 for debuggers like DDT!
         // can intercept this to detect if the CPU is executing garbage memory
-        std::memset(EMU.mem.get(), i8080_RST_7, 65536 * sizeof(i8080_word_t));
+        std::memset(EMU.mem.get(), i8080_RST_7, emu_memsize * sizeof(i8080_word_t));
         std::memcpy(&EMU.mem[0x0038], emu_call, sizeof(emu_call));
 
         std::memcpy(&EMU.mem[0x0000], emu_call, sizeof(emu_call)); // WBOOT
@@ -172,50 +160,51 @@ int emu_init(emu_opts opts)
 
     EMU.quit = false;
     EMU.err = 0;
-    EMU.opts = opts;
-    // testing
-    EMU.rcrd_con = false;
-    EMU.conout.clear();    
+    EMU.opts = opts;  
     return 0;
 }
 
 void emu_destroy(void)
 {
     EMU.mem.reset();
-    std::string().swap(EMU.conout);
+}
+
+// VS C4127
+static constexpr bool word_t_is_byte(void)
+{
+    return sizeof(i8080_word_t) == 1;
 }
 
 int emu_load(const char* filepath)
 {
     std::FILE* fs = std::fopen(filepath, "rb");
     if (!fs) {
-        emu_printerr("%s could not be opened.", filepath);
+        emu_printerr("Could not open %s", filepath);
         return EMU_EFILE;
     }
 
-    auto max_binsize = 65536u; // 64K
+    auto max_binsize = emu_memsize;
     i8080_word_t* binp = EMU.mem.get();
     if (EMU.opts.use_cpm_con)
     {
-        max_binsize -= (cpm80_lowsize + cpm80_highsize);
+        max_binsize -= cpm80_lowsize;
         binp += cpm80_lowsize;
     }
 
-    constexpr bool word_is_uchar = sizeof(i8080_word_t) == 1; // VS C4127
-    if (word_is_uchar)
+    if (word_t_is_byte())
     {
         auto n = std::fread(binp, 1, max_binsize, fs);
         (void)n; // Werror=unused-result
     }
     else { 
-        decltype(max_binsize) i = 0; int c;
+        memsize_t i = 0; int c;
         while ((c = std::fgetc(fs)) != EOF && i < max_binsize)
             binp[i++] = i8080_word_t(c);
     }
     if (std::ferror(fs))
     {
         std::fclose(fs);
-        emu_printerr("%s could not be read.", filepath);
+        emu_printerr("Could not read %s", filepath);
         return EMU_EFILE;
     }
     else if (!std::feof(fs))
@@ -264,36 +253,54 @@ static std::string i8080_dbginfo(const i8080* cpu)
     addfmt(ret, buf, "inte=%u\n", cpu->inte);
     addfmt(ret, buf, "intr=%u\n", cpu->intr);
     addfmt(ret, buf, "halt=%u\n", cpu->halt);
-    addfmt(ret, buf, "cycles=%llu", cpu->cycles);   
+    addfmt(ret, buf, "cycles=%llu\n", cpu->cycles);   
     return ret;
 }
 
-const char* emu_errname(int err) noexcept
+static const char* emu_errname(int err) noexcept
 {
     switch (err)
     {
     case EMU_EKEYINTR: return "EMU_EKEYINTR";
     case EMU_EFILE: return "EMU_EFILE";
-    case EMU_EEXC: return "EMU_EEXC";
     case EMU_EHNDLR: return "EMU_EHNDLR";
     case EMU_EOPCODE: return "EMU_EOPCODE";
     case EMU_EBDOS: return "EMU_EBDOS";
     case EMU_EDBGR: return "EMU_EDBGR";
-    default: return "";
+    default: return "Unknown error";
     }
 }
 
-static int check_err(int i80err)
+void emu_errexit(int err)
 {
-    int err = EMU.quit ? EMU.err : i80err;
-    if (err)
-    {
+    if (err != EMU_EFILE) // already printed
         emu_printerr("%s", emu_errname(err));
-        std::fputs("\033[1;33mCPU status:\n", stderr);
-        std::fputs(i8080_dbginfo(&EMU.cpu).c_str(), stderr);
-        std::fputs("\033[0m\n", stderr);
+
+    if (err > 0) // no need otherwise
+    {
+        std::FILE* fs = std::fopen("dump.txt", "wb");
+        if (!fs) {
+            std::fputs("Could not open dump file\n", stderr);
+            std::exit(EXIT_FAILURE);
+        }
+
+        std::fputs("CPU status:\n", fs);
+        std::fputs(i8080_dbginfo(&EMU.cpu).c_str(), fs);
+        std::fputs("\n", fs);
+
+        std::fputs("Memory:\n", fs);
+        if (word_t_is_byte())
+            std::fwrite(EMU.mem.get(), 1, emu_memsize, fs);
+        else {
+            memsize_t i = 0;
+            while (std::fputc(EMU.mem[i++], fs) != EOF && i < emu_memsize);
+        }
+
+        std::fclose(fs);
+        std::fputs("Saved dump file to dump.txt\n", stderr);
     }
-    return err;
+
+    std::exit(EXIT_FAILURE);
 }
 
 static int emu_do_run_with_intr(void)
@@ -321,7 +328,7 @@ static int emu_do_run_with_intr(void)
         }
     }
     keyintr_end();
-    return check_err(i80err);
+    return EMU.quit ? EMU.err : i80err;
 }
 
 static int emu_do_run(void)
@@ -332,7 +339,7 @@ static int emu_do_run(void)
         i80err = i8080_next(&EMU.cpu);
         if (i80err) break;
     }
-    return check_err(i80err);
+    return EMU.quit ? EMU.err : i80err;
 }
 
 int emu_run(void)

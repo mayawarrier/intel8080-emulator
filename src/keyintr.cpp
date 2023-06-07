@@ -39,9 +39,9 @@ static inline ::ssize_t do_write(int fd, const char(&msg)[N])
 template <std::size_t N>
 static void safe_fatal(const char(&msg)[N]) noexcept
 {
-    do_write(STDERR_FILENO, "\n\033[1;33mi8080emu: fatal: ");
+    do_write(STDERR_FILENO, "i8080emu: \033[1;31mfatal:\033[0m ");
     do_write(STDERR_FILENO, msg);
-    do_write(STDERR_FILENO, "\033[0m\n");
+    do_write(STDERR_FILENO, "\n");
     std::abort();
 }
 #endif
@@ -49,9 +49,9 @@ static void fatal(const char* format, ...) noexcept
 {
     std::va_list args;
     va_start(args, format);
-    std::fputs("\n\033[1;33mi8080emu: fatal: ", stderr);
+    std::fputs("i8080emu: \033[1;31mfatal:\033[0m ", stderr);
     std::vfprintf(stderr, format, args);
-    std::fputs("\033[0m\n", stderr);
+    std::fputs("\n", stderr);
     va_end(args);
     std::abort();
 }
