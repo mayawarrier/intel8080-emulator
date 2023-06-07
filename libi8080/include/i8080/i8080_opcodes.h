@@ -1,13 +1,6 @@
-/*
- * All the opcodes in the INTEL 8080.
- * Roughly categorized by instruction type.
- *
- * Conditional RETs and CALLs take 6 extra cycles if the condition succeeds.
- * ALT_s are undocumented opcodes and are alternatives for existing opcodes.
- */
 
-#ifndef OPCODES_H
-#define OPCODES_H
+#ifndef I8080_OPCODES_H
+#define I8080_OPCODES_H
                                 /*    size       flags       details                           cycles  */
 #define i8080_NOP 0x00          /*      1                    no operation                         4    */
 #define i8080_LXI_B 0x01        /*      3                    B <- byte 3, C <- byte 2             10   */
@@ -52,9 +45,9 @@
 #define i8080_INR_H 0x24        /*      1       Z,S,P,AC     H <- H + 1                           5    */
 #define i8080_DCR_H 0x25        /*      1       Z,S,P,AC     H <- H - 1                           5    */
 #define i8080_MVI_H 0x26        /*      2                    H <- byte 2                          7    */
-#define i8080_DAA 0x27          /*      1       Z,S,P,AC     A to BCD, add 6 to lower nibble      
-                                                             if AC or > 9, add 6 to higher
-                                                             nibble if CY or > 9                  4    */
+#define i8080_DAA 0x27          /*      1       Z,S,P,AC     A to decimal. add 6 to lower nibble      
+                                                             if > 9 or AC set, add 6 to higher
+                                                             nibble if > 9 or CY set              4    */
 #define i8080_ALT_NOP4 0x28
 
 #define i8080_DAD_H 0x29        /*      1       CY           HL <- HL + HL                        10   */
@@ -73,7 +66,7 @@
 #define i8080_DCR_M 0x35        /*      1       Z,S,P,AC     [HL] <- [HL] - 1                     10   */
 #define i8080_MVI_M 0x36        /*      2                    [HL] <- byte 2                       10   */
 #define i8080_STC 0x37          /*      1       CY           CY = 1                               4    */
-#define i8080_EMU_EXT_CALL 0x38 /*      Calls emu_ext_call() with the cpu context.                     */
+#define i8080_ALT_NOP6 0x38
 
 #define i8080_DAD_SP 0x39       /*      1       CY           HL <- HL + SP                        10   */
 #define i8080_LDA 0x3a          /*      3                    A <- [adr]                           13   */
@@ -138,8 +131,8 @@
 #define i8080_MOV_M_E 0x73      /*      1                    [HL] <- E                            7    */
 #define i8080_MOV_M_H 0x74      /*      1                    [HL] <- H                            7    */
 #define i8080_MOV_M_L 0x75      /*      1                    [HL] <- L                            7    */
-#define i8080_HLT 0x76          /*      1                    halt, S0, S1 = 0, interrupt
-                                                             brings it out of this state          7    */
+#define i8080_HLT 0x76          /*      1                    halt, cleared by interrupt/reset     7    */
+
 #define i8080_MOV_M_A 0x77      /*      1                    [HL] <- A                            7    */
 #define i8080_MOV_A_B 0x78      /*      1                    A <- B                               5    */
 #define i8080_MOV_A_C 0x79      /*      1                    A <- C                               5    */
@@ -232,7 +225,7 @@
 #define i8080_CNZ 0xc4          /*      3                    if NZ, CALL adr                      17/11*/
 #define i8080_PUSH_B 0xc5       /*      1                    {[SP-1],[SP-2]}={B,C}, SP <- SP - 2  11   */
 #define i8080_ADI 0xc6          /*      2       Z,S,P,CY,AC  A <- A + byte 2                      7    */
-#define i8080_RST_0 0xc7        /*      1                    CALL $0 interrupt vector             11   */
+#define i8080_RST_0 0xc7        /*      1                    CALL interrupt handler at 0x0        11   */
 #define i8080_RZ 0xc8           /*      1                    if Z, perform RET                    11/5 */
 #define i8080_RET 0xc9          /*      1                    PC = {[SP + 1], [SP]}, SP <- SP + 2  10   */
 #define i8080_JZ 0xca           /*      3                    if Z, perform JMP                    10   */
@@ -240,7 +233,7 @@
 #define i8080_CZ 0xcc           /*      3                    if Z, CALL adr                       17/11*/
 #define i8080_CALL 0xcd         /*      3                    PUSH PC, PC <- adr                   17   */
 #define i8080_ACI 0xce          /*      2       Z,S,P,CY,AC  A <- A + byte 2 + CY                 7    */
-#define i8080_RST_1 0xcf        /*      1                    CALL $8 interrupt vector             11   */
+#define i8080_RST_1 0xcf        /*      1                    CALL interrupt handler at 0x8        11   */
 
 #define i8080_RNC 0xd0          /*      1                    if NCY, perform RET                  11/5 */
 #define i8080_POP_D 0xd1        /*      1                    DE = {[SP + 1], [SP]}, SP <- SP + 2  10   */
@@ -249,7 +242,7 @@
 #define i8080_CNC 0xd4          /*      3                    if NCY, CALL adr                     17/11*/
 #define i8080_PUSH_D 0xd5       /*      1                    {[SP-1],[SP-2]}={D,E}, SP <- SP - 2  11   */
 #define i8080_SUI 0xd6          /*      2       Z,S,P,CY,AC  A <- A - byte 2                      7    */
-#define i8080_RST_2 0xd7        /*      1                    CALL $10 interrupt vector            11   */
+#define i8080_RST_2 0xd7        /*      1                    CALL interrupt handler at 0x10       11   */
 #define i8080_RC 0xd8           /*      1                    if CY, perform RET                   11/5 */
 #define i8080_ALT_RET0 0xd9
 #define i8080_JC 0xda           /*      3                    if CY, perform JMP                   10   */
@@ -257,7 +250,7 @@
 #define i8080_CC 0xdc           /*      3                    if CY, CALL adr                      17/11*/
 #define i8080_ALT_CALL0 0xdd
 #define i8080_SBI 0xde          /*      2       Z,S,P,CY,AC  A <- A - byte 2 - CY                 7    */
-#define i8080_RST_3 0xdf        /*      1                    CALL $18 interrupt vector            11   */
+#define i8080_RST_3 0xdf        /*      1                    CALL interrupt handler at 0x18       11   */
 
 #define i8080_RPO 0xe0          /*      1                    if P odd, perform RET                11/5 */
 #define i8080_POP_H 0xe1        /*      1                    HL = {[SP + 1], [SP]}, SP <- SP + 2  10   */
@@ -266,15 +259,15 @@
 #define i8080_CPO 0xe4          /*      3                    if P odd, CALL adr                   17/11*/
 #define i8080_PUSH_H 0xe5       /*      1                    {[SP-1],[SP-2]}={H,L}, SP <- SP - 2  11   */
 #define i8080_ANI 0xe6          /*      2       Z,S,P,CY,AC  A <- A & byte 2                      7    */
-#define i8080_RST_4 0xe7        /*      1                    CALL $20 interrupt vector            11   */
+#define i8080_RST_4 0xe7        /*      1                    CALL interrupt handler at 0x20       11   */
 #define i8080_RPE 0xe8          /*      1                    if P even, perform RET               11/5 */
 #define i8080_PCHL 0xe9         /*      1                    PC <- HL                             5    */
 #define i8080_JPE 0xea          /*      3                    if P even, perform JMP               10   */
-#define i8080_XCHG 0xeb         /*      1                    HL <-> DE                            5    */
+#define i8080_XCHG 0xeb         /*      1                    HL <-> DE                            4    */
 #define i8080_CPE 0xec          /*      3                    if P even, CALL adr                  17/11*/
 #define i8080_ALT_CALL1 0xed
 #define i8080_XRI 0xee          /*      2       Z,S,P,CY,AC  A <- A ^ byte 2                      7    */
-#define i8080_RST_5 0xef        /*      1                    CALL $28 interrupt vector            11   */
+#define i8080_RST_5 0xef        /*      1                    CALL interrupt handler at 0x28       11   */
 
 #define i8080_RP 0xf0           /*      1                    if !S i.e. positive, perform RET     11/5 */
 #define i8080_POP_PSW 0xf1      /*      1                    {A,flags}={[SP+1],[SP]},SP<-SP+2     10   */
@@ -283,7 +276,7 @@
 #define i8080_CP 0xf4           /*      3                    if !S i.e. positive, CALL adr        17/11*/
 #define i8080_PUSH_PSW 0xf5     /*      1                    {[SP-1],[SP-2]}={A,flags}, SP<-SP-2  11   */
 #define i8080_ORI 0xf6          /*      2       Z,S,P,CY,AC  A <- A | byte 2                      7    */
-#define i8080_RST_6 0xf7        /*      1                    CALL $30 interrupt vector            11   */
+#define i8080_RST_6 0xf7        /*      1                    CALL interrupt handler at 0x30       11   */
 #define i8080_RM 0xf8           /*      1                    if S i.e. negative, perform RET      11/5 */
 #define i8080_SPHL 0xf9         /*      1                    SP <- HL                             5    */
 #define i8080_JM 0xfa           /*      3                    if S i.e. negative, perform JMP      10   */
@@ -291,6 +284,6 @@
 #define i8080_CM 0xfc           /*      3                    if S i.e. negative, CALL adr         17/11*/
 #define i8080_ALT_CALL2 0xfd
 #define i8080_CPI 0xfe          /*      2       Z,S,P,CY,AC  A - byte 2                           7    */
-#define i8080_RST_7 0xff        /*      1                    CALL $38 interrupt vector            11   */
+#define i8080_RST_7 0xff        /*      1                    CALL interrupt handler at 0x38       11   */
 
-#endif /* OPCODES_H */
+#endif
