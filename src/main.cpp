@@ -42,10 +42,10 @@ int main(int argc, char** argv)
         cxxopts::Options opts("i8080emu", "Emulate an Intel 8080.");
         opts.add_options()
             ("h,help", "Show usage.")
-            ("con", "Emulate CP/M-80 console. Program is loaded at 0x100.",
+            ("con", "Emulate CP/M-80 console. Program will be loaded at 0x100.",
                 cxxopts::value<bool>()->default_value("true"))
-            ("kintr", "Convert keyboard interrupts to 8080 interrupts.")
-            ("f,file", "Input file.", cxxopts::value<std::string>());
+            ("kintr", "Convert Ctrl+C to 8080 interrupts.")
+            ("f,file", "Input file.", cxxopts::value<std::string>(), "<file>");
         opts.add_options("Test")
             ("t,tests", "Run tests.")
             ("testdir", "Look for test files in this directory.",

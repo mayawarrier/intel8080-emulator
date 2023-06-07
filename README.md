@@ -1,75 +1,61 @@
-
-
-
 # intel8080-emulator
 
-An emulator for the Intel 8080 microprocessor, written in C89/ANSI C. 
-Supports asynchronous interrupts and emulates part of the CP/M 2.2 BIOS for 8080 binaries that target it.
+Emulate an Intel 8080 microprocessor. Features:
+- Accurate and complete (see test results)
+- Supports async 8080 interrupts (see tests/INTERRUPT.COM)
+- Portable:
+    - The base library (libi8080) is written in C89 and is optionally freestanding (define I8080_NO_STDLIB)
+    - The command line interface is written in C++11 (GCC >= 4.9, clang >= 3.1, MSVC >= VS 2015 should work)
+    - Supports CMake versions as low as 3.1.
 
-I've tried my best to make this as portable and accurate as possible! I'd appreciate any feedback towards this goal.
+### Targets
+- libi8080: base library that can be used standalone to emulate an 8080.
+- i8080emu: command line interface to run tests or simple CP/M-80 binaries.
 
-### Portability:
-- Written in C89/ANSI C, taking advantage of C99 features if available.
-- Tested with **gcc** 6.3.0 on Debian 9, WebAssembly/**emcc** on Debian 10 through WSL with a WebAssembly-thread compatible browser (Chrome 60.0+, with the feature turned on), and with **MSVC** on Windows 8.
-- Attempt made to support async interrupts on as many environments as possible **(see i8080_predef.h and i8080_sync.c)**. This is untested, but should work on Windows versions >= XP, POSIX environments >= 199506, and GNUC compilers >= version 4.7.0.
-### Accuracy:
-- Passes test ROMs TST8080.COM (Kelly Smith test) from Microcosm Associates 1980 and CPUTEST.COM from Supersoft Associates 1981.
-- Passes test_interrupts.COM, which tests if async interrupts are synchronized and serviced correctly.
-- More tests to be added!
-### libi8080emu, libi8080
-- libi8080 is the core emulation library and can be used standalone to emulate an i8080.
-- libi8080emu wraps around libi8080 to provide debugging functionality and CP/M 2.2 BIOS emulation.
-
-## Building and running tests:
-
-**Dependencies:** git-lfs, cmake
-
-**Setup:** Install git-lfs and run `git-lfs install && git-lfs pull` in the repo directory (or use the project's CMakeLists.txt to automatically install dependencies and perform setup).
-
-**Steps to build only the libi8080 and libi8080emu libraries:**
-
-Build only the C89-compliant libraries with:
+## Building
+Install [CMake](https://cmake.org/). 
+Open terminal (or Windows Powershell), cd to the source directory and run:
 ```
-cmake . -DCMAKE_BUILD_TYPE=Release -DLIBS_ONLY=ON
+mkdir build
+cd build
+cmake ..
 cmake --build .
 ```
-**Steps to build with the command line frontend (written in C++11):**
-```
-cmake . -DCMAKE_BUILD_TYPE=Release -DFIRST_TIME_SETUP=OFF
-cmake --build .
-```
-**DFIRST_TIME_SETUP=ON** 
-- Will try to auto-install git-lfs if it is unavailable (this requires admin privileges).
-- On Windows, this will first install and configure the Chocolatey package manager, then install git-lfs through Chocolatey.
 
-### Command line tool:
-Frontend to libi8080emu, to run tests or other ROMs from the command line.
+## Running
+./i8080emu --help 
 ```
-i8080-emu, an emulator for the INTEL 8080 microprocessor with some CP/M 2.2 BIOS support.
-Supports async interrupts, CPM 2.2 BDOS ops 2 and 9, and a simple command processor at CP/M WBOOT.
+Emulate an Intel 8080.
+Usage:
+  i8080emu [OPTION...]
 
-Usage: i8080-emu [options]
-Options:
-   -h   --help                  Print this help message.
-   -e   --env ENV               Set the environment. "default" or "cpm".
-   -f   --file FILE             Execute the file as i8080 binary.
-   --run-all-tests              Run all the test files under tests/.
-```
---run-all-tests:
-```
+  -h, --help         Show usage.
+      --con          Emulate CP/M-80 console. Program is loaded at 0x100.
+                     (default: true)
+      --kintr        Convert Ctrl+C to 8080 interrupts.
+  -f, --file <file>  Input file.
 
--------------------------- Test 1: TST8080.COM --------------------------
-                8080/8085 CPU Diagnostic, Kelly Smith, 1980
--------------------------------------------------------------------------
+ Test options:
+  -t, --tests          Run tests.
+      --testdir <dir>  Look for test files in this directory. (default:
+                       tests)
+
+```
+./i8080emu --kintr -f tests/INTERRUPT.COM
+```
+Waiting for interrupt...
+^CReceived, exit to DOS.
+```
+./i8080emu --tests 
+```
+********** Running test 1/4: TST8080.COM
 MICROCOSM ASSOCIATES 8080/8085 CPU DIAGNOSTIC
  VERSION 1.0  (C) 1980
 
  CPU IS OPERATIONAL
--------------------------------------------------------------------------
+**********
 
--------------------------- Test 2: CPUTEST.COM --------------------------
-        Supersoft Associates CPU test, Diagnostics II suite, 1981
--------------------------------------------------------------------------
+********** Running test 2/4: CPUTEST.COM
 
 DIAGNOSTICS II V1.2 - CPU TEST
 COPYRIGHT (C) 1981 - SUPERSOFT ASSOCIATES
@@ -80,18 +66,47 @@ BEGIN TIMING TEST
 END TIMING TEST
 CPU TESTS OK
 
--------------------------------------------------------------------------
+**********
 
----------------------- Test 3: test_interrupts.COM ----------------------
-                Prints '+' in a loop for 0.2s, then returns to
-                WBOOT upon receiving interrupt.
--------------------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
--------------------------------------------------------------------------
+********** Running test 3/4: 8080PRE.COM
+8080 Preliminary tests complete
+**********
 
-3/3 tests passed.
+********** Running test 4/4: 8080EXM.COM
+8080 instruction exerciser
+dad <b,d,h,sp>................  PASS! crc is:14474ba6
+aluop nn......................  PASS! crc is:9e922f9e
+aluop <b,c,d,e,h,l,m,a>.......  PASS! crc is:cf762c86
+<daa,cma,stc,cmc>.............  PASS! crc is:bb3f030c
+<inr,dcr> a...................  PASS! crc is:adb6460e
+<inr,dcr> b...................  PASS! crc is:83ed1345
+<inx,dcx> b...................  PASS! crc is:f79287cd
+<inr,dcr> c...................  PASS! crc is:e5f6721b
+<inr,dcr> d...................  PASS! crc is:15b5579a
+<inx,dcx> d...................  PASS! crc is:7f4e2501
+<inr,dcr> e...................  PASS! crc is:cf2ab396
+<inr,dcr> h...................  PASS! crc is:12b2952c
+<inx,dcx> h...................  PASS! crc is:9f2b23c0
+<inr,dcr> l...................  PASS! crc is:ff57d356
+<inr,dcr> m...................  PASS! crc is:92e963bd
+<inx,dcx> sp..................  PASS! crc is:d5702fab
+lhld nnnn.....................  PASS! crc is:a9c3d5cb
+shld nnnn.....................  PASS! crc is:e8864f26
+lxi <b,d,h,sp>,nnnn...........  PASS! crc is:fcf46e12
+ldax <b,d>....................  PASS! crc is:2b821d5f
+mvi <b,c,d,e,h,l,m,a>,nn......  PASS! crc is:eaa72044
+mov <bcdehla>,<bcdehla>.......  PASS! crc is:10b58cee
+sta nnnn / lda nnnn...........  PASS! crc is:ed57af72
+<rlc,rrc,ral,rar>.............  PASS! crc is:e0d89235
+stax <b,d>....................  PASS! crc is:2b0471e9
+Tests complete
+**********
 ```
+
+
 ## Helpful resources:
-- [superzazu's 8080 emulator](https://github.com/superzazu/8080)
-- [Detecting OS types using compiler macros](http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system)
-- [Overview of the CP/M BIOS](https://www.seasip.info/Cpm/bios.html)
+ * [8080 Programming manual](https://altairclone.com/downloads/manuals/8080%20Programmers%20Manual.pdf)
+ * [RadioShack's 8080 manual](https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel)
+ * [8080 Opcode table](http://pastraiser.com/cpu/i8080/i8080_opcodes.html)
+ * [Detecting OS types using compiler macros](https://web.archive.org/web/20191012035921/http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system)
+* [Overview of the CP/M BIOS](https://www.seasip.info/Cpm/bios.html)
