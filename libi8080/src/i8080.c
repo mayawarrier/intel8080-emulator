@@ -284,7 +284,7 @@ static inline void i8080_rar(struct i8080* const cpu) {
 }
 
 /* Decimal adjust accumulator (convert to 4-bit BCD). */
-static void i8080_daa(struct i8080* const cpu) {
+static inline void i8080_daa(struct i8080* const cpu) {
     i8080_word_t lo = word_lo(cpu->a);
     i8080_word_t hi = word_hi(cpu->a);
     /* units */
@@ -377,8 +377,8 @@ static int i8080_exec(struct i8080* const cpu, i8080_word_t opcode) {
     switch (opcode)
     {
     /* NOPs. Do nothing. */
-    case i8080_NOP: case i8080_ALT_NOP0: case i8080_ALT_NOP1: case i8080_ALT_NOP2:
-    case i8080_ALT_NOP3: case i8080_ALT_NOP4: case i8080_ALT_NOP5: case i8080_ALT_NOP6:
+    case i8080_NOP: case i8080_UD_NOP1: case i8080_UD_NOP2: case i8080_UD_NOP3:
+    case i8080_UD_NOP4: case i8080_UD_NOP5: case i8080_UD_NOP6: case i8080_UD_NOP7:
         break;
 
     /* Move between registers */
@@ -590,8 +590,8 @@ static int i8080_exec(struct i8080* const cpu, i8080_word_t opcode) {
     case i8080_POP_PSW: set_psw(cpu, i8080_pop(cpu)); break;
 
     /* Call subroutine */
-    case i8080_CALL: case i8080_ALT_CALL0:
-    case i8080_ALT_CALL1: case i8080_ALT_CALL2:
+    case i8080_CALL: case i8080_UD_CALL1:
+    case i8080_UD_CALL2: case i8080_UD_CALL3:
         i8080_call(cpu); 
         break;
     case i8080_CNZ: i8080_cond_call(cpu, !cpu->z); break;
@@ -604,7 +604,7 @@ static int i8080_exec(struct i8080* const cpu, i8080_word_t opcode) {
     case i8080_CM: i8080_cond_call(cpu, cpu->s); break;
 
     /* Return from subroutine */
-    case i8080_RET: case i8080_ALT_RET0:
+    case i8080_RET: case i8080_UD_RET:
         i8080_ret(cpu);
         break;
     case i8080_RNZ: i8080_cond_ret(cpu, !cpu->z); break;
@@ -617,7 +617,7 @@ static int i8080_exec(struct i8080* const cpu, i8080_word_t opcode) {
     case i8080_RM: i8080_cond_ret(cpu, cpu->s); break;
 
     /* Jump immediate */
-    case i8080_JMP: case i8080_ALT_JMP0:
+    case i8080_JMP: case i8080_UD_JMP:
         i8080_jmp(cpu); 
         break;
     case i8080_JNZ: i8080_cond_jmp(cpu, !cpu->z); break;

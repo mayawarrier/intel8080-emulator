@@ -97,7 +97,9 @@ static void sem_reset(sem_t* sem)
         if (::sem_getvalue(sem, &value) == -1)
             fatal("sem_getvalue errno %d", errno);
 
-        if (value > 0)
+        if (value == 0)
+            break;
+        else
         {
             errno = 0;
             while (::sem_trywait(sem) == -1 && errno == EINTR)
@@ -105,7 +107,6 @@ static void sem_reset(sem_t* sem)
             if (!(errno == 0 || errno == EAGAIN))
                 fatal("sem_trywait errno %d", errno);
         }
-        else break;
     }
 }
 

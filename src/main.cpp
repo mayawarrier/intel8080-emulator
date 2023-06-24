@@ -4,18 +4,18 @@
 #include <string>
 #include <iostream>
 
+#define CXXOPTS_NO_RTTI
 #include "cxxopts/cxxopts.hpp"
 #include "emu.hpp"
 
-
-static const std::pair<const char*, emu_opts> TESTS[] =
+static const std::pair<const char*, emu_opts> TESTS[] = 
 {
     {"TST8080.COM", emu_opts()},
     {"CPUTEST.COM", emu_opts()},
     {"8080PRE.COM", emu_opts()},
     {"8080EXM.COM", emu_opts()}
 };
-#define NUM_TESTS 4
+static constexpr auto NUM_TESTS = sizeof(TESTS) / sizeof(TESTS[0]);
 
 static int bail(const char* format, ...) noexcept
 {
@@ -26,14 +26,14 @@ static int bail(const char* format, ...) noexcept
     return EXIT_FAILURE;
 }
 
-static int run(std::string file, emu_opts opts)
+static int run(const std::string& file, emu_opts opts)
 {
     int e;
     if ((e = emu_init(opts)) != 0 ||
         (e = emu_load(file.c_str())) != 0 ||
         (e = emu_run()) != 0)
-        emu_errexit(e);
-    return e;
+        return e;
+    return 0;
 }
 
 int main(int argc, char** argv)
@@ -68,8 +68,9 @@ int main(int argc, char** argv)
                 std::cout << i + 1 << "/" << NUM_TESTS << ": ";
                 std::cout << test.first << "\033[0m" << std::endl;
 
-                if (run(testdir + "/" + test.first, test.second) != 0)
-                    return EXIT_FAILURE;
+                int e = run(testdir + "/" + test.first, test.second);
+                if (e) emu_errexit(e);
+
                 std::cout << "\n\033[1;33m**********\033[0m\n" << std::endl;
             }
             return EXIT_SUCCESS;
@@ -82,8 +83,10 @@ int main(int argc, char** argv)
             bool conv_key_intr = res["kintr"].as<bool>();
             bool use_cpm_con = res["con"].as<bool>();
 
-            return run(file, emu_opts(conv_key_intr, use_cpm_con)) == 0 ?
-                EXIT_SUCCESS : EXIT_FAILURE;
+            int e = run(file, emu_opts(conv_key_intr, use_cpm_con));
+            if (e) emu_errexit(e);
+            
+            return EXIT_SUCCESS;
         }
     }
     catch (const cxxopts::exceptions::exception& e)
