@@ -4,7 +4,7 @@ An Intel 8080 microprocessor emulator. Features:
 - Accurate and complete (see test results below)
 - Supports async 8080 interrupts (see tests/INTERRUPT.COM)
 - Portable:
-    - The base library (libi8080) is written in C89 and is optionally freestanding (define I8080_NO_STDLIB)
+    - The base library (libi8080) is written in C89, is freestanding, and can run without a std library (define I8080_NO_STDLIB)
     - The command line interface is written in C++11 (GCC >= 4.9, clang >= 3.1, MSVC >= VS 2015 should work)
     - Supports CMake versions as low as 3.1.
 
