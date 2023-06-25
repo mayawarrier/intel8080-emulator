@@ -2,15 +2,15 @@
 
 An Intel 8080 microprocessor emulator. Features:
 - Accurate and complete (see test results below)
-- Supports async 8080 interrupts (see tests/INTERRUPT.COM)
+- Supports async 8080 interrupts (see tests/bin/INTERRUPT.COM)
 - Portable:
-    - The base library (libi8080) is written in C89, is freestanding, and can run without a std library (define I8080_NO_STDLIB)
-    - The command line interface is written in C++11 (GCC >= 4.9, clang >= 3.1, MSVC >= VS 2015 should work)
+    - libi8080 is C89-compatible, freestanding, and can run without a std library (define I8080_NO_STDLIB)
+    - Testing tool is written in C++11 (GCC >= 4.9, clang >= 3.1, MSVC >= VS 2015 should work)
     - Supports CMake versions as low as 3.1.
 
 ### Targets
 - libi8080: base library that can be used standalone to emulate an 8080.
-- i8080emu: command line interface to run tests or simple CP/M-80 binaries.
+- i8080emu: command line tool to run tests or simple CP/M-80 binaries.
 
 ## Building
 Install [CMake](https://cmake.org/). 
@@ -38,10 +38,10 @@ Usage:
  Test options:
   -t, --tests          Run tests.
       --testdir <dir>  Look for test files in this directory. (default:
-                       tests)
+                       testbin)
 
 ```
-./i8080emu --kintr -f tests/INTERRUPT.COM \
+./i8080emu --kintr -f testbin/INTERRUPT.COM \
 This test requires user input, so it does not run from --tests by default.
 ```
 Waiting for interrupt...

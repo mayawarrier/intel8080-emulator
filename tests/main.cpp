@@ -48,8 +48,8 @@ int main(int argc, char** argv)
             ("f,file", "Input file.", cxxopts::value<std::string>(), "<file>");
         opts.add_options("Test")
             ("t,tests", "Run tests.")
-            ("testdir", "Look for test files in this directory.",
-                cxxopts::value<std::string>()->default_value("tests"), "<dir>");
+            ("testdir", "Look for test binaries in this directory.",
+                cxxopts::value<std::string>()->default_value("testbin"), "<dir>");
 
         auto res = opts.parse(argc, argv);
         if (res["help"].as<bool>())

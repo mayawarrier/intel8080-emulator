@@ -66,7 +66,7 @@ static struct sigaction keyintr_sa;
 static bool signals(const int* sigs, int nsigs, void(*handler)(int))
 {
     for (int i = 0; i < nsigs; ++i)
-        if (std::signal(sigs[i], handler) == SIG_ERR)
+        if (::signal(sigs[i], handler) == SIG_ERR)
             return false;
     return true;
 }

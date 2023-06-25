@@ -1,5 +1,5 @@
 ;
-; Source for tests/INTERRUPT.COM
+; Source for INTERRUPT.COM
 ; Wait until an interrupt is received, then exit.
 ;
 
