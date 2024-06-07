@@ -4,7 +4,7 @@ An Intel 8080 microprocessor emulator. Features:
 - Accurate and complete (see test results below)
 - Supports async 8080 interrupts (see tests/bin/INTERRUPT.COM)
 - Portable:
-    - libi8080 is C89-compatible, freestanding, and can run without a std library (define I8080_NO_STDLIB)
+    - libi8080 is C89-compatible and freestanding.
     - Testing tool is written in C++11 (GCC >= 4.9, clang >= 3.1, MSVC >= VS 2015 should work)
     - Supports CMake versions as low as 3.1.
 
