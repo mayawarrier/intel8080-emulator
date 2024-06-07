@@ -250,8 +250,8 @@ static std::string i8080_dbginfo(const i8080* cpu)
     addfmt(ret, buf, "carry=%u\n", cpu->cy);
     addfmt(ret, buf, "aux-carry=%u\n", cpu->ac);
     addfmt(ret, buf, "parity=%u\n", cpu->p);
-    addfmt(ret, buf, "inte=%u\n", cpu->inte);
-    addfmt(ret, buf, "intr=%u\n", cpu->intr);
+    addfmt(ret, buf, "int_en=%u\n", cpu->int_en);
+    addfmt(ret, buf, "int_rq=%u\n", cpu->int_rq);
     addfmt(ret, buf, "halt=%u\n", cpu->halt);
     addfmt(ret, buf, "cycles=%llu\n", cpu->cycles);   
     return ret;

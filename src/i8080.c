@@ -2,6 +2,7 @@
  * references
  * Intel manual: https://altairclone.com/downloads/manuals/8080%20Programmers%20Manual.pdf
  * Tandy manual: https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel
+ * 8080 Data sheet: https://deramp.com/downloads/intel/8080%20Data%20Sheet.pdf
  * opcode table: http://pastraiser.com/cpu/i8080/i8080_opcodes.html 
  */
 
@@ -672,8 +673,8 @@ static int i8080_exec(struct i8080* const cpu, i8080_word_t opcode) {
     case i8080_RST_7: i8080_call_addr(cpu, 0x0038); break;
 
     /* Enable / disable interrupts */
-    case i8080_EI: cpu->inte = 1; break;
-    case i8080_DI: cpu->inte = 0; break;
+    case i8080_EI: cpu->int_en = 1; break;
+    case i8080_DI: cpu->int_en = 0; break;
 
     /* Halt */
     case i8080_HLT: cpu->halt = 1; break;
@@ -687,29 +688,45 @@ static int i8080_exec(struct i8080* const cpu, i8080_word_t opcode) {
 
 void i8080_reset(struct i8080* const cpu) {
     cpu->pc = 0;
-    cpu->inte = 0;
-    cpu->intr = 0;
+    cpu->int_en = 0;
+    cpu->int_rq = 0;
+    cpu->int_ff = 0;
     cpu->halt = 0;
     cpu->cycles = 0;
 }
 
-void i8080_interrupt(struct i8080* const cpu) { cpu->intr = cpu->inte; }
+void i8080_interrupt(struct i8080* const cpu) { cpu->int_rq = 1; }
 
+
+/* Follows the state transitions as closely as possible. */
+/* (8080 data sheet pg 7) */
 int i8080_next(struct i8080* const cpu) {
-    /* check interrupt first as it removes HALT */
-    if (cpu->intr) {
-        if (unlikely(!cpu->intr_read)) 
+    /* execute interrupt if there is one */
+    if (cpu->int_ff) {
+        if (unlikely(!cpu->intr_read))
             return i8080_EHNDLR;
 
-        cpu->inte = 0;
-        cpu->intr = 0;
-        cpu->halt = 0;
-
+        cpu->int_en = 0;
+        cpu->int_ff = 0;
+        cpu->int_rq = 0;
         return i8080_exec(cpu, cpu->intr_read(cpu));
     }
-    if (unlikely(cpu->halt)) 
-        return 0;
 
-    /* next from memory */
-    return i8080_exec(cpu, read_word_adv(cpu));
+    int ret;
+    if (unlikely(cpu->halt)) {
+        ret = 0;
+    }
+    else {
+        /* normal execution */
+        ret = i8080_exec(cpu, read_word_adv(cpu));
+    }
+
+    /* Sync incoming interrupt with end of */
+    /* instruction cycle (8080 data sheet pg 11). */
+    /* This delays execution by one instruction. */
+    if (cpu->int_rq && cpu->int_en) {
+        cpu->int_ff = 1;
+        cpu->halt = 0;
+    }
+    return ret;
 }

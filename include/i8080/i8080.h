@@ -1,7 +1,26 @@
 /*
  * Emulate an Intel 8080 microprocessor.
- *
  * All opcodes (0x00-0xff) are supported.
+ * 
+ * Example usage:
+ *
+ * void run_8080(uint64_t num_clk_cycles) 
+ * {
+ *     i8080 cpu;
+ *     cpu.mem_read = my_mem_read_cb;
+ *     cpu.mem_write = my_mem_write_cb;
+ *     cpu.io_read = my_io_read_cb;      // optional
+ *     cpu.io_write = my_io_write_cb;    // optional
+ *     cpu.intr_read = my_intr_read_cb;  // optional
+ *     
+ *     i8080_reset(&cpu);
+ *     
+ *     while (i8080_next(&cpu) == 0 && cpu.cycles < num_clk_cycles) {
+ *         // some code
+ *         // call i8080_interrupt(&cpu) here
+ *     }
+ *     printf("Done!");
+ * }
  */
 
 #ifndef I8080_H
@@ -15,11 +34,13 @@ extern "C" {
 
 struct i8080
 {
-    /* Working register */
+    /* Working registers */
     i8080_word_t a, b, c, d, e, h, l;
 
     i8080_addr_t sp; /* Stack pointer */
     i8080_addr_t pc; /* Program counter */
+
+    i8080_word_t int_rq; /* Interrupt request */
 
     i8080_word_t s : 1;  /* Sign flag */
     i8080_word_t z : 1;  /* Zero flag */
@@ -27,9 +48,10 @@ struct i8080
     i8080_word_t ac : 1; /* Aux carry flag */
     i8080_word_t p : 1;  /* Parity flag */
 
-    i8080_word_t inte : 1; /* Interrupt enable */
-    i8080_word_t intr : 1; /* Interrupt pending */
     i8080_word_t halt : 1; /* See HLT. */
+
+    i8080_word_t int_en : 1; /* Interrupts enabled (INTE pin) */
+    i8080_word_t int_ff : 1; /* Interrupt latch */
 
     /* Clock cycles */
     i8080_cycles_t cycles;
@@ -60,19 +82,17 @@ enum i8080_err
     i8080_EOPCODE = 2
 };
 
-/* Reset chip. */
-/* PC <= 0, interrupts are disabled, */
-/* halt cleared, and cycles set to 0. */
+/* Reset chip. Eq to low on RESET pin. */
 void i8080_reset(struct i8080* const cpu);
 
-/* Run the next instruction in memory */
-/* or service a pending interrupt. */
+/* Run one instruction. */
 /* Returns 0 on success. */
 int i8080_next(struct i8080* const cpu);
 
-/* Send an interrupt. */
-/* If interrupts are enabled, intr_read() is called */
-/* shortly after to acknowledge the interrupt.*/
+/* Send an interrupt request. */
+/* If interrupts are enabled, intr_read() will be */
+/* invoked by i8080_next() and the returned opcode */
+/* will be executed. */
 void i8080_interrupt(struct i8080* const cpu);
 
 #ifdef __cplusplus
