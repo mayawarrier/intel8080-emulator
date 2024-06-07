@@ -12,7 +12,15 @@
 #define inline
 #endif
 
-#ifdef __builtin_expect
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_expect)
+#define HAS_BUILTIN_EXPECT
+#endif
+#elif __GNUC__ >= 3
+#define HAS_BUILTIN_EXPECT
+#endif
+
+#ifdef HAS_BUILTIN_EXPECT
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 #else
@@ -42,13 +50,13 @@
 
 #define concatenate(word1, word2) (((i8080_dword_t)(word1) << 8) | (word2))
 
-#if (defined(I8080_WORD_T_MAX) && I8080_WORD_T_MAX == WORD_MAX)
+#if I8080_WORD_T_MAX == WORD_MAX
 #define limit_word(word) (word)
 #else
 #define limit_word(word) ((word) & WORD_MAX)
 #endif
 
-#if (defined(I8080_DWORD_T_MAX) && I8080_DWORD_T_MAX == DWORD_MAX)
+#if I8080_DWORD_T_MAX == DWORD_MAX
 #define limit_dword(dword) (dword)
 #else
 #define limit_dword(dword) ((dword) & DWORD_MAX)
