@@ -1,20 +1,20 @@
 # intel8080-emulator
 
-An Intel 8080 microprocessor emulator. Features:
+An Intel 8080 emulator and disassembler. Features:
 - Accurate and complete (see test results below)
 - Supports async 8080 interrupts (see tests/bin/INTERRUPT.COM)
 - Portable:
-    - libi8080 is C89-compatible and freestanding.
+    - The core library is C89-compatible and optionally freestanding (define I8080_FREESTANDING)
     - Testing tool is written in C++11 (GCC >= 4.9, clang >= 3.1, MSVC >= VS 2015 should work)
-    - Supports CMake versions as low as 3.1.
+    - Cross-platform builds via CMake, supports CMake versions as low as 3.1.
 
 ### Targets
-- libi8080: base library that can be used standalone to emulate an 8080.
+- libi8080: core 8080 emulation library.
 - i8080emu: command line tool to run tests or simple CP/M-80 binaries.
 
 ## Building
 Install [CMake](https://cmake.org/). 
-Open terminal (or Windows Powershell), cd to the source directory and run:
+Open Terminal (or Windows Powershell), cd to the source directory and run:
 ```
 mkdir build
 cd build

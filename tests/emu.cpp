@@ -314,7 +314,7 @@ static int emu_do_run_with_intr(void)
     int i80err = 0;
     while (!EMU.quit)
     {
-        i80err = i8080_next(&EMU.cpu);
+        i80err = i8080_step(&EMU.cpu);
         if (i80err) break;
 
         if (EMU.cpu.halt)
@@ -336,7 +336,7 @@ static int emu_do_run(void)
     int i80err = 0;
     while (!EMU.quit)
     {
-        i80err = i8080_next(&EMU.cpu);
+        i80err = i8080_step(&EMU.cpu);
         if (i80err) break;
     }
     return EMU.quit ? EMU.err : i80err;

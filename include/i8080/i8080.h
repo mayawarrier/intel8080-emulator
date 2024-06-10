@@ -28,6 +28,10 @@
 
 #include "i8080_types.h"
 
+#ifndef I8080_FREESTANDING
+#include <stdio.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -78,7 +82,7 @@ enum i8080_err
     /* Missing I/O or interrupt handler. */
     i8080_EHNDLR = 1,
     /* Unrecognized opcode.
-     * Only possible if opcode can be > 0xff. */
+     * Only possible if i8080_word_t is not 8-bit. */
     i8080_EOPCODE = 2
 };
 
@@ -87,11 +91,20 @@ void i8080_reset(struct i8080* const cpu);
 
 /* Run one instruction. */
 /* Returns 0 on success. */
-int i8080_next(struct i8080* const cpu);
+int i8080_step(struct i8080* const cpu);
+
+#ifndef I8080_FREESTANDING
+/* Disassemble one instruction. */
+/* This can be called before i8080_step() to print the */
+/* instruction that is about to be executed. */
+/* It can also be called in a loop to disassemble a section of memory. */
+/* Returns 0 on success. */
+int i8080_disassemble(struct i8080* const cpu, FILE* os);
+#endif
 
 /* Send an interrupt request. */
 /* If interrupts are enabled, intr_read() will be */
-/* invoked by i8080_next() and the returned opcode */
+/* invoked by i8080_step() and the returned opcode */
 /* will be executed. */
 void i8080_interrupt(struct i8080* const cpu);
 

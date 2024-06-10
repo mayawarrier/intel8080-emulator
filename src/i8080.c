@@ -2,12 +2,16 @@
  * references
  * Intel manual: https://altairclone.com/downloads/manuals/8080%20Programmers%20Manual.pdf
  * Tandy manual: https://archive.org/details/8080-8085_Assembly_Language_Programming_1977_Intel
- * 8080 Data sheet: https://deramp.com/downloads/intel/8080%20Data%20Sheet.pdf
+ * 8080 Datasheet: https://deramp.com/downloads/intel/8080%20Data%20Sheet.pdf
  * opcode table: http://pastraiser.com/cpu/i8080/i8080_opcodes.html 
  */
 
 #include "i8080/i8080.h"
 #include "i8080/i8080_opcodes.h"
+
+#ifndef I8080_FREESTANDING
+#include <string.h>
+#endif
 
 #if defined (__STDC__) && !defined(__STDC_VERSION__)
 #define inline
@@ -697,10 +701,9 @@ void i8080_reset(struct i8080* const cpu) {
 
 void i8080_interrupt(struct i8080* const cpu) { cpu->int_rq = 1; }
 
-
-/* Follows the state transitions as closely as possible. */
-/* (8080 data sheet pg 7) */
-int i8080_next(struct i8080* const cpu) {
+/* see CPU state transitions, Datasheet pg 7 */
+int i8080_step(struct i8080* const cpu) 
+{
     /* execute interrupt if there is one */
     if (cpu->int_ff) {
         if (unlikely(!cpu->intr_read))
@@ -715,14 +718,13 @@ int i8080_next(struct i8080* const cpu) {
     int ret;
     if (unlikely(cpu->halt)) {
         ret = 0;
-    }
-    else {
+    } else {
         /* normal execution */
         ret = i8080_exec(cpu, read_word_adv(cpu));
     }
 
     /* Sync incoming interrupt with end of */
-    /* instruction cycle (8080 data sheet pg 11). */
+    /* instruction cycle (Datasheet pg 11). */
     /* This delays execution by one instruction. */
     if (cpu->int_rq && cpu->int_en) {
         cpu->int_ff = 1;
@@ -730,3 +732,151 @@ int i8080_next(struct i8080* const cpu) {
     }
     return ret;
 }
+
+#ifndef I8080_FREESTANDING
+
+/* '?' indicates that the instruction is undocumented */
+static const char* OP_TO_STR[] = {
+    "nop",  "lxi", "stax", "inx", "inr", "dcr", "mvi", "rlc",
+    "?nop", "dad", "ldax", "dcx", "inr", "dcr", "mvi", "rrc",
+    "?nop", "lxi", "stax", "inx", "inr", "dcr", "mvi", "ral",
+    "?nop", "dad", "ldax", "dcx", "inr", "dcr", "mvi", "rar",
+    "?nop", "lxi", "shld", "inx", "inr", "dcr", "mvi", "daa",
+    "?nop", "dad", "lhld", "dcx", "inr", "dcr", "mvi", "cma",
+    "?nop", "lxi", "sta",  "inx", "inr", "dcr", "mvi", "stc",
+    "?nop", "dad", "lda",  "dcx", "inr", "dcr", "mvi", "cmc",
+
+    "mov", "mov", "mov", "mov", "mov", "mov", "mov", "mov",
+    "mov", "mov", "mov", "mov", "mov", "mov", "mov", "mov",
+    "mov", "mov", "mov", "mov", "mov", "mov", "mov", "mov",
+    "mov", "mov", "mov", "mov", "mov", "mov", "mov", "mov",
+    "mov", "mov", "mov", "mov", "mov", "mov", "mov", "mov",
+    "mov", "mov", "mov", "mov", "mov", "mov", "mov", "mov",
+    "mov", "mov", "mov", "mov", "mov", "mov", "hlt", "mov",
+    "mov", "mov", "mov", "mov", "mov", "mov", "mov", "mov",
+
+    "add", "add", "add", "add", "add", "add", "add", "add",
+    "adc", "adc", "adc", "adc", "adc", "adc", "adc", "adc",
+    "sub", "sub", "sub", "sub", "sub", "sub", "sub", "sub",
+    "sbb", "sbb", "sbb", "sbb", "sbb", "sbb", "sbb", "sbb",
+
+    "ana", "ana", "ana", "ana", "ana", "ana", "ana", "ana",
+    "xra", "xra", "xra", "xra", "xra", "xra", "xra", "xra",
+    "ora", "ora", "ora", "ora", "ora", "ora", "ora", "ora",
+    "cmp", "cmp", "cmp", "cmp", "cmp", "cmp", "cmp", "cmp",
+
+    "rnz", "pop",  "jnz", "jmp",  "cnz", "push",  "adi", "rst",
+    "rz",  "ret",  "jz",  "?jmp", "cz",  "call",  "aci", "rst",
+    "rnc", "pop",  "jnc", "out",  "cnc", "push",  "sui", "rst",
+    "rc",  "?ret", "jc",  "in",   "cc",  "?call", "sbi", "rst",
+    "rpo", "pop",  "jpo", "xthl", "cpo", "push",  "ani", "rst",
+    "rpe", "pchl", "jpe", "xchg", "cpe", "?call", "xri", "rst",
+    "rp",  "pop",  "jp",  "di",   "cp",  "push",  "ori", "rst",
+    "rm",  "sphl", "jm",  "ei",   "cm",  "?call", "cpi", "rst"
+};
+
+static const char* OPARGS_TO_STR[] = {
+    NULL, "b, %04xh",  "b",     "b",  "b", "b", "b, %02xh", NULL,
+    NULL, "b",         "b",     "b",  "c", "c", "c, %02xh", NULL,
+    NULL, "d, %04xh",  "d",     "d",  "d", "d", "d, %02xh", NULL,
+    NULL, "d",         "d",     "d",  "e", "e", "e, %02xh", NULL,
+    NULL, "h, %04xh",  "%04xh", "h",  "h", "h", "h, %02xh", NULL,
+    NULL, "h",         "%04xh", "h",  "l", "l", "l, %02xh", NULL,
+    NULL, "sp, %04xh", "%04xh", "sp", "m", "m", "m, %02xh", NULL,
+    NULL, "sp",        "%04xh", "sp", "a", "a", "a, %02xh", NULL,
+
+    "b, b", "b, c", "b, d", "b, e", "b, h", "b, l", "b, m", "b, a",
+    "c, b", "c, c", "c, d", "c, e", "c, h", "c, l", "c, m", "c, a",
+    "d, b", "d, c", "d, d", "d, e", "d, h", "d, l", "d, m", "d, a",
+    "e, b", "e, c", "e, d", "e, e", "e, h", "e, l", "e, m", "e, a",
+    "h, b", "h, c", "h, d", "h, e", "h, h", "h, l", "h, m", "h, a",
+    "l, b", "l, c", "l, d", "l, e", "l, h", "l, l", "l, m", "l, a",
+    "m, b", "m, c", "m, d", "m, e", "m, h", "m, l", NULL,   "m, a",
+    "a, b", "a, c", "a, d", "a, e", "a, h", "a, l", "a, m", "a, a",
+
+    "b", "c", "d", "e", "h", "l", "m", "a",
+    "b", "c", "d", "e", "h", "l", "m", "a",
+    "b", "c", "d", "e", "h", "l", "m", "a",
+    "b", "c", "d", "e", "h", "l", "m", "a",
+
+    "b", "c", "d", "e", "h", "l", "m", "a",
+    "b", "c", "d", "e", "h", "l", "m", "a",
+    "b", "c", "d", "e", "h", "l", "m", "a",
+    "b", "c", "d", "e", "h", "l", "m", "a",
+
+    NULL, "b",   "%04xh", "%04xh", "%04xh", "b",     "%02xh", "0",
+    NULL, NULL,  "%04xh", "%04xh", "%04xh", "%04xh", "%02xh", "1",
+    NULL, "d",   "%04xh", "%02xh", "%04xh", "d",     "%02xh", "2",
+    NULL, NULL,  "%04xh", "%02xh", "%04xh", "%04xh", "%02xh", "3",
+    NULL, "h",   "%04xh", NULL,    "%04xh", "h",     "%02xh", "4",
+    NULL, NULL,  "%04xh", NULL,    "%04xh", "%04xh", "%02xh", "5",
+    NULL, "psw", "%04xh", NULL,    "%04xh", "psw",   "%02xh", "6",
+    NULL, NULL,  "%04xh", NULL,    "%04xh", "%04xh", "%02xh", "7"
+};
+
+int i8080_disassemble(struct i8080* const cpu, FILE* os)
+{
+    i8080_word_t opcode = read_word_adv(cpu);
+    if (opcode > WORD_MAX) {
+        return i8080_EOPCODE;
+    }
+    const char* opname = OP_TO_STR[opcode];
+    const char* opargs = OPARGS_TO_STR[opcode];
+
+    fprintf(os, "0x%04x\t", cpu->pc);
+
+    if (opargs == NULL) {
+        fputs(opname, os);
+    }
+    else {
+        // requires special formatting
+        char fmtbuf[64];
+        strcpy(fmtbuf, "%-6s");
+        strcat(fmtbuf, opargs);
+
+        switch (opcode)
+        {
+            // 3 byte instructions
+        case i8080_LXI_B: case i8080_LXI_D:
+        case i8080_LXI_H: case i8080_LXI_SP:
+        case i8080_SHLD: case i8080_LHLD:
+        case i8080_STA: case i8080_LDA:
+        case i8080_JNZ: case i8080_JZ:
+        case i8080_JNC: case i8080_JC:
+        case i8080_JPO: case i8080_JPE:
+        case i8080_JP:  case i8080_JM:
+        case i8080_JMP: case i8080_UD_JMP:
+        case i8080_CNZ: case i8080_CZ:
+        case i8080_CNC: case i8080_CC:
+        case i8080_CPO: case i8080_CPE:
+        case i8080_CP:  case i8080_CM:
+        case i8080_CALL:
+        case i8080_UD_CALL1:
+        case i8080_UD_CALL2:
+        case i8080_UD_CALL3:
+            fprintf(os, fmtbuf, opname, read_addr_adv(cpu));
+            break;
+
+            // 2 byte instructions
+        case i8080_MVI_B: case i8080_MVI_C:
+        case i8080_MVI_D: case i8080_MVI_E:
+        case i8080_MVI_H: case i8080_MVI_L:
+        case i8080_MVI_M: case i8080_MVI_A:
+        case i8080_OUT: case i8080_IN:
+        case i8080_ADI: case i8080_ACI:
+        case i8080_SUI: case i8080_SBI:
+        case i8080_ANI: case i8080_XRI:
+        case i8080_ORI: case i8080_CPI:
+            fprintf(os, fmtbuf, opname, read_word_adv(cpu));
+            break;
+
+            // 1 byte instructions
+        default:
+            fprintf(os, fmtbuf, opname);
+            break;
+        }
+    }
+
+    return 0;
+}
+#endif

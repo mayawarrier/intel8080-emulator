@@ -17,6 +17,8 @@ target_include_directories(i8080 PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
+target_compile_definitions(i8080 PRIVATE _CRT_SECURE_NO_WARNINGS)
+
 if (MSVC)
 	target_compile_options(i8080 PRIVATE /W3 /WX)
 else()
