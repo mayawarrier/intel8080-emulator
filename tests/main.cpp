@@ -5,7 +5,7 @@
 #include <iostream>
 
 #define CXXOPTS_NO_RTTI
-#include "cxxopts/cxxopts.hpp"
+#include "cxxopts.hpp"
 #include "emu.hpp"
 
 static const std::pair<const char*, emu_opts> TESTS[] = 
